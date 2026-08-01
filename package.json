@@ -1,0 +1,45 @@
+{
+  "name": "subatom",
+  "version": "1.0.0",
+  "description": "subatom, web framework, high performance, enterprise grade",
+  "keywords": [
+    "subatom",
+    "framework",
+    "web",
+    "http",
+    "fast",
+    "rest",
+    "app",
+    "router",
+    "backend",
+    "api",
+    "server",
+    "restful",
+    "secure"
+  ],
+  "license": "MIT",
+  "author": "Kunal Chandra Das <kunalchandradasofficial@gmail.com>",
+  "engines": {
+    "node": ">= 18"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch playground/index.ts",
+    "clean": "rm -rf dist",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@types/busboy": "^1.5.4",
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "busboy": "^1.6.0"
+  }
+}
