@@ -2,20 +2,14 @@
   "extends": "./tsconfig.json",
 
   "compilerOptions": {
+    "outDir": "./dist",
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    "declarationMap": false,
+    "sourceMap": false,
     "noEmitOnError": true
   },
 
-  "include": [
-    "/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
 
-  "exclude": [
-    "playground",
-    "tests",
-    "dist",
-    "node_modules"
-  ]
+  "exclude": ["playground", "tests", "dist", "node_modules"]
 }

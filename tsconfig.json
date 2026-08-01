@@ -31,7 +31,7 @@
 
     "skipLibCheck": true,
 
-    "removeComments": false,
+    "removeComments": true,
     "noEmitOnError": true,
 
     "incremental": false
