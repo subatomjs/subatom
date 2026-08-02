@@ -1,8 +1,8 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { ServerResponse } from "node:http";
-import { basename, extname, isAbsolute, join, resolve } from "node:path";
-import { SubatomError } from "../../errors/Error";
-import { MIME_TYPES } from "../../utils/mime";
+import { basename, extname, isAbsolute, resolve } from "node:path";
+import { SubatomError } from "../../errors/Error.js";
+import { MIME_TYPES } from "../../utils/mime.js";
 
 export interface CookieOptions {
   /** Max age in milliseconds (converted to seconds per spec). */

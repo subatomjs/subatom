@@ -1,7 +1,7 @@
 // middleware/raw.ts
-import { Request } from "../http/Request";
-import { Response as SubatomResponse } from "../http/Response";
-import { parseLimit } from "../../utils/parseLimit";
+import { Request } from "../http/Request.js";
+import { Response as SubatomResponse } from "../http/Response.js";
+import { parseLimit } from "../../utils/parseLimit.js";
 
 export interface RawOptions {
   limit?: string | number;

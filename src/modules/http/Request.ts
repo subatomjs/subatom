@@ -1,7 +1,7 @@
 import { IncomingMessage } from "node:http";
 import { TLSSocket } from "node:tls";
-import { UploadFile } from "../file_upload/UploadFile";
-import { BadRequestError, PayloadTooLargeError } from "../../errors/Error";
+import { UploadFile } from "../file_upload/UploadFile.js";
+import { BadRequestError, PayloadTooLargeError } from "../../errors/Error.js";
 
 /**
  * Dictionary mapping field names to either a single UploadFile or an array of UploadFiles.

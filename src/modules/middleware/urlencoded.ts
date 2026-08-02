@@ -1,31 +1,34 @@
-// middleware/json.ts
-import { Request } from "../http/Request";
-import { Response as SubatomResponse } from "../http/Response";
-import { parseLimit } from "../../utils/parseLimit";
+// middleware/urlencoded.ts
+import querystring from "node:querystring"; // Or: import querystring from "node:querystring";
+import { Request } from "../http/Request.js";
+import { Response as SubatomResponse } from "../http/Response.js";
+import { parseLimit } from "../../utils/parseLimit.js";
 
-export interface JsonOptions {
+export interface UrlencodedOptions {
   limit?: string | number;
 }
 
-export function json(options: JsonOptions = {}) {
-  const maxBytes = parseLimit(options.limit ?? "100kb"); // Default 100kb like Express
+export function urlencoded(options: UrlencodedOptions = {}) {
+  const maxBytes = parseLimit(options.limit ?? "100kb"); // Default 100kb limit
 
   return async (
     req: Request<any, any, any, any>,
     res: SubatomResponse,
     next: () => void | Promise<void>,
   ) => {
-    // 1. Only process requests with JSON content-type or requests that carry a body
     const contentType = req.raw.headers["content-type"] || "";
     const hasBody =
       req.raw.headers["content-length"] || req.raw.headers["transfer-encoding"];
 
-    if (!hasBody || !contentType.includes("application/json")) {
-      req.body = {};
+    // 1. Only process application/x-www-form-urlencoded requests
+    if (
+      !hasBody ||
+      !contentType.includes("application/x-www-form-urlencoded")
+    ) {
       return next();
     }
 
-    // 2. Early Content-Length check if the header is provided
+    // 2. Content-Length header guard check
     const contentLength = parseInt(
       req.raw.headers["content-length"] || "0",
       10,
@@ -38,7 +41,7 @@ export function json(options: JsonOptions = {}) {
       return;
     }
 
-    // 3. Stream data buffer aggregation with real-time size tracking
+    // 3. Aggregate request stream chunks and enforce size limits dynamically
     try {
       const chunks: Buffer[] = [];
       let totalBytes = 0;
@@ -46,7 +49,6 @@ export function json(options: JsonOptions = {}) {
       for await (const chunk of req.raw) {
         totalBytes += chunk.length;
 
-        // Enforce byte limit during chunk streaming
         if (totalBytes > maxBytes) {
           res.status(413).json({
             success: false,
@@ -58,21 +60,24 @@ export function json(options: JsonOptions = {}) {
         chunks.push(chunk);
       }
 
-      // 4. Parse aggregated buffer into JSON
+      // 4. Decode form string payload into a JavaScript Object
       const rawBody = Buffer.concat(chunks).toString("utf-8");
 
       if (rawBody.trim().length > 0) {
-        req.body = JSON.parse(rawBody);
-      } else {
+        // Parse "name=Kunal&roles=admin&roles=dev" into { name: 'Kunal', roles: ['admin', 'dev'] }
+        const parsedQuery = querystring.parse(rawBody);
+
+        // Attach parsed result onto req.body
+        req.body = { ...req.body, ...parsedQuery };
+      } else if (!req.body) {
         req.body = {};
       }
 
       await next();
     } catch (error) {
-      // 5. Catch invalid JSON syntax errors
       res.status(400).json({
         success: false,
-        message: "Bad Request: Invalid JSON Payload",
+        message: "Bad Request: Malformed URL-encoded payload",
       });
     }
   };

@@ -1,35 +1,27 @@
-// middleware/text.ts
-import { Request } from "../http/Request";
-import { Response as SubatomResponse } from "../http/Response";
-import { parseLimit } from "../../utils/parseLimit";
+// middleware/json.ts
+import { Request } from "../http/Request.js";
+import { Response as SubatomResponse } from "../http/Response.js";
+import { parseLimit } from "../../utils/parseLimit.js";
 
-export interface TextOptions {
+export interface JsonOptions {
   limit?: string | number;
-  type?: string | string[];
-  defaultEncoding?: BufferEncoding;
 }
 
-export function text(options: TextOptions = {}) {
-  const maxBytes = parseLimit(options.limit ?? "100kb");
-  const acceptedType = options.type ?? "text/plain";
-  const encoding = options.defaultEncoding ?? "utf-8";
+export function json(options: JsonOptions = {}) {
+  const maxBytes = parseLimit(options.limit ?? "100kb"); // Default 100kb like Express
 
   return async (
     req: Request<any, any, any, any>,
     res: SubatomResponse,
     next: () => void | Promise<void>,
   ) => {
-    // 1. Only process requests with matching content-type or requests that carry a body
+    // 1. Only process requests with JSON content-type or requests that carry a body
     const contentType = req.raw.headers["content-type"] || "";
     const hasBody =
       req.raw.headers["content-length"] || req.raw.headers["transfer-encoding"];
 
-    const matchesType = Array.isArray(acceptedType)
-      ? acceptedType.some((type) => contentType.includes(type))
-      : contentType.includes(acceptedType);
-
-    if (!hasBody || !matchesType) {
-      req.body = "";
+    if (!hasBody || !contentType.includes("application/json")) {
+      req.body = {};
       return next();
     }
 
@@ -66,15 +58,21 @@ export function text(options: TextOptions = {}) {
         chunks.push(chunk);
       }
 
-      // 4. Convert aggregated buffer to text string
-      req.body = Buffer.concat(chunks).toString(encoding);
+      // 4. Parse aggregated buffer into JSON
+      const rawBody = Buffer.concat(chunks).toString("utf-8");
+
+      if (rawBody.trim().length > 0) {
+        req.body = JSON.parse(rawBody);
+      } else {
+        req.body = {};
+      }
 
       await next();
     } catch (error) {
-      // 5. Catch stream read or encoding errors
+      // 5. Catch invalid JSON syntax errors
       res.status(400).json({
         success: false,
-        message: "Bad Request: Error reading text payload",
+        message: "Bad Request: Invalid JSON Payload",
       });
     }
   };

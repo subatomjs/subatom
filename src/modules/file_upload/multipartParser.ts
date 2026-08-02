@@ -5,13 +5,13 @@ import path from "node:path";
 import os from "node:os";
 import { Readable } from "node:stream";
 import { IncomingHttpHeaders } from "node:http";
-import { UploadFile } from "./UploadFile";
-import { FileParserConfig } from "../../types/file_upload/TypeUploadFile";
+import { UploadFile } from "./UploadFile.js";
+import { FileParserConfig } from "../../types/file_upload/TypeUploadFile.js";
 import {
   BadRequestError,
   PayloadTooLargeError,
   UnprocessableEntityError,
-} from "../../errors/Error";
+} from "../../errors/Error.js";
 
 export interface ParseResult {
   body: Record<string, unknown>;

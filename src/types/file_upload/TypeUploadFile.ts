@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from "node:http";
-import { UploadFile } from "../../modules/file_upload/UploadFile";
+import { UploadFile } from "../../modules/file_upload/UploadFile.js";
 
 export type StorageStrategy = "memory" | "disk";
 

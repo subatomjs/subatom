@@ -1,5 +1,5 @@
-import { Request } from "../../modules/http/Request";
-import { Response as SubatomResponse } from "../../modules/http/Response";
+import { Request } from "../../modules/http/Request.js";
+import { Response as SubatomResponse } from "../../modules/http/Response.js";
 
 export type TypeHandler = (
   req: Request<any, any, any, any>,

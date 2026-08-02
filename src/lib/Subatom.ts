@@ -1,9 +1,9 @@
-import { Router } from "./Router";
-import { SubatomServer } from "./SubatomServer";
-import { Request } from "../modules/http/Request";
-import { Response as SubatomResponse } from "../modules/http/Response";
-import { TypeHandler, RouteMeta } from "../types/type_lib/typeRouter";
-import { configEnv, EnvOptions, env } from "../config/env";
+import { Router } from "./Router.js";
+import { SubatomServer } from "./SubatomServer.js";
+import { Request } from "../modules/http/Request.js";
+import { Response as SubatomResponse } from "../modules/http/Response.js";
+import { TypeHandler, RouteMeta } from "../types/type_lib/typeRouter.js";
+import { configEnv, EnvOptions, env } from "../config/env.js";
 
 export type MiddlewareHandler = (
   req: Request<any, any, any, any>,

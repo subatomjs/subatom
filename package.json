@@ -1,45 +1,71 @@
 {
   "name": "subatom",
-  "version": "1.0.0",
-  "description": "subatom, web framework, high performance, enterprise grade",
-  "keywords": [
-    "subatom",
-    "framework",
-    "web",
-    "http",
-    "fast",
-    "rest",
-    "app",
-    "router",
-    "backend",
-    "api",
-    "server",
-    "restful",
-    "secure"
-  ],
+  "version": "0.1.0",
+  "description": "Subatom is a modern, high-performance, enterprise-grade web framework for Node.js.",
   "license": "MIT",
   "author": "Kunal Chandra Das <kunalchandradasofficial@gmail.com>",
-  "engines": {
-    "node": ">= 18"
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
+  "keywords": [
+    "subatom",
+    "framework",
+    "node",
+    "nodejs",
+    "backend",
+    "web",
+    "http",
+    "server",
+    "rest",
+    "rest-api",
+    "api",
+    "router",
+    "typescript",
+    "fast",
+    "performance",
+    "enterprise"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/subatomjs/subatom.git"
+  },
+  "bugs": {
+    "url": "https://github.com/subatomjs/subatom/issues"
+  },
+  "homepage": "https://github.com/subatomjs/subatom#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "dev": "tsx watch playground/index.ts",
     "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch ./src/index.ts",
+    "prepublishOnly": "npm run clean && npm run build",
     "test": "vitest"
+  },
+  "dependencies": {
+    "busboy": "^1.6.0"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/node": "^26.1.2",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2"
-  },
-  "dependencies": {
-    "busboy": "^1.6.0"
   }
 }

@@ -1,9 +1,9 @@
 // utils/errorFormatter.ts
 
-import { Request } from "../modules/http/Request";
-import { Response } from "../modules/http/Response";
-import { SubatomError } from "./Error";
-import { env } from "../config/env";
+import { Request } from "../modules/http/Request.js";
+import { Response } from "../modules/http/Response.js";
+import { SubatomError } from "./Error.js";
+import { env } from "../config/env.js";
 
 export class ErrorFormatter {
   public static handle(

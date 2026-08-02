@@ -1,6 +1,6 @@
 // middleware/cors.ts
-import { Request } from "../http/Request";
-import { Response as SubatomResponse } from "../http/Response";
+import { Request } from "../http/Request.js";
+import { Response as SubatomResponse } from "../http/Response.js";
 
 export type CorsOriginFunction = (
   origin: string | undefined,

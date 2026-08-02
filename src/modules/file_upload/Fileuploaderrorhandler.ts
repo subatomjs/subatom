@@ -2,11 +2,11 @@ import {
   BadRequestError,
   PayloadTooLargeError,
   UnprocessableEntityError,
-} from "../../errors/Error";
+} from "../../errors/Error.js";
 import {
   FrameworkRequest,
   NextFunction,
-} from "../../types/file_upload/TypeUploadFile";
+} from "../../types/file_upload/TypeUploadFile.js";
 
 /**
  * Register this LAST in your middleware chain (after all routes and other

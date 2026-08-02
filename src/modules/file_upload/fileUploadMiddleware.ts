@@ -2,16 +2,16 @@ import {
   FrameworkRequest,
   Middleware,
   FileMiddlewareOptions,
-} from "../../types/file_upload/TypeUploadFile";
-import { parseMultipart } from "./multipartParser";
-import { UploadFile } from "./UploadFile";
+} from "../../types/file_upload/TypeUploadFile.js";
+import { parseMultipart } from "./multipartParser.js";
+import { UploadFile } from "./UploadFile.js";
 import { Readable } from "node:stream";
 import { IncomingHttpHeaders } from "node:http";
 import {
   BadRequestError,
   PayloadTooLargeError,
   UnprocessableEntityError,
-} from "../../errors/Error";
+} from "../../errors/Error.js";
 
 /**
  * Writes the error response directly to the client instead of relying on

@@ -3,11 +3,11 @@ import {
   TypeRoute,
   MatchResult,
   RouteMeta,
-} from "../types/type_lib/typeRouter";
-import { Request } from "../modules/http/Request";
-import { Response } from "../modules/http/Response";
-import { ErrorFormatter } from "../errors/errorFormatter";
-import { NotFoundError, MethodNotAllowedError } from "../errors/Error";
+} from "../types/type_lib/typeRouter.js";
+import { Request } from "../modules/http/Request.js";
+import { Response } from "../modules/http/Response.js";
+import { ErrorFormatter } from "../errors/errorFormatter.js";
+import { NotFoundError, MethodNotAllowedError } from "../errors/Error.js";
 
 /**
  * HTTP methods that represent a terminal, request-handling route (as

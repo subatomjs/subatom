@@ -8,7 +8,7 @@
 
     "types": ["node"],
 
-    "rootDir": "./",
+    "rootDir": "./src",
     "outDir": "./dist",
 
     "declaration": true,
@@ -35,5 +35,9 @@
     "noEmitOnError": true,
 
     "incremental": false
-  }
+  },
+
+  "include": ["src"],
+
+  "exclude": ["dist", "node_modules", "playground", "tests"]
 }

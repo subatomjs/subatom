@@ -3,13 +3,16 @@
 
   "compilerOptions": {
     "outDir": "./dist",
-    "declaration": true,
     "declarationMap": false,
-    "sourceMap": false,
-    "noEmitOnError": true
+    "sourceMap": false
   },
 
   "include": ["src/**/*.ts"],
 
-  "exclude": ["playground", "tests", "dist", "node_modules"]
+  "exclude": [
+    "playground",
+    "tests",
+    "dist",
+    "node_modules"
+  ]
 }

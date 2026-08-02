@@ -6,11 +6,11 @@ import {
 } from "node:http";
 import net from "node:net";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { Request } from "../modules/http/Request";
-import { Response as SubatomResponse } from "../modules/http/Response";
-import { Router } from "./Router";
-import { ErrorFormatter } from "../errors/errorFormatter";
-import { NotFoundError } from "../errors/Error";
+import { Request } from "../modules/http/Request.js";
+import { Response as SubatomResponse } from "../modules/http/Response.js";
+import { Router } from "./Router.js";
+import { ErrorFormatter } from "../errors/errorFormatter.js";
+import { NotFoundError } from "../errors/Error.js";
 
 export type MiddlewareHandler = (
   req: Request<any, any, any, any>,

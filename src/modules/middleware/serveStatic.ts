@@ -1,9 +1,9 @@
 // middleware/serveStatic.ts
 import fs from "node:fs";
 import path from "node:path";
-import { Request } from "../http/Request";
-import { Response as SubatomResponse } from "../http/Response";
-import { getMimeType } from "../../utils/mime";
+import { Request } from "../http/Request.js";
+import { Response as SubatomResponse } from "../http/Response.js";
+import { getMimeType } from "../../utils/mime.js";
 
 export interface StaticOptions {
   index?: string;
