@@ -5,7 +5,7 @@ import { loadConfig } from "../config/load-config.js";
 import { readUserPackageJson } from "../utils/pkg.js";
 import { logger } from "../utils/logger.js";
 
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 const STATIC_ASSET_EXTENSIONS = new Set([".json", ".env", ".txt", ".graphql"]);
 
 function walk(dir: string, files: string[] = []): string[] {

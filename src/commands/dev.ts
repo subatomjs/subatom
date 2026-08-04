@@ -49,7 +49,7 @@ export async function runDev(opts: DevOptions): Promise<void> {
   manager.start();
 
   const watcher = createWatcher({
-    watchDir: path.dirname(entry).split(path.sep)[0] || "src",
+    watchDir: path.dirname(entry), // ✅ fixed — use real folder, no string splitting
     extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"],
     debounceMs: 300,
     onChange: (file) => {
