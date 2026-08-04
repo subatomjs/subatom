@@ -1,4 +1,4 @@
-export { configEnv, parseEnv } from "./config/env.js";
+export { configEnv, parseEnv, env } from "./config/env.js";
 
 export * from "./lib/Subatom.js";
 export * from "./lib/Router.js";
