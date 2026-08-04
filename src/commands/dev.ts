@@ -1,9 +1,11 @@
+// subatom/src/commands/dev.ts
 import { createRequire } from "node:module";
 import path from "node:path";
 import { loadConfig } from "../config/load-config.js";
 import { resolveEntry } from "../utils/find-entry.js";
 import { resolvePort } from "../utils/port.js";
-import { runProcess } from "../utils/spawn-process.js";
+import { createWatcher } from "../watch/file-watcher.js";
+import { ProcessManager } from "../watch/process-manager.js";
 import { logger } from "../utils/logger.js";
 
 interface DevOptions {
@@ -26,15 +28,15 @@ export async function runDev(opts: DevOptions): Promise<void> {
 
   const port = await resolvePort(preferredPort, host);
 
-  // Resolve the tsx CLI binary from subatom's own node_modules so we don't
-  // depend on tsx being globally installed or hoisted into the user's project.
   const require = createRequire(import.meta.url);
   const tsxCliPath = require.resolve("tsx/cli");
 
-  logger.info(`Starting dev server for ${path.relative(cwd, entry)}`);
-  logger.success(`Listening on http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
+  logger.info(`Watching ${path.relative(cwd, path.dirname(entry))} for changes...`);
+  logger.success(`Server: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
 
-  runProcess(process.execPath, [tsxCliPath, "watch", entry], {
+  const manager = new ProcessManager({
+    command: process.execPath,
+    args: [tsxCliPath, entry],
     cwd,
     label: "dev server",
     env: {
@@ -43,4 +45,25 @@ export async function runDev(opts: DevOptions): Promise<void> {
       HOST: host,
     },
   });
+
+  manager.start();
+
+  const watcher = createWatcher({
+    watchDir: path.dirname(entry).split(path.sep)[0] || "src",
+    extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"],
+    debounceMs: 300,
+    onChange: (file) => {
+      manager.restart(path.relative(cwd, file));
+    },
+  });
+
+  const shutdown = () => {
+    logger.info("Shutting down dev server...");
+    watcher.close();
+    manager.stop();
+    process.exit(0);
+  };
+
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 }
