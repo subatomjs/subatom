@@ -7,6 +7,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "subatom": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -56,16 +59,20 @@
     "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch ./src/index.ts",
+    "cli:dev": "tsx watch ./src/cli.ts",
     "prepublishOnly": "npm run clean && npm run build",
     "test": "vitest"
   },
   "dependencies": {
-    "busboy": "^1.6.0"
+    "busboy": "^1.6.0",
+    "commander": "^15.0.0",
+    "esbuild": "^0.28.1",
+    "picocolors": "^1.1.1",
+    "tsx": "^4.23.5"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/node": "^26.1.2",
-    "tsx": "^4.23.1",
     "typescript": "^7.0.2"
   }
 }

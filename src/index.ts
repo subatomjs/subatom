@@ -46,3 +46,7 @@ export type {
 
 // --- Parser & Configuration Types ---
 export type { FileParserConfig } from "./types/file_upload/TypeUploadFile.js";
+
+// Export config 
+export { defineConfig } from "./config/load-config.js";
+export type { SubatomConfig, SubatomUserConfig } from "./config/types.js";
