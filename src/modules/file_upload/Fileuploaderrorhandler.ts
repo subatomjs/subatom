@@ -1,11 +1,11 @@
 import {
-  BadRequestError,
-  PayloadTooLargeError,
-  UnprocessableEntityError,
+	BadRequestError,
+	PayloadTooLargeError,
+	UnprocessableEntityError,
 } from "../../errors/Error.js";
-import {
-  FrameworkRequest,
-  NextFunction,
+import type {
+	FrameworkRequest,
+	NextFunction,
 } from "../../types/file_upload/TypeUploadFile.js";
 
 /**
@@ -21,50 +21,50 @@ import {
  * "infinite loop" from the browser.
  */
 export function fileUploadErrorHandler(
-  err: unknown,
-  req: FrameworkRequest,
-  res: any,
-  next: NextFunction,
+	err: unknown,
+	req: FrameworkRequest,
+	res: any,
+	next: NextFunction,
 ) {
-  if (!err) return next();
+	if (!err) return next();
 
-  const status = statusFor(err);
-  const message = (err as Error)?.message || "Internal server error";
+	const status = statusFor(err);
+	const message = (err as Error)?.message || "Internal server error";
 
-  // Adjust this block to match whatever response API your framework
-  // actually exposes. Two common shapes are handled below.
-  if (res.raw && typeof res.raw.writeHead === "function") {
-    // Wrapped-request style (matches getStream()/getHeaders() pattern
-    // used elsewhere in this codebase)
-    if (!res.raw.headersSent) {
-      res.raw.writeHead(status, { "Content-Type": "application/json" });
-      res.raw.end(JSON.stringify({ error: message }));
-    }
-    return;
-  }
+	// Adjust this block to match whatever response API your framework
+	// actually exposes. Two common shapes are handled below.
+	if (res.raw && typeof res.raw.writeHead === "function") {
+		// Wrapped-request style (matches getStream()/getHeaders() pattern
+		// used elsewhere in this codebase)
+		if (!res.raw.headersSent) {
+			res.raw.writeHead(status, { "Content-Type": "application/json" });
+			res.raw.end(JSON.stringify({ error: message }));
+		}
+		return;
+	}
 
-  if (typeof res.status === "function" && typeof res.json === "function") {
-    // Express-like API
-    res.status(status).json({ error: message });
-    return;
-  }
+	if (typeof res.status === "function" && typeof res.json === "function") {
+		// Express-like API
+		res.status(status).json({ error: message });
+		return;
+	}
 
-  if (typeof res.writeHead === "function") {
-    // Raw node http.ServerResponse
-    if (!res.headersSent) {
-      res.writeHead(status, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: message }));
-    }
-    return;
-  }
+	if (typeof res.writeHead === "function") {
+		// Raw node http.ServerResponse
+		if (!res.headersSent) {
+			res.writeHead(status, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: message }));
+		}
+		return;
+	}
 
-  // Last resort: rethrow so it doesn't fail completely silently
-  throw err;
+	// Last resort: rethrow so it doesn't fail completely silently
+	throw err;
 }
 
 function statusFor(err: unknown): number {
-  if (err instanceof PayloadTooLargeError) return 413;
-  if (err instanceof UnprocessableEntityError) return 422;
-  if (err instanceof BadRequestError) return 400;
-  return 500;
+	if (err instanceof PayloadTooLargeError) return 413;
+	if (err instanceof UnprocessableEntityError) return 422;
+	if (err instanceof BadRequestError) return 400;
+	return 500;
 }

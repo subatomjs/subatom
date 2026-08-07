@@ -1,52 +1,46 @@
-export { configEnv, parseEnv, env } from "./config/env.js";
-
-export * from "./lib/Subatom.js";
+export { configEnv, env, parseEnv } from "./config/env.js";
 export * from "./lib/Router.js";
-
-// middleware
-export { json } from "./modules/middleware/json.js";
-export { urlencoded } from "./modules/middleware/urlencoded.js";
-export { cors } from "./modules/middleware/cors.js";
-export { serveStatic } from "./modules/middleware/serveStatic.js";
-
-//! --- Core Upload Class & Options ---
-export { UploadFile } from "./modules/file_upload/UploadFile.js";
-export type { UploadFileOptions } from "./modules/file_upload/UploadFile.js";
-
+export * from "./lib/Subatom.js";
 // --- Middleware Functions (Individual Named Exports) ---
 export {
-  single,
-  array,
-  fields,
+	array,
+	fields,
+	single,
 } from "./modules/file_upload/fileUploadMiddleware.js";
+export type { UploadFileOptions } from "./modules/file_upload/UploadFile.js";
+//! --- Core Upload Class & Options ---
+export { UploadFile } from "./modules/file_upload/UploadFile.js";
+export { cors } from "./modules/middleware/cors.js";
+// middleware
+export { json } from "./modules/middleware/json.js";
+export { serveStatic } from "./modules/middleware/serveStatic.js";
+export { urlencoded } from "./modules/middleware/urlencoded.js";
 
 // --- Grouped Middleware Object Export ---
 import {
-  single,
-  array,
-  fields,
+	array,
+	fields,
+	single,
 } from "./modules/file_upload/fileUploadMiddleware.js";
 
 export const file = {
-  single,
-  array,
-  fields,
+	single,
+	array,
+	fields,
 };
 
-// --- Framework Types & Type Definitions ---
-export type {
-  FrameworkRequest,
-  FileMiddlewareOptions,
-  FilesMap,
-  RequestFiles,
-  StorageStrategy,
-  Middleware,
-  NextFunction,
-} from "./types/file_upload/TypeUploadFile.js";
-
-// --- Parser & Configuration Types ---
-export type { FileParserConfig } from "./types/file_upload/TypeUploadFile.js";
-
-// Export config 
+// Export config
 export { defineConfig } from "./config/load-config.js";
 export type { SubatomConfig, SubatomUserConfig } from "./config/types.js";
+// --- Framework Types & Type Definitions ---
+// --- Parser & Configuration Types ---
+export type {
+	FileMiddlewareOptions,
+	FileParserConfig,
+	FilesMap,
+	FrameworkRequest,
+	Middleware,
+	NextFunction,
+	RequestFiles,
+	StorageStrategy,
+} from "./types/file_upload/TypeUploadFile.js";

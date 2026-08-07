@@ -1,19 +1,14 @@
 {
-  "extends": "./tsconfig.json",
+	"extends": "./tsconfig.json",
 
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declarationMap": false,
-    "sourceMap": false
-  },
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"declarationMap": false,
+		"sourceMap": false
+	},
 
-  "include": ["src/**/*.ts"],
+	"include": ["src/**/*.ts"],
 
-  "exclude": [
-    "playground",
-    "tests",
-    "dist",
-    "node_modules"
-  ]
+	"exclude": ["playground", "tests", "dist", "node_modules"]
 }

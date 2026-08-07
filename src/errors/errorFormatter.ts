@@ -1,69 +1,73 @@
 // utils/errorFormatter.ts
 
-import { Request } from "../modules/http/Request.js";
-import { Response } from "../modules/http/Response.js";
-import { SubatomError } from "./Error.js";
 import { env } from "../config/env.js";
+import type { Request } from "../modules/http/Request.js";
+import type { Response } from "../modules/http/Response.js";
+import type { SubatomError } from "./Error.js";
 
 export class ErrorFormatter {
-  public static handle(
-    err: Error | SubatomError,
-    req: Request,
-    res: Response,
-  ): void {
-    const isDev = env.NODE_ENV !== "production";
+	public static handle(
+		err: Error | SubatomError,
+		req: Request,
+		res: Response,
+	): void {
+		const isDev = env.NODE_ENV !== "production";
 
-    // 1. Extract Details
-    const statusCode = (err as SubatomError).statusCode || 500;
-    const errorCode = (err as SubatomError).errorCode || "INTERNAL_SERVER_ERROR";
-    const message = err.message || "An unexpected error occurred";
-    const details = (err as SubatomError).details;
+		// 1. Extract Details
+		const statusCode = (err as SubatomError).statusCode || 500;
+		const errorCode =
+			(err as SubatomError).errorCode || "INTERNAL_SERVER_ERROR";
+		const message = err.message || "An unexpected error occurred";
+		const details = (err as SubatomError).details;
 
-    // 2. Check content-type preference (HTML vs JSON)
-    const acceptsHtml = req.headers["accept"]?.includes("text/html");
+		// 2. Check content-type preference (HTML vs JSON)
+		const acceptsHtml = req.headers["accept"]?.includes("text/html");
 
-    if (isDev) {
-      // -------------------------------------------------------------
-      // DEVELOPMENT MODE: Detailed diagnostic output
-      // -------------------------------------------------------------
-      if (acceptsHtml) {
-        const html = ErrorFormatter.renderDevHtml(
-          err,
-          req,
-          statusCode,
-          errorCode,
-        );
-        res
-          .status(statusCode)
-          .setHeader("Content-Type", "text/html")
-          .send(html);
-      } else {
-        res.status(statusCode).json({
-          status: "error",
-          framework: "Subatom",
-          statusCode,
-          errorCode,
-          message,
-          details,
-          stack: err.stack ? err.stack.split("\n    ") : [],
-          request: {
-            method: req.method,
-            path: req.path,
-            headers: req.headers,
-          },
-        });
-      }
-    } else {
-      // -------------------------------------------------------------
-      // PRODUCTION MODE: Sanitized & safe output
-      // -------------------------------------------------------------
-      const isOperational = (err as SubatomError).isOperational ?? false;
+		if (isDev) {
+			// -------------------------------------------------------------
+			// DEVELOPMENT MODE: Detailed diagnostic output
+			// -------------------------------------------------------------
+			if (acceptsHtml) {
+				const html = ErrorFormatter.renderDevHtml(
+					err,
+					req,
+					statusCode,
+					errorCode,
+				);
+				res
+					.status(statusCode)
+					.setHeader("Content-Type", "text/html")
+					.send(html);
+			} else {
+				res.status(statusCode).json({
+					status: "error",
+					framework: "Subatom",
+					statusCode,
+					errorCode,
+					message,
+					details,
+					stack: err.stack ? err.stack.split("\n    ") : [],
+					request: {
+						method: req.method,
+						path: req.path,
+						headers: req.headers,
+					},
+				});
+			}
+		} else {
+			// -------------------------------------------------------------
+			// PRODUCTION MODE: Sanitized & safe output
+			// -------------------------------------------------------------
+			const isOperational = (err as SubatomError).isOperational ?? false;
 
-      // Safe public message
-      const publicMessage = isOperational ? message : "Internal Server Error";
+			// Safe public message
+			const publicMessage = isOperational ? message : "Internal Server Error";
 
-      if (acceptsHtml) {
-        res.status(statusCode).setHeader("Content-Type", "text/html").send(`
+			if (acceptsHtml) {
+				res
+					.status(statusCode)
+					.setHeader("Content-Type", "text/html")
+					.send(`
           <!DOCTYPE html>
           <html>
             <head><title>${statusCode} - ${publicMessage}</title></head>
@@ -73,28 +77,28 @@ export class ErrorFormatter {
             </body>
           </html>
         `);
-      } else {
-        res.status(statusCode).json({
-          status: "error",
-          statusCode,
-          message: publicMessage,
-          ...(details && isOperational ? { details } : {}),
-        });
-      }
-    }
-  }
+			} else {
+				res.status(statusCode).json({
+					status: "error",
+					statusCode,
+					message: publicMessage,
+					...(details && isOperational ? { details } : {}),
+				});
+			}
+		}
+	}
 
-  private static renderDevHtml(
-    err: Error,
-    req: Request,
-    status: number,
-    code: string,
-  ): string {
-    const stack = err.stack
-      ? err.stack.replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      : "No stack trace available";
+	private static renderDevHtml(
+		err: Error,
+		req: Request,
+		status: number,
+		code: string,
+	): string {
+		const stack = err.stack
+			? err.stack.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+			: "No stack trace available";
 
-    return `
+		return `
       <!DOCTYPE html>
       <html lang="en">
       <head>
@@ -122,5 +126,5 @@ export class ErrorFormatter {
       </body>
       </html>
     `;
-  }
+	}
 }

@@ -67,7 +67,9 @@
     "dev": "tsx watch ./src/index.ts",
     "cli:dev": "tsx watch ./src/cli.ts",
     "prepublishOnly": "npm run clean && npm run build",
-    "test": "vitest"
+    "unit:test": "npx run vitest",
+    "lint": "npx @biomejs/biome check .",
+    "lint-fix": "npx @biomejs/biome check --write ."
   },
   "dependencies": {
     "busboy": "^1.6.0",
@@ -78,6 +80,7 @@
     "tsx": "^4.23.5"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.7",
     "@types/busboy": "^1.5.4",
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
