@@ -1,4 +1,7 @@
 import type { Readable } from "node:stream";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { NextFunction } from "./INext.js";
+
 
 export interface UploadFileOptions {
 	filename: string;
@@ -10,11 +13,7 @@ export interface UploadFileOptions {
 	size?: number;
 }
 
-/**
- * The public contract for an uploaded file as seen by route handlers and
- * middleware. Type against this — `req.file: IUploadFile` / `req.files:
- * IUploadFile[]` — rather than the concrete `UploadFile` class.
- */
+
 export interface IUploadFile {
 	readonly filename: string;
 	readonly encoding: string;
@@ -41,8 +40,7 @@ export interface IUploadFile {
 
 export type FilesMap = Record<string, IUploadFile | IUploadFile[]>;
 
-import type { IncomingMessage, ServerResponse } from "node:http";
-import type { NextFunction } from "./INext.js";
+
 
 export type StorageStrategy = "memory" | "disk";
 
