@@ -8,7 +8,7 @@
 
 		"types": ["node"],
 
-		"rootDir": "./src",
+		"rootDir": "./",
 		"outDir": "./dist",
 
 		"declaration": true,
@@ -37,7 +37,7 @@
 		"incremental": false
 	},
 
-	"include": ["src"],
+	"include": ["index.ts", "subatom", "subatom/core/http/request/services/.ts"],
 
 	"exclude": ["dist", "node_modules", "playground", "tests"]
 }

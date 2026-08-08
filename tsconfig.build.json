@@ -3,12 +3,12 @@
 
 	"compilerOptions": {
 		"outDir": "./dist",
-		"rootDir": "./src",
+		"rootDir": "./",
 		"declarationMap": false,
 		"sourceMap": false
 	},
 
-	"include": ["src/**/*.ts"],
+	"include": ["index.ts", "subatom/**/*.ts"],
 
 	"exclude": ["playground", "tests", "dist", "node_modules"]
 }
