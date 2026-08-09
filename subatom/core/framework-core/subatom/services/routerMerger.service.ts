@@ -14,6 +14,9 @@ export function mergeSubRouter(
 			handlers: route.handlers,
 			...(route.tags !== undefined ? { tags: route.tags } : {}),
 			...(route.rateLimit !== undefined ? { rateLimit: route.rateLimit } : {}),
+			...(route.routerPipeline !== undefined
+				? { routerPipeline: route.routerPipeline }
+				: {}),
 		});
 	}
 }

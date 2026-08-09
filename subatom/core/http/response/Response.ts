@@ -37,6 +37,7 @@ export class Response implements IResponse {
 		return this.raw.headersSent;
 	}
 
+	
 	public get writableEnded(): boolean {
 		return this.raw.writableEnded;
 	}

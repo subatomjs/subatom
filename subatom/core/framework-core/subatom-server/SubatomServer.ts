@@ -11,12 +11,17 @@ import type {
   IRequestContext,
   ISubatomServerConfig,
 } from "../../../types/framework/core/IFrameworkCore.js";
-import type { IRouter } from "../../../types/framework/router/IRouter.js";
+
+// ❌ OLD: import type { IRouter } from "../../../types/framework/router/IRouter.js";
+// ✅ NEW: Import the concrete Router class
+import { Router } from "../../router/Router.js";
+
 import type {
   ErrorMiddlewareHandler,
   MiddlewareHandler,
 } from "../../../types/http/IMiddleware.js";
 import type { IWebSocketRoute } from "../../../types/framework/websocket/IWebSocket.js";
+import type { IRequestPipelineConfig } from "../../pipeline/modifier/RequestPipeline.js";
 
 // Single-purpose service imports
 import { findAndLoadConfig } from "./services/configLoader.service.js";
@@ -26,21 +31,24 @@ import { processHttpRequest } from "./services/requestHandler.service.js";
 import { closeServer } from "./services/serverShutdown.service.js";
 import { trackSocket } from "./services/socketTracker.service.js";
 import { WebSocketManager } from "../../websocket/WebSocketManager.js";
+import { IRouter } from "../../../types/framework/router/IRouter.js";
 
 export class SubatomServer {
   private readonly server: Server;
   private config: ISubatomServerConfig = {};
   private readonly openSockets = new Set<Socket>();
   private readonly webSocketManager: WebSocketManager;
+  private pipelineConfig: IRequestPipelineConfig = {
+    transformers: [],
+    interceptors: [],
+    serializers: [],
+  };
 
-  /**
-   * Tracks {req, res} for whatever request is "in flight" on the current
-   * async execution context.
-   */
   private readonly requestContext = new AsyncLocalStorage<IRequestContext>();
 
   constructor(
-    private readonly router: IRouter,
+    // 👈 Change `IRouter` to `Router` here
+    private readonly router: Router |IRouter,
     private readonly middlewares: MiddlewareHandler[] = [],
     private readonly errorMiddlewares: ErrorMiddlewareHandler[] = [],
     private readonly wsRoutes: IWebSocketRoute[] = [],
@@ -73,6 +81,10 @@ export class SubatomServer {
     this.config = { ...this.config, ...config };
   }
 
+  public setPipelineConfig(config: IRequestPipelineConfig): void {
+    this.pipelineConfig = config;
+  }
+
   private async handleRequest(
     native_request: IncomingMessage,
     native_response: ServerResponse,
@@ -80,10 +92,11 @@ export class SubatomServer {
     await processHttpRequest(
       native_request,
       native_response,
-      this.router,
+      this.router, // 👈 No longer raises TS2740
       this.middlewares,
       this.errorMiddlewares,
       this.requestContext,
+      this.pipelineConfig,
     );
   }
 

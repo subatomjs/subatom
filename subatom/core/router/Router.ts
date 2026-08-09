@@ -5,6 +5,12 @@ import type {
   IRouteMeta,
   IRouter,
 } from "../../types/framework/router/IRouter.js";
+import type {
+  IInterceptor,
+  ISerializer,
+  ITransformer,
+} from "../../types/framework/pipeline/IPipeline.js";
+import type { IRequestPipelineConfig } from "../pipeline/modifier/RequestPipeline.js";
 import type { IRequest } from "../../types/http/IRequest.js";
 import type { IResponse } from "../../types/http/IResponse.js";
 import {
@@ -14,6 +20,11 @@ import {
 } from "../http/errors/Error.js";
 import { ErrorFormatter } from "../http/errors/errorFormatter.js";
 import { Next } from "../pipeline/next-pipeline/Next.js";
+import {
+  registerInterceptor,
+  registerSerializer,
+  registerTransformer,
+} from "../pipeline/modifier/services/pipelineRegistrar.service.js";
 
 const MIDDLEWARE_METHOD = "USE";
 const WILDCARD_METHOD = "ALL";
@@ -21,6 +32,34 @@ const QUERY_METHOD = "QUERY";
 
 export class Router implements IRouter {
   protected routes: IRoute[] = [];
+
+  private readonly transformers: ITransformer[] = [];
+  private readonly interceptors: IInterceptor[] = [];
+  private readonly serializers: ISerializer[] = [];
+
+  // ============================================================
+  // Router-level pipeline registration
+  // ============================================================
+
+  public transformer(transformer: ITransformer): void {
+    registerTransformer(this.transformers, transformer);
+  }
+
+  public intercept(interceptor: IInterceptor): void {
+    registerInterceptor(this.interceptors, interceptor);
+  }
+
+  public serializer(serializer: ISerializer): void {
+    registerSerializer(this.serializers, serializer);
+  }
+
+  public getPipelineConfig(): IRequestPipelineConfig {
+    return {
+      transformers: this.transformers,
+      interceptors: this.interceptors,
+      serializers: this.serializers,
+    };
+  }
 
   // ============================================================
   // Verb registration
@@ -120,6 +159,7 @@ export class Router implements IRouter {
       method: method.toUpperCase(),
       path: cleanPath,
       handlers,
+      routerPipeline: this.getPipelineConfig(),
     };
 
     if (meta?.tags && meta.tags.length > 0) {
@@ -159,14 +199,6 @@ export class Router implements IRouter {
     return undefined;
   }
 
-  /**
-   * Runs matching + the full middleware/handler pipeline for one
-   * request. Unlike `handleRequest`, this does NOT catch/format errors
-   * itself — it lets them propagate. Intended for embedding inside a
-   * larger error-handling boundary (e.g. SubatomServer's user-defined
-   * error-middleware pipeline). Use `handleRequest` if you're driving
-   * the Router directly with no outer error handling of your own.
-   */
   public async dispatch(
     req: IRequest,
     res: IResponse,
@@ -196,10 +228,6 @@ export class Router implements IRouter {
       throw new NotFoundError(`Cannot ${method} ${req.path}`);
     }
 
-    // Terminal-route params take precedence over any same-named params
-    // captured by a mount-level middleware prefix. Spread is used (not
-    // Object.assign) so this stays safe even if a client sends a param
-    // segment literally named "__proto__" or "constructor".
     req.params = { ...useParams, ...matchResult.params };
     req.query = matchResult.query;
 
@@ -212,11 +240,6 @@ export class Router implements IRouter {
     await this.runPipeline(pipeline, req, res);
   }
 
-  /**
-   * Convenience wrapper around `dispatch` for using the Router
-   * standalone: catches any error and formats a response via
-   * ErrorFormatter directly.
-   */
   public async handleRequest(
     req: IRequest,
     res: IResponse,
@@ -225,8 +248,6 @@ export class Router implements IRouter {
     try {
       await this.dispatch(req, res, globalMiddlewares);
     } catch (err: unknown) {
-      // If a handler already wrote and ended the response before
-      // throwing, we can't safely send another one.
       if (res.writableEnded) {
         console.error(
           "[Subatom Error]: Unhandled error occurred after the response was already sent.",
@@ -238,10 +259,6 @@ export class Router implements IRouter {
     }
   }
 
-  // ============================================================
-  // Internal: pipeline execution
-  // ============================================================
-
   private async runPipeline(
     handlers: IHandler[],
     req: IRequest,
@@ -250,10 +267,6 @@ export class Router implements IRouter {
     const pipeline = new Next(handlers, req, res);
     await pipeline.run();
   }
-
-  // ============================================================
-  // Internal: middleware collection
-  // ============================================================
 
   private collectUseMiddlewares(pathName: string): {
     handlers: IHandler[];
@@ -274,10 +287,6 @@ export class Router implements IRouter {
 
     return { handlers, params };
   }
-
-  // ============================================================
-  // Internal: URL parsing
-  // ============================================================
 
   private extractPathname(rawUrl: string): string {
     const queryIndex = rawUrl.indexOf("?");

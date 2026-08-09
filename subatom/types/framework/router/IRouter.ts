@@ -1,6 +1,12 @@
 import type { IRequest } from "../../http/IRequest.js";
 import type { IResponse } from "../../http/IResponse.js";
 import type { NextFunction } from "../pipeline/INext.js";
+import type {
+  IInterceptor,
+  ISerializer,
+  ITransformer,
+} from "../pipeline/IPipeline.js";
+import type { IRequestPipelineConfig } from "../../../core/pipeline/modifier/RequestPipeline.js"; // adjust path to your actual location
 
 /**
  * `next` accepts an optional error — passing one short-circuits the
@@ -9,28 +15,29 @@ import type { NextFunction } from "../pipeline/INext.js";
  * present in the type, or `next(err)` fails to compile for consumers.
  */
 export type IHandler = (
-	req: IRequest,
-	res: IResponse,
-	next: NextFunction,
+  req: IRequest,
+  res: IResponse,
+  next: NextFunction,
 ) => void | Promise<void>;
 
 export interface IRoute {
-	method: string;
-	path: string;
-	handlers: IHandler[];
-	tags?: string[];
-	rateLimit?: string;
+  method: string;
+  path: string;
+  handlers: IHandler[];
+  tags?: string[];
+  rateLimit?: string;
+  routerPipeline?: IRoutePipelineRef;
 }
 
 export interface IMatchResult {
-	route: IRoute;
-	params: Record<string, string>;
-	query: Record<string, string>;
+  route: IRoute;
+  params: Record<string, string>;
+  query: Record<string, string>;
 }
 
 export interface IRouteMeta {
-	tags?: string[] | undefined;
-	rateLimit?: string | undefined;
+  tags?: string[] | undefined;
+  rateLimit?: string | undefined;
 }
 
 /**
@@ -40,48 +47,58 @@ export interface IRouteMeta {
  * you shouldn't need to touch directly.
  */
 export interface IRouter {
-	get(path: string, ...handlers: IHandler[]): void;
-	post(path: string, ...handlers: IHandler[]): void;
-	put(path: string, ...handlers: IHandler[]): void;
-	patch(path: string, ...handlers: IHandler[]): void;
-	delete(path: string, ...handlers: IHandler[]): void;
-	options(path: string, ...handlers: IHandler[]): void;
-	head(path: string, ...handlers: IHandler[]): void;
-	trace(path: string, ...handlers: IHandler[]): void;
-	connect(path: string, ...handlers: IHandler[]): void;
+  get(path: string, ...handlers: IHandler[]): void;
+  post(path: string, ...handlers: IHandler[]): void;
+  put(path: string, ...handlers: IHandler[]): void;
+  patch(path: string, ...handlers: IHandler[]): void;
+  delete(path: string, ...handlers: IHandler[]): void;
+  options(path: string, ...handlers: IHandler[]): void;
+  head(path: string, ...handlers: IHandler[]): void;
+  trace(path: string, ...handlers: IHandler[]): void;
+  connect(path: string, ...handlers: IHandler[]): void;
+  transformer(transformer: ITransformer): void; // 👈 add
+  intercept(interceptor: IInterceptor): void; // 👈 add
+  serializer(serializer: ISerializer): void; // 👈 add
+  getPipelineConfig(): IRequestPipelineConfig; // 👈 add
 
-	/**
-	 * QUERY — the proposed HTTP method (IETF draft "The HTTP QUERY
-	 * Method") for safe, idempotent requests that carry a body. Useful
-	 * when a search/filter payload is too complex or too large for a
-	 * GET query string, but the semantics should still be read-only and
-	 * cacheable like GET rather than mutating like POST. Registers a
-	 * terminal route matched only against `QUERY` requests, same shape
-	 * as `get`/`post`.
-	 */
-	query(path: string, ...handlers: IHandler[]): void;
+  /**
+   * QUERY — the proposed HTTP method (IETF draft "The HTTP QUERY
+   * Method") for safe, idempotent requests that carry a body. Useful
+   * when a search/filter payload is too complex or too large for a
+   * GET query string, but the semantics should still be read-only and
+   * cacheable like GET rather than mutating like POST. Registers a
+   * terminal route matched only against `QUERY` requests, same shape
+   * as `get`/`post`.
+   */
+  query(path: string, ...handlers: IHandler[]): void;
 
-	/** Registers a terminal route that matches any HTTP method. */
-	all(path: string, ...handlers: IHandler[]): void;
+  /** Registers a terminal route that matches any HTTP method. */
+  all(path: string, ...handlers: IHandler[]): void;
 
-	/** Registers path-scoped or global middleware. */
-	use(pathOrHandler: string | IHandler, ...handlers: IHandler[]): void;
+  /** Registers path-scoped or global middleware. */
+  use(pathOrHandler: string | IHandler, ...handlers: IHandler[]): void;
 
-	getRoutes(): IRoute[];
-	clearRoutes(): void;
+  getRoutes(): IRoute[];
+  clearRoutes(): void;
 
-	registerWithMeta(
-		method: string,
-		path: string,
-		handlers: IHandler[],
-		meta?: IRouteMeta,
-	): void;
+  registerWithMeta(
+    method: string,
+    path: string,
+    handlers: IHandler[],
+    meta?: IRouteMeta,
+  ): void;
 
-	match(method?: string, rawUrl?: string): IMatchResult | undefined;
+  match(method?: string, rawUrl?: string): IMatchResult | undefined;
 
-	handleRequest(
-		req: IRequest,
-		res: IResponse,
-		globalMiddlewares?: IHandler[],
-	): Promise<void>;
+  handleRequest(
+    req: IRequest,
+    res: IResponse,
+    globalMiddlewares?: IHandler[],
+  ): Promise<void>;
+}
+
+export interface IRoutePipelineRef {
+  transformers: ITransformer[];
+  interceptors: IInterceptor[];
+  serializers: ISerializer[];
 }
