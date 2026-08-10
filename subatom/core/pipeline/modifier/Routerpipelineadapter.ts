@@ -68,11 +68,19 @@ export async function handleRequestWithPipeline(
           effectivePipelineConfig.interceptors,
           ctx,
           async () => {
-            const dispatchPromise = router.dispatch(
-              req,
-              capturedRes,
-              options.globalMiddlewares,
-            );
+            const dispatchPromise = router
+              .dispatch(req, capturedRes, options.globalMiddlewares)
+              .catch((err) => {
+                // If `captured` wins the race, this promise is abandoned by the
+                // `Promise.race` below but keeps running in the background. Without
+                // this catch, a handler throwing *after* the response was already
+                // flushed becomes an unhandled rejection instead of a logged error.
+                console.error(
+                  "[Subatom Error]: Handler chain rejected after response was already captured.",
+                  err,
+                );
+                throw err;
+              });
 
             const outcome = await Promise.race([
               captured.then((cap) => ({ type: "captured" as const, cap })),

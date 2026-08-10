@@ -27,6 +27,7 @@ export interface IRoute {
   tags?: string[];
   rateLimit?: string;
   routerPipeline?: IRoutePipelineRef;
+   name?: string;
 }
 
 export interface IMatchResult {
@@ -38,8 +39,13 @@ export interface IMatchResult {
 export interface IRouteMeta {
   tags?: string[] | undefined;
   rateLimit?: string | undefined;
+  name?: string | undefined; 
 }
-
+export interface IRouteOptions {
+  name?: string;
+  tags?: string[];
+  rateLimit?: string;
+}
 /**
  * The public contract for a Router. Type against this —
  * `const router: IRouter = new Router()` — rather than the concrete

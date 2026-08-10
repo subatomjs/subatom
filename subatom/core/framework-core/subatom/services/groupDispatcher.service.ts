@@ -1,7 +1,7 @@
 import { Router } from "../../../router/Router.js";
 import type { Subatom } from "../Subatom.js";
 import { RouteGroupBuilder } from "../subordinate/RouteGroupBuilder.js";
-import { mergeSubRouter } from "./routerMerger.service.js";
+import { mergeSubRouter } from "../../../router/services/routerMerger.service.js";
 
 export function dispatchGroup(
 	app: Subatom,
