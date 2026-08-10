@@ -1,4 +1,4 @@
-import { env } from "../../../../engine/utils/env/env.js";
+import { env } from "../../../../cli-engine/utils/env/env.js";
 import type { SubatomServer } from "../../subatom-server/SubatomServer.js";
 
 export function registerProcessBoundary(
