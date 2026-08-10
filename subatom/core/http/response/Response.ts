@@ -3,7 +3,8 @@ import type {
 	CookieOptions,
 	DownloadOptions,
 	IResponse,
-	SendFileOptions,
+	IResponseHelper,
+	SendFileOptions
 } from "../../../types/http/IResponse.js";
 import { appendHeader } from "./services/appendHeader.service.js";
 import { clearCookie, setCookie } from "./services/cookie.service.js";
@@ -21,15 +22,18 @@ import {
 // Import exact service per method
 import { setStatusCode } from "./services/statusCode.service.js";
 import { varyHeader } from "./services/varyHeader.service.js";
+import { ResponseHelper } from "./helper/ResponseHelper.js";
 
 export class Response implements IResponse {
 	public readonly raw: ServerResponse;
+	public readonly helper: IResponseHelper;
 
 	private _statusCode = 200;
 	private readonly _headers: Map<string, string | string[]> = new Map();
 
 	constructor(native_response: ServerResponse) {
 		this.raw = native_response;
+		this.helper = new ResponseHelper(this);
 	}
 
 	// State inspection
@@ -206,4 +210,5 @@ export class Response implements IResponse {
 		setAttachment(this.raw, this._headers, this.headersSent, filename);
 		return this;
 	}
+
 }
