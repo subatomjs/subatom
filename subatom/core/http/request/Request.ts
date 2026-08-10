@@ -15,6 +15,7 @@ import { readJson } from "./services/readJson.service.js";
 import { readText } from "./services/readText.service.js";
 import { resolveClientIp } from "./services/resolveClientIp.service.js";
 import { resolveOrigin } from "./services/resolveOrigin.service.js";
+import { ISession } from "../../../types/framework/factory-function/ISession.js";
 
 // Import exact service per function
 
@@ -114,6 +115,9 @@ export class Request<
 		// Delegated to parseCookies.service.ts
 		this.cookies = parseCookies(this.headers["cookie"]) as Cookies;
 	}
+
+	public session!: ISession;
+	public sessionID!: string;
 
 	// --- Methods Delegated to Individual Services ---
 

@@ -49,11 +49,63 @@ export async function handleRequestWithPipeline(
   );
 
   const pipeline = new RequestPipeline(effectivePipelineConfig);
+
+  // const {
+  //     res: capturedRes,
+  //     captured,
+  //     rejectCaptured,
+  //   } = createResponseCapture(res, options.terminalMethods);
+
+  //   // Track whether `captured` has actually resolved, without awaiting it here —
+  //   // we just need to know "did something call res.json()/send() etc first?"
+  //   let hasCaptured = false;
+  //   captured.then(() => { hasCaptured = true; }).catch(() => {});
+
+  //   try {
+  //     let capturedMethod = "json";
+
+  //     const result = await pipeline.execute({
+  //       req,
+  //       res: capturedRes,
+  //       routePath: cleanPath,
+  //       method: req.method,
+  //       runControllerChain: async (ctx: IPipelineContext) => {
+  //         return runInterceptors(
+  //           effectivePipelineConfig.interceptors,
+  //           ctx,
+  //           async () => {
+  //             const dispatchPromise = router
+  //               .dispatch(req, capturedRes, options.globalMiddlewares)
+  //               .catch((err) => {
+  //                 // Only log this when a response was genuinely captured
+  //                 // already and this dispatch failure is now happening in
+  //                 // the background after Promise.race abandoned it.
+  //                 // Ordinary dispatch errors (404s, etc.) fall through
+  //                 // silently here and get handled once, correctly, by the
+  //                 // outer catch below.
+  //                 if (hasCaptured) {
+  //                   console.error(
+  //                     "[Subatom Error]: Handler chain rejected after response was already captured.",
+  //                     err,
+  //                   );
+  //                 }
+  //                 throw err;
+  //               });
+
   const {
     res: capturedRes,
     captured,
     rejectCaptured,
   } = createResponseCapture(res, options.terminalMethods);
+
+  // Track whether `captured` has actually resolved, without awaiting it here —
+  // we just need to know "did something call res.json()/send() etc first?"
+  let hasCaptured = false;
+  captured
+    .then(() => {
+      hasCaptured = true;
+    })
+    .catch(() => {});
 
   try {
     let capturedMethod = "json";
@@ -71,14 +123,18 @@ export async function handleRequestWithPipeline(
             const dispatchPromise = router
               .dispatch(req, capturedRes, options.globalMiddlewares)
               .catch((err) => {
-                // If `captured` wins the race, this promise is abandoned by the
-                // `Promise.race` below but keeps running in the background. Without
-                // this catch, a handler throwing *after* the response was already
-                // flushed becomes an unhandled rejection instead of a logged error.
-                console.error(
-                  "[Subatom Error]: Handler chain rejected after response was already captured.",
-                  err,
-                );
+                // Only log this when a response was genuinely captured
+                // already and this dispatch failure is now happening in
+                // the background after Promise.race abandoned it.
+                // Ordinary dispatch errors (404s, etc.) fall through
+                // silently here and get handled once, correctly, by the
+                // outer catch below.
+                if (hasCaptured) {
+                  console.error(
+                    "[Subatom Error]: Handler chain rejected after response was already captured.",
+                    err,
+                  );
+                }
                 throw err;
               });
 

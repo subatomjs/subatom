@@ -1,12 +1,10 @@
 // middleware/cors.ts
 
-import type { NextFunction } from "../../../types/framework/pipeline/INext.js";
-import type {
-	ICorsOptions,
-	TCorsOriginFunction,
-} from "../../../types/framework/pipeline/IPipeline.js";
-import type { IRequest } from "../../../types/http/IRequest.js";
-import type { IResponse } from "../../../types/http/IResponse.js";
+import { NextFunction } from "../../types/framework/pipeline/INext.js";
+import { ICorsOptions, TCorsOriginFunction } from "../../types/framework/pipeline/IPipeline.js";
+import { IRequest } from "../../types/http/IRequest.js";
+import { IResponse } from "../../types/http/IResponse.js";
+
 
 const defaultOptions: ICorsOptions = {
 	origin: "*",

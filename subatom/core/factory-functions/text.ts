@@ -1,22 +1,30 @@
-// middleware/json.ts
+// middleware/text.ts
 
-import type { NextFunction } from "../../../types/framework/pipeline/INext.js";
-import type { ILimit } from "../../../types/framework/pipeline/IPipeline.js";
-import type { IRequest } from "../../../types/http/IRequest.js";
-import type { IResponse } from "../../../types/http/IResponse.js";
-import { parseLimit } from "../../utils/parseLimit.js";
+import { NextFunction } from "../../types/framework/pipeline/INext.js";
+import { ITextOptions } from "../../types/framework/pipeline/IPipeline.js";
+import { IRequest } from "../../types/http/IRequest.js";
+import { IResponse } from "../../types/http/IResponse.js";
+import { parseLimit } from "../utils/parseLimit.js";
 
-export function json(options: ILimit = {}) {
-	const maxBytes = parseLimit(options.limit ?? "100kb"); // Default 100kb like Express
+
+
+export function text(options: ITextOptions = {}) {
+	const maxBytes = parseLimit(options.limit ?? "100kb");
+	const acceptedType = options.type ?? "text/plain";
+	const encoding = options.defaultEncoding ?? "utf-8";
 
 	return async (req: IRequest, res: IResponse, next: NextFunction) => {
-		// 1. Only process requests with JSON content-type or requests that carry a body
+		// 1. Only process requests with matching content-type or requests that carry a body
 		const contentType = req.raw.headers["content-type"] || "";
 		const hasBody =
 			req.raw.headers["content-length"] || req.raw.headers["transfer-encoding"];
 
-		if (!hasBody || !contentType.includes("application/json")) {
-			req.body = {};
+		const matchesType = Array.isArray(acceptedType)
+			? acceptedType.some((type) => contentType.includes(type))
+			: contentType.includes(acceptedType);
+
+		if (!hasBody || !matchesType) {
+			req.body = "";
 			return next();
 		}
 
@@ -53,21 +61,15 @@ export function json(options: ILimit = {}) {
 				chunks.push(chunk);
 			}
 
-			// 4. Parse aggregated buffer into JSON
-			const rawBody = Buffer.concat(chunks).toString("utf-8");
-
-			if (rawBody.trim().length > 0) {
-				req.body = JSON.parse(rawBody);
-			} else {
-				req.body = {};
-			}
+			// 4. Convert aggregated buffer to text string
+			req.body = Buffer.concat(chunks).toString(encoding);
 
 			await next();
 		} catch (error) {
-			// 5. Catch invalid JSON syntax errors
+			// 5. Catch stream read or encoding errors
 			res.status(400).json({
 				success: false,
-				message: "Bad Request: Invalid JSON Payload",
+				message: "Bad Request: Error reading text payload",
 			});
 		}
 	};
