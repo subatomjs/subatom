@@ -1,4 +1,4 @@
-export * from "./subatom/core/framework-core/subatom/Subatom.js";
+export * from "./subatom/core/bootstrap/subatom/Subatom.js";
 export * from "./subatom/core/router/Router.js";
 export { configEnv, env } from "./subatom/cli-engine/utils/env/env.js";
 export { parseEnv } from "./subatom/cli-engine/utils/env/parseEnv.js";

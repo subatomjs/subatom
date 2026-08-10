@@ -1,6 +1,6 @@
 // services/routerMerger.service.js
 import type { Router } from "../Router.js";
-import { combinePaths } from "../../framework-core/subatom/helpers/combinePath.js";
+import { combinePaths } from "../../bootstrap/subatom/helpers/combinePath.js";
 
 function assertRouterInstance(subRouter: unknown, callSite: string): asserts subRouter is Router {
 	if (

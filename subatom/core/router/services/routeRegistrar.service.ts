@@ -14,8 +14,8 @@ import {
   IRouteMeta,
   IRouteOptions,
 } from "../../../types/framework/router/IRouter.js";
-import { combinePaths } from "../../framework-core/subatom/helpers/combinePath.js";
-import { HttpMethod } from "../../framework-core/subatom/subordinate/RouteGroupBuilder.js";
+import { combinePaths } from "../../bootstrap/subatom/helpers/combinePath.js";
+import { HttpMethod } from "../../bootstrap/subatom/subordinate/RouteGroupBuilder.js";
 import { parseRouteArgs } from "../helpers/parseRouteArgs.js";
 import { Router } from "../Router.js";
 
