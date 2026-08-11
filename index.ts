@@ -58,3 +58,14 @@ export type {
   IUploadFile,
   FilesMap,
 } from "./subatom/types/framework/pipeline/IUploadFile.js";
+
+
+// export streams with types
+export * from './subatom/core/http/streams/index.js';
+export * from './subatom/core/websocket/sse/index.js'
+
+
+//
+export * from './subatom/core/http/compression/compression.js'
+export * from "./subatom/core/http/compression//staticPrecompress.js"
+

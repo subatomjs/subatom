@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type {
   IWebSocketOptions,
   IWebSocketRoute,
-} from "../../../types/framework/websocket/IWebSocket.js";
+} from "../../../types/websocket/IWebSocket.js";
 
 export async function handleUpgrade(
   request: IncomingMessage,

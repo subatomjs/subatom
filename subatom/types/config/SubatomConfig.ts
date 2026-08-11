@@ -1,4 +1,4 @@
-import type { IWebSocketOptions } from "../framework/websocket/IWebSocket.js";
+import type { IWebSocketOptions } from "../websocket/IWebSocket.js";
 
 export interface SubatomConfig {
 	entry: string;

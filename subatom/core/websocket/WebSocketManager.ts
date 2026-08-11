@@ -11,7 +11,7 @@ import {
   IWebSocketHandlers,
   IWebSocketOptions,
   IWebSocketRoute,
-} from "../../types/framework/websocket/IWebSocket.js";
+} from "../../types/websocket/IWebSocket.js";
 
 const DEFAULT_OPTIONS: Required<
   Pick<

@@ -1,7 +1,7 @@
 import {
   IWebSocketHandlers,
   WebSocketMessageData,
-} from "../../../types/framework/websocket/IWebSocket.js";
+} from "../../../types/websocket/IWebSocket.js";
 import type { WebSocketConnection } from "../WebSocketConnection.js";
 
 export function dispatchMessage(

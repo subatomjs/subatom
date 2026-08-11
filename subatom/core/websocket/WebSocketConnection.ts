@@ -6,7 +6,7 @@ import { TokenBucket } from "./services/rateLimiter.service.js";
 import {
   IWebSocketConnection,
   WebSocketReadyState,
-} from "../../types/framework/websocket/IWebSocket.js";
+} from "../../types/websocket/IWebSocket.js";
 
 /**
  * Thin, safe wrapper around a raw `ws` socket. Never expose the raw socket's

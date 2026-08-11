@@ -1,5 +1,5 @@
 import type { ISubatomServerConfig } from "../../../../types/framework/core/IFrameworkCore.js";
-import type { IWebSocketRoute } from "../../../../types/framework/websocket/IWebSocket.js";
+import type { IWebSocketRoute } from "../../../../types/websocket/IWebSocket.js";
 import type {
   ErrorMiddlewareHandler,
   MiddlewareHandler,

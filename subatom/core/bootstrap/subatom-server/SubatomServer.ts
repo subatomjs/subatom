@@ -20,7 +20,7 @@ import type {
   ErrorMiddlewareHandler,
   MiddlewareHandler,
 } from "../../../types/http/IMiddleware.js";
-import type { IWebSocketRoute } from "../../../types/framework/websocket/IWebSocket.js";
+import type { IWebSocketRoute } from "../../../types/websocket/IWebSocket.js";
 import type { IRequestPipelineConfig } from "../../pipeline/modifier/RequestPipeline.js";
 
 // Single-purpose service imports

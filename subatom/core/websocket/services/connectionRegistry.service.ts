@@ -1,4 +1,4 @@
-import { IWebSocketConnection } from "../../../types/framework/websocket/IWebSocket.js";
+import { IWebSocketConnection } from "../../../types/websocket/IWebSocket.js";
 
 /**
  * Central bookkeeping for every live connection and every room. Kept as its

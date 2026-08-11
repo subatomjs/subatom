@@ -30,6 +30,12 @@ export interface DownloadOptions extends SendFileOptions {
   filename?: string;
 }
 
+
+export type FormatHandlers = {
+    [key: string]: () => void;
+};
+
+
 /**
  * The public contract for an HTTP response as seen by route handlers and
  * middleware. Type against this — `(req: IRequest, res: IResponse) => {}` —
@@ -135,6 +141,7 @@ export interface IResponse {
    * escapes quotes to prevent header/attribute injection.
    */
   attachment(filename?: string): this;
+  format(handlers: FormatHandlers, requestHeaders: Record<string, string | string[] | undefined>): this;
 }
 
 export type IResponseHelper = {

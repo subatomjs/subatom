@@ -53,38 +53,4 @@ export function pipeFile(
 	fileStream.pipe(raw);
 }
 
-export function sendFile(
-	raw: ServerResponse,
-	headersMap: Map<string, string | string[]>,
-	headersSent: boolean,
-	filePath: string,
-	options: SendFileOptions,
-	setStatusCode: (code: number) => void,
-): void {
-	const resolvedPath = resolveSafePath(filePath, options.root);
-	if (resolvedPath === null) {
-		setStatusCode(403);
-		raw.end("Forbidden");
-		return;
-	}
-	if (!existsSync(resolvedPath) || !statSync(resolvedPath).isFile()) {
-		setStatusCode(404);
-		raw.end("File not found");
-		return;
-	}
 
-	const ext = extname(resolvedPath).toLowerCase();
-	const mimeType =
-		options.contentType || MIME_TYPES[ext] || "application/octet-stream";
-
-	setHeader(raw, headersMap, headersSent, "Content-Type", mimeType);
-	setHeader(
-		raw,
-		headersMap,
-		headersSent,
-		"Content-Length",
-		statSync(resolvedPath).size.toString(),
-	);
-
-	pipeFile(raw, headersSent, resolvedPath, setStatusCode);
-}

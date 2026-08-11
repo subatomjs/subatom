@@ -45,7 +45,7 @@ import type {
 import type {
   IWebSocketHandlers,
   IWebSocketRoute,
-} from "../../../types/framework/websocket/IWebSocket.js";
+} from "../../../types/websocket/IWebSocket.js";
 import { IRequestPipelineConfig } from "../../pipeline/modifier/RequestPipeline.js";
 import {
   registerInterceptor,
