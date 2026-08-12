@@ -1,27 +1,17 @@
-import { IncomingMessage, ServerResponse } from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import { SubatomCompression, CompressionAlgorithm } from './compression.js';
-
-export interface StaticPrecompressOptions {
-  /** Absolute path to the root directory hosting static files */
-  publicDir: string;
-  /** Custom mapping of algorithms to file extensions. Default: .br, .gz, .zst, .deflate */
-  extensionMap?: Partial<Record<CompressionAlgorithm, string>>;
-  /** Enable fallback to dynamic real-time compression if pre-compressed asset isn't found. Default: true */
-  fallbackToDynamic?: boolean;
-}
+import type { IncomingMessage, ServerResponse } from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import type { CompressionAlgorithm, StaticPrecompressOptions } from "../../../types/http/ICompression.js";
+import { SubatomCompression } from "./compressor.js";
+import { getStaticMimeType } from "./utils.js";
 
 const DEFAULT_EXT_MAP: Record<string, string> = {
-  br: '.br',
-  gzip: '.gz',
-  zstd: '.zst',
-  deflate: '.deflate',
+  br: ".br",
+  gzip: ".gz",
+  zstd: ".zst",
+  deflate: ".deflate",
 };
 
-/**
- * Serves pre-compressed static files directly from disk based on Accept-Encoding.
- */
 export class SubatomStaticPrecompress {
   private publicDir: string;
   private extMap: Record<string, string>;
@@ -35,17 +25,14 @@ export class SubatomStaticPrecompress {
     this.compressionEngine = new SubatomCompression();
   }
 
-  /**
-   * Evaluates the request path and Accept-Encoding header to find a matching pre-compressed file on disk.
-   */
   public resolvePrecompressedFile(
     req: IncomingMessage,
-    requestPath: string
+    requestPath: string,
   ): { targetPath: string; encoding: CompressionAlgorithm | null } {
-    const rawAcceptEncoding = req.headers['accept-encoding'] as string | undefined;
+    const rawAcceptEncoding = req.headers["accept-encoding"] as string | undefined;
     const { algorithm } = this.compressionEngine.negotiate(rawAcceptEncoding);
 
-    if (algorithm === 'identity') {
+    if (algorithm === "identity") {
       return { targetPath: requestPath, encoding: null };
     }
 
@@ -57,11 +44,9 @@ export class SubatomStaticPrecompress {
       }
     }
 
-    // Secondary fallback check: if client supports 'br' or 'gzip' but negotiation selected another,
-    // look for available static files in order of efficiency.
-    const priorityFallbacks: CompressionAlgorithm[] = ['br', 'gzip', 'deflate'];
+    const priorityFallbacks: CompressionAlgorithm[] = ["br", "gzip", "deflate"];
     for (const fallbackAlgo of priorityFallbacks) {
-      if (fallbackAlgo === algorithm) continue; // Already checked above
+      if (fallbackAlgo === algorithm) continue;
       const ext = this.extMap[fallbackAlgo];
       if (ext) {
         const fallbackPath = `${requestPath}${ext}`;
@@ -74,48 +59,38 @@ export class SubatomStaticPrecompress {
     return { targetPath: requestPath, encoding: null };
   }
 
-  /**
-   * Middleware handler for Subatom's static router
-   */
   public middleware() {
     return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-      // Ignore non-GET/HEAD HTTP methods
-      if (req.method !== 'GET' && req.method !== 'HEAD') {
+      if (req.method !== "GET" && req.method !== "HEAD") {
         return next();
       }
 
-      // Safe path resolution to prevent directory traversal attacks
-      const safeRelativePath = path.normalize(req.url || '/').replace(/^(\.\.[\/\\])+/, '');
+      const safeRelativePath = path.normalize(req.url || "/").replace(/^(\.\.[\/\\])+/, "");
       const absoluteFilePath = path.join(this.publicDir, safeRelativePath);
 
-      // Verify base file existence
       if (!fs.existsSync(absoluteFilePath) || fs.statSync(absoluteFilePath).isDirectory()) {
         return next();
       }
 
-      // Always set Vary header for HTTP caching correctness
-      const existingVary = res.getHeader('Vary');
+      const existingVary = res.getHeader("Vary");
       if (!existingVary) {
-        res.setHeader('Vary', 'Accept-Encoding');
-      } else if (typeof existingVary === 'string' && !existingVary.includes('Accept-Encoding')) {
-        res.setHeader('Vary', `${existingVary}, Accept-Encoding`);
+        res.setHeader("Vary", "Accept-Encoding");
+      } else if (typeof existingVary === "string" && !existingVary.includes("Accept-Encoding")) {
+        res.setHeader("Vary", `${existingVary}, Accept-Encoding`);
       }
 
-      // Attempt static pre-compressed file discovery
       const { targetPath, encoding } = this.resolvePrecompressedFile(req, absoluteFilePath);
 
       if (encoding) {
-        // Pre-compressed file found! Stream straight from disk.
-        res.setHeader('Content-Encoding', encoding);
-        
-        // Derive original Content-Type from original file name (not .br or .gz)
-        const mimeType = this.getMimeType(absoluteFilePath);
-        if (mimeType) res.setHeader('Content-Type', mimeType);
+        res.setHeader("Content-Encoding", encoding);
+
+        const mimeType = getStaticMimeType(absoluteFilePath);
+        if (mimeType) res.setHeader("Content-Type", mimeType);
 
         const stat = fs.statSync(targetPath);
-        res.setHeader('Content-Length', stat.size);
+        res.setHeader("Content-Length", stat.size);
 
-        if (req.method === 'HEAD') {
+        if (req.method === "HEAD") {
           res.statusCode = 200;
           return res.end();
         }
@@ -125,26 +100,7 @@ export class SubatomStaticPrecompress {
         return;
       }
 
-      // If no pre-compressed asset exists and dynamic fallback is enabled, pass down to dynamic middleware
       next();
     };
   }
-
-  private getMimeType(filePath: string): string {
-    const ext = path.extname(filePath).toLowerCase();
-    const map: Record<string, string> = {
-      '.html': 'text/html; charset=utf-8',
-      '.css': 'text/css; charset=utf-8',
-      '.js': 'application/javascript; charset=utf-8',
-      '.json': 'application/json; charset=utf-8',
-      '.svg': 'image/svg+xml',
-      '.wasm': 'application/wasm',
-    };
-    return map[ext] || 'application/octet-stream';
-  }
-}
-
-export function serveStaticPrecompressed(options: StaticPrecompressOptions) {
-  const handler = new SubatomStaticPrecompress(options);
-  return handler.middleware();
 }

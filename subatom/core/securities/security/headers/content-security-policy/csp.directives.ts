@@ -1,0 +1,9 @@
+export const VALID_CSP_DIRECTIVES = new Set([
+  'child-src', 'connect-src', 'default-src', 'font-src', 'frame-src',
+  'img-src', 'manifest-src', 'media-src', 'object-src', 'prefetch-src',
+  'script-src', 'script-src-elem', 'script-src-attr', 'style-src',
+  'style-src-elem', 'style-src-attr', 'worker-src', 'base-uri',
+  'plugin-types', 'sandbox', 'disowned-opener', 'form-action',
+  'frame-ancestors', 'navigate-to', 'report-uri', 'report-to',
+  'block-all-mixed-content', 'upgrade-insecure-requests'
+]);

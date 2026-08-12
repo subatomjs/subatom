@@ -1,6 +1,5 @@
 /// <reference types="node" />
 import {
-  afterAll,
   afterEach,
   beforeEach,
   describe,
@@ -23,7 +22,7 @@ import {
   createCompression,
   type CompressionAlgorithm,
   type CompressionOptions,
-} from "../subatom/core/http/compression/compression.js";
+} from "../subatom/core/http/compression/index.js";
 
 /**
  * ============================================================================
@@ -2294,39 +2293,39 @@ describe(
       },
     );
 
-it.each([
-  "br",
-  "gzip",
-  "deflate",
-] as const)(
-  "produces valid %s compressed output",
-  async (algorithm) => {
-    server = createTestServer();
+    it.each([
+      "br",
+      "gzip",
+      "deflate",
+    ] as const)(
+      "produces valid %s compressed output",
+      async (algorithm) => {
+        server = createTestServer();
 
-    await listen(server);
+        await listen(server);
 
-    const response = await rawRequest(server, {
-      path: "/json",
-      headers: {
-        "Accept-Encoding": algorithm,
+        const response = await rawRequest(server, {
+          path: "/json",
+          headers: {
+            "Accept-Encoding": algorithm,
+          },
+        });
+
+        expect(
+          response.headers["content-encoding"],
+        ).toBe(algorithm);
+
+        const decompressed =
+          await decompressResponse(
+            algorithm,
+            response.body,
+          );
+
+        expect(
+          decompressed.toString(),
+        ).toBe(LARGE_JSON);
       },
-    });
-
-    expect(
-      response.headers["content-encoding"],
-    ).toBe(algorithm);
-
-    const decompressed =
-      await decompressResponse(
-        algorithm,
-        response.body,
-      );
-
-    expect(
-      decompressed.toString(),
-    ).toBe(LARGE_JSON);
-  },
-);
+    );
 
     it("compressed response is smaller than original for highly compressible data", async () => {
       server =

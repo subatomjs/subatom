@@ -20,7 +20,8 @@ export const file = {
 export { defineConfig } from "./subatom/config/load.config.js";
 export { UploadFile } from "./subatom/core/pipeline/file-system/UploadFile.js";
 
-export { cors } from "./subatom/core/factory-functions/cors.js";
+export { cors } from "./subatom/core/securities/cross-origin/index.js";
+export * from "./subatom/core/securities/cross-origin/index.js";
 export { json } from "./subatom/core/factory-functions/json.js";
 export { raw } from "./subatom/core/factory-functions/raw.js";
 export { serveStatic } from "./subatom/core/factory-functions/serveStatic.js";
@@ -33,7 +34,6 @@ export type {
   SubatomConfig,
   SubatomUserConfig,
 } from "./subatom/types/config/SubatomConfig.js";
-
 
 export type {
   IRequest,
@@ -59,13 +59,14 @@ export type {
   FilesMap,
 } from "./subatom/types/framework/pipeline/IUploadFile.js";
 
-
 // export streams with types
-export * from './subatom/core/http/streams/index.js';
-export * from './subatom/core/websocket/sse/index.js'
-
+export * from "./subatom/core/http/streams/index.js";
+export * from "./subatom/core/websocket/sse/index.js";
 
 //
-export * from './subatom/core/http/compression/compression.js'
-export * from "./subatom/core/http/compression//staticPrecompress.js"
+export * from "./subatom/core/http/compression/index.js";
+export * from "./subatom/core/http/compression//staticPrecompress.js";
 
+
+// Security
+export * from './subatom/core/securities/security/index.js'
