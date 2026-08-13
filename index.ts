@@ -67,6 +67,6 @@ export * from "./subatom/core/websocket/sse/index.js";
 export * from "./subatom/core/http/compression/index.js";
 export * from "./subatom/core/http/compression//staticPrecompress.js";
 
-
 // Security
-export * from './subatom/core/securities/security/index.js'
+export * from "./subatom/core/securities/security/index.js";
+export * from "./subatom/core/securities/rate-limits/index.js";

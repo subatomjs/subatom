@@ -1,4 +1,4 @@
-import { CorsOrigin } from "../../../types/security/ICors.js";
+import { CorsOrigin } from "../../../types/securities/ICors.js";
 
 export function normalizeHeaderValue(val?: string | string[]): string {
   if (Array.isArray(val)) {

@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from "../../../../types/http/IMiddleware.js";
+import { IRequest } from "../../../../types/http/IRequest.js";
 import { parseRateLimitSpec } from "./parseRateLimitSpec.js";
 
 export function createRateLimitMiddleware(spec: string): MiddlewareHandler {
@@ -23,9 +24,9 @@ export function createRateLimitMiddleware(spec: string): MiddlewareHandler {
 	return (req, res, next) => {
 		try {
 			const clientKey: string =
-				(req as any)?.ip ||
-				(req as any)?.rawRequest?.socket?.remoteAddress ||
-				(req as any)?.rawRequest?.headers?.["x-forwarded-for"] ||
+				(req as IRequest)?.ip ||
+				(req as IRequest)?.rawRequest?.socket?.remoteAddress ||
+				(req as IRequest)?.rawRequest?.headers?.["x-forwarded-for"] ||
 				"unknown";
 
 			const now = Date.now();

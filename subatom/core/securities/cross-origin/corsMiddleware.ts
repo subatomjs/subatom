@@ -1,7 +1,7 @@
 import { NextFunction } from "../../../types/framework/pipeline/INext.js";
 import { IRequest } from "../../../types/http/IRequest.js";
 import { IResponse } from "../../../types/http/IResponse.js";
-import { ICorsOptions, CorsMiddleware } from "../../../types/security/ICors.js";
+import { ICorsOptions, CorsMiddleware } from "../../../types/securities/ICors.js";
 import { normalizeHeaderValue, resolveOrigin } from "./utils.js";
 
 const DEFAULT_OPTIONS: ICorsOptions = {

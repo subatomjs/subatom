@@ -6,4 +6,4 @@ export type {
 	CustomOriginFunction,
 	AsyncOriginFunction,
 	CorsMiddleware,
-} from "../../../types/security/ICors.js";
+} from "../../../types/securities/ICors.js";
