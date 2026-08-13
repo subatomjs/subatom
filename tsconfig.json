@@ -37,7 +37,7 @@
 		"incremental": false
 	},
 
-	"include": ["index.ts", "subatom", "subatom/core/http/request/services/.ts"],
+	"include": ["index.ts", "package", "package/core/http/request/services/.ts"],
 
 	"exclude": ["dist", "node_modules", "playground", "tests"]
 }
