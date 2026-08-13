@@ -8,7 +8,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "subatom": "./dist/subatom/engine/cli.js"
+    "subatom": "./dist/package/cli-engine/cli.js"
   },
   "exports": {
     ".": {
@@ -16,12 +16,12 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./package.json": "./package.json",
     "./*": {
       "types": "./dist/*.d.ts",
       "import": "./dist/*.js",
       "default": "./dist/*.js"
-    },
-    "./package.json": "./package.json"
+    }
   },
   "files": [
     "dist",
@@ -63,13 +63,13 @@
   "sideEffects": false,
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.build.json",
-    "dev": "tsx watch ./index.ts",
-    "cli:dev": "tsx watch ./subatom/cli.ts",
+    "build": "tsc -p tsconfig.build.json && node --import tsx ./package/cli-engine/postbuild.ts",
     "prepublishOnly": "npm run clean && npm run build",
-    "unit:test": "npx run vitest",
-    "lint": "npx @biomejs/biome check .",
-    "lint-fix": "npx @biomejs/biome check --write .",
+    "dev": "tsx watch ./index.ts",
+    "cli:dev": "tsx watch ./package/cli-engine/cli.ts",
+    "unit:test": "vitest run",
+    "lint": "biome check .",
+    "lint-fix": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
