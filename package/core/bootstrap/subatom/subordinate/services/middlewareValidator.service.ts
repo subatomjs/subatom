@@ -1,3 +1,6 @@
+// subatom/package/core/bootstrap/subatom/subordinate/services/middlewareValidator.service.ts
+
+
 import type { MiddlewareHandler } from "../../../../../types/http/IMiddleware.js";
 
 function assertIsFunction(value: unknown, label: string): void {

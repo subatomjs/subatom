@@ -1,3 +1,4 @@
+// subatom/package/core/bootstrap/subatom-server/services/errorPipeline.service.ts
 import type { ErrorMiddlewareHandler } from "../../../../types/http/IMiddleware.js";
 import type { IRequest } from "../../../../types/http/IRequest.js";
 import type { IResponse } from "../../../../types/http/IResponse.js";

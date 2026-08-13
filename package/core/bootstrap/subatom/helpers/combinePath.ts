@@ -1,3 +1,5 @@
+// subatom/package/core/bootstrap/subatom/helpers/combinePath.ts
+
 function normalizePathSegment(segment?: string | null): string {
 	if (segment === null || segment === undefined) return "";
 	const trimmed = String(segment).trim();

@@ -1,3 +1,5 @@
+// subatom/package/core/bootstrap/subatom/subordinate/RouteGroupBuilder.ts
+
 import type { IGroupContext } from "../../../../types/framework/core/IFrameworkCore.js";
 import type { IHandler } from "../../../../types/framework/router/IRouter.js";
 import type { MiddlewareHandler } from "../../../../types/http/IMiddleware.js";

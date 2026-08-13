@@ -1,3 +1,4 @@
+// subatom/package/core/bootstrap/subatom/subordinate/services/contextBuilder.service.ts
 import type { IGroupContext } from "../../../../../types/framework/core/IFrameworkCore.js";
 import type { MiddlewareHandler } from "../../../../../types/http/IMiddleware.js";
 import { combinePaths } from "../../helpers/combinePath.js";

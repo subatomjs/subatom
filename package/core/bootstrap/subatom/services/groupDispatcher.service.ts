@@ -1,3 +1,4 @@
+// subatom/package/core/bootstrap/subatom/services/groupDispatcher.service.ts
 import { Router } from "../../../router/Router.js";
 import type { Subatom } from "../Subatom.js";
 import { RouteGroupBuilder } from "../subordinate/RouteGroupBuilder.js";

@@ -1,3 +1,5 @@
+// subatom/package/core/router/services/errorNormalizer.service.ts
+
 import { SubatomError } from "../../http/errors/Error.js";
 
 export function normalizeError(err: unknown): Error {

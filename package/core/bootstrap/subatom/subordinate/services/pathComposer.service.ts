@@ -1,3 +1,5 @@
+// subatom/package/core/bootstrap/subatom/subordinate/services/pathComposer.service.ts
+
 import { combinePaths } from "../../helpers/combinePath.js";
 
 export function appendPrefix(currentPrefix: string, segment: string): string {

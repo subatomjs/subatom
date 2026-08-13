@@ -1,3 +1,5 @@
+// subatom/package/core/bootstrap/subatom/subordinate/services/tagValidator.service.ts
+
 export function collectTags(
 	ownTags: string[],
 	...tags: Array<string | string[]>

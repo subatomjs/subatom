@@ -1,3 +1,5 @@
+// subatom/package/core/bootstrap/subatom/helpers/parseRateLimitSpec.ts
+
 interface ParsedRateLimit {
 	limit: number;
 	windowMs: number;

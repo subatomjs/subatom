@@ -70,3 +70,7 @@ export * from "./package/core/http/compression/staticPrecompress.js";
 // Security
 export * from "./package/core/securities/security/index.js";
 export * from "./package/core/securities/rate-limits/index.js";
+
+
+//Docs
+export * from './package/core/docs/registerDocs.js'

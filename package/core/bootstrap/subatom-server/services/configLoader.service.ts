@@ -1,3 +1,4 @@
+// subatom/package/core/bootstrap/subatom-server/services/configLoader.service.ts
 import type { ISubatomServerConfig } from "../../../../types/framework/core/IFrameworkCore.js";
 
 export async function findAndLoadConfig(): Promise<ISubatomServerConfig> {

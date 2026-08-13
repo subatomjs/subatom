@@ -1,3 +1,4 @@
+// subatom/package/core/bootstrap/subatom/services/middlewareRegistrar.service.ts
 import type {
 	ErrorMiddlewareHandler,
 	MiddlewareHandler,

@@ -1,3 +1,5 @@
+// subatom/package/core/bootstrap/subatom/subordinate/services/rateLimitConfig.service.ts
+
 import type { MiddlewareHandler } from "../../../../../types/http/IMiddleware.js";
 import { createRateLimitMiddleware } from "../../helpers/createRateLimitMiddleware.js";
 import { parseRateLimitSpec } from "../../helpers/parseRateLimitSpec.js";

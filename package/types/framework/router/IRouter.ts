@@ -1,3 +1,4 @@
+// types/framework/router/IRouter.ts
 import type { IRequest } from "../../http/IRequest.js";
 import type { IResponse } from "../../http/IResponse.js";
 import type { NextFunction } from "../pipeline/INext.js";
@@ -6,19 +7,37 @@ import type {
   ISerializer,
   ITransformer,
 } from "../pipeline/IPipeline.js";
-import type { IRequestPipelineConfig } from "../../../core/pipeline/modifier/RequestPipeline.js"; // adjust path to your actual location
+import type { IRequestPipelineConfig } from "../../../core/pipeline/modifier/RequestPipeline.js";
 
-/**
- * `next` accepts an optional error — passing one short-circuits the
- * pipeline into the error boundary (see `Router.runPipeline`). Handlers
- * that want to propagate an error via `next(err)` need this parameter
- * present in the type, or `next(err)` fails to compile for consumers.
- */
+
+
+export interface ISchemaObject {
+  type?: string;
+  properties?: Record<string, any>;
+  required?: string[];
+  [key: string]: any;
+}
+
+export interface IRouteSchema {
+  body?: ISchemaObject | Record<string, any> | unknown;
+  query?: ISchemaObject | Record<string, any> | unknown;
+  params?: ISchemaObject | Record<string, any> | unknown;
+  headers?: ISchemaObject | Record<string, any> | unknown;
+}
+
+
 export type IHandler = (
   req: IRequest,
   res: IResponse,
   next: NextFunction,
 ) => void | Promise<void>;
+
+export interface IRouteSchema {
+  body?: unknown;
+  query?: unknown;
+  params?: unknown;
+  headers?: unknown;
+}
 
 export interface IRoute {
   method: string;
@@ -27,7 +46,8 @@ export interface IRoute {
   tags?: string[];
   rateLimit?: string;
   routerPipeline?: IRoutePipelineRef;
-   name?: string;
+  name?: string;
+  schema?: IRouteSchema;
 }
 
 export interface IMatchResult {
@@ -39,19 +59,17 @@ export interface IMatchResult {
 export interface IRouteMeta {
   tags?: string[] | undefined;
   rateLimit?: string | undefined;
-  name?: string | undefined; 
+  name?: string | undefined;
+  schema?: IRouteSchema | undefined;
 }
+
 export interface IRouteOptions {
   name?: string;
   tags?: string[];
   rateLimit?: string;
+  schema?: IRouteSchema;
 }
-/**
- * The public contract for a Router. Type against this —
- * `const router: IRouter = new Router()` — rather than the concrete
- * `Router` class, which also exposes path-matching/pipeline internals
- * you shouldn't need to touch directly.
- */
+
 export interface IRouter {
   get(path: string, ...handlers: IHandler[]): void;
   post(path: string, ...handlers: IHandler[]): void;
@@ -62,40 +80,22 @@ export interface IRouter {
   head(path: string, ...handlers: IHandler[]): void;
   trace(path: string, ...handlers: IHandler[]): void;
   connect(path: string, ...handlers: IHandler[]): void;
-  transformer(transformer: ITransformer): void; // 👈 add
-  intercept(interceptor: IInterceptor): void; // 👈 add
-  serializer(serializer: ISerializer): void; // 👈 add
-  getPipelineConfig(): IRequestPipelineConfig; // 👈 add
-
-  /**
-   * QUERY — the proposed HTTP method (IETF draft "The HTTP QUERY
-   * Method") for safe, idempotent requests that carry a body. Useful
-   * when a search/filter payload is too complex or too large for a
-   * GET query string, but the semantics should still be read-only and
-   * cacheable like GET rather than mutating like POST. Registers a
-   * terminal route matched only against `QUERY` requests, same shape
-   * as `get`/`post`.
-   */
+  transformer(transformer: ITransformer): void;
+  intercept(interceptor: IInterceptor): void;
+  serializer(serializer: ISerializer): void;
+  getPipelineConfig(): IRequestPipelineConfig;
   query(path: string, ...handlers: IHandler[]): void;
-
-  /** Registers a terminal route that matches any HTTP method. */
   all(path: string, ...handlers: IHandler[]): void;
-
-  /** Registers path-scoped or global middleware. */
   use(pathOrHandler: string | IHandler, ...handlers: IHandler[]): void;
-
   getRoutes(): IRoute[];
   clearRoutes(): void;
-
   registerWithMeta(
     method: string,
     path: string,
     handlers: IHandler[],
     meta?: IRouteMeta,
   ): void;
-
   match(method?: string, rawUrl?: string): IMatchResult | undefined;
-
   handleRequest(
     req: IRequest,
     res: IResponse,

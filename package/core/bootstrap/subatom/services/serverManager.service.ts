@@ -1,3 +1,4 @@
+// subatom/package/core/bootstrap/subatom/services/serverManager.service.ts
 import type { ISubatomServerConfig } from "../../../../types/framework/core/IFrameworkCore.js";
 import type { IWebSocketRoute } from "../../../../types/websocket/IWebSocket.js";
 import type {

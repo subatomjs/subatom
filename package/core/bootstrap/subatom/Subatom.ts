@@ -1,3 +1,4 @@
+// subatom/package/core/bootstrap/subatom/Subatom.ts
 import { configEnv } from "../../../cli-engine/utils/env/env.js";
 import type { EnvOptions } from "../../../types/engine-utils/EnvOptions.js";
 import type {
