@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createCORPMiddleware } from "../../subatom/core/securities/security/headers/cross-origin-resource-policy/corp.middleware";
+import { createCORPMiddleware } from "../../package/core/securities/security/headers/cross-origin-resource-policy/corp.middleware";
 
 describe('CORP Middleware', () => {
   it('should set same-origin policy', () => {

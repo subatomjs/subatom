@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createCSPMiddleware } from "../../subatom/core/securities/security/headers/content-security-policy/csp.middleware";
+import { createCSPMiddleware } from "../../package/core/securities/security/headers/content-security-policy/csp.middleware";
 
 describe('CSP Middleware', () => {
   it('should apply default CSP headers', () => {

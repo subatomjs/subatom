@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createReferrerPolicyMiddleware } from "../../subatom/core/securities/security/headers/referrer-policy";
+import { createReferrerPolicyMiddleware } from "../../package/core/securities/security/headers/referrer-policy";
 
 describe('Referrer Policy Middleware', () => {
   it('should apply default no-referrer policy', () => {

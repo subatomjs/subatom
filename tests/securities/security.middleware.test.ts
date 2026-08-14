@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { subatomSecurity } from '../../subatom/core/securities/security/security.middleware.js';
+import { subatomSecurity } from '../../package/core/securities/security/security.middleware.js';
 
 describe('Subatom Orchestrator Middleware', () => {
   it('should apply all default headers properly in stack', () => {

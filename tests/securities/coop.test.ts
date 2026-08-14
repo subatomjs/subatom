@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createCOOPMiddleware } from "../../subatom/core/securities/security/headers/cross-origin-opener-policy/coop.middleware";
+import { createCOOPMiddleware } from "../../package/core/securities/security/headers/cross-origin-opener-policy/coop.middleware";
 
 describe('COOP Middleware', () => {
   it('should set same-origin policy', () => {

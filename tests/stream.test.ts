@@ -6,13 +6,13 @@ import { once } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 // Module Imports
-import { reqOnData } from "../subatom/core/http/streams/methods/request/reqOnData.js";
-import { reqPipe } from "../subatom/core/http/streams/methods/request/reqPipe.js";
-import { resStream } from "../subatom/core/http/streams/methods/response/resStream.js";
-import { resSendStream } from "../subatom/core/http/streams/methods/response/resSendStream.js";
-import { UploadFile } from "../subatom/core/pipeline/file-system/UploadFile.js";
-import { pipeline } from "../subatom/core/http/streams/methods/stream-composition/pipeline.js";
-import { createTransform } from "../subatom/core/http/streams/methods/stream-composition/Transform.js";
+import { reqOnData } from "../package/core/http/streams/methods/request/reqOnData.js";
+import { reqPipe } from "../package/core/http/streams/methods/request/reqPipe.js";
+import { resStream } from "../package/core/http/streams/methods/response/resStream.js";
+import { resSendStream } from "../package/core/http/streams/methods/response/resSendStream.js";
+import { UploadFile } from "../package/core/pipeline/file-system/UploadFile.js";
+import { pipeline } from "../package/core/http/streams/methods/stream-composition/pipeline.js";
+import { createTransform } from "../package/core/http/streams/methods/stream-composition/Transform.js";
 
 // ==========================================
 // MOCK CREATORS

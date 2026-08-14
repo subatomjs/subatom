@@ -1,6 +1,6 @@
 // test/rate-limit/integration.test.ts
 import { describe, it, expect, vi } from "vitest";
-import { rateLimit } from "../subatom/core/securities/rate-limits/index";
+import { rateLimit } from "../package/core/securities/rate-limits/index";
 
 describe("Subatom Rate Limit Integration Tests", () => {
   it("allows requests under the limit and sets headers", async () => {

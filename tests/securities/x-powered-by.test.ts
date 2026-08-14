@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createXPoweredByMiddleware } from "../../subatom/core/securities/security/headers/x-powered-by";
+import { createXPoweredByMiddleware } from "../../package/core/securities/security/headers/x-powered-by";
 
 describe('X-Powered-By Middleware', () => {
   it('should remove header when configured false', () => {

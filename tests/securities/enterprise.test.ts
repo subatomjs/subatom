@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { enterpriseProfile } from '../../subatom/core/securities/security/profiles/enterprise.profile.js';
-import { subatomSecurity } from "../../subatom/core/securities/security/security.middleware";
+import { enterpriseProfile } from '../../package/core/securities/security/profiles/enterprise.profile.js';
+import { subatomSecurity } from "../../package/core/securities/security/security.middleware";
 
 describe('Enterprise Profile Test', () => {
   it('should enforce default-src none in CSP', () => {

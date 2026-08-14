@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { productionProfile } from '../../subatom/core/securities/security/profiles/production.profile.js';
-import { subatomSecurity } from "../../subatom/core/securities/security/security.middleware";
+import { productionProfile } from '../../package/core/securities/security/profiles/production.profile.js';
+import { subatomSecurity } from "../../package/core/securities/security/security.middleware";
 
 describe('Production Profile Test', () => {
   it('should enforce strict max-age HSTS header', () => {

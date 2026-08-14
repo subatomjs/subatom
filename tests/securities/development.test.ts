@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { developmentProfile } from '../../subatom/core/securities/security/profiles/development.profile.js';
-import { subatomSecurity } from "../../subatom/core/securities/security/security.middleware";
+import { developmentProfile } from '../../package/core/securities/security/profiles/development.profile.js';
+import { subatomSecurity } from "../../package/core/securities/security/security.middleware";
 
 describe('Development Profile Test', () => {
   it('should allow unsafe-eval and unsafe-inline in dev profile', () => {

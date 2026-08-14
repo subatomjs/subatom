@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createCOEPMiddleware } from "../../subatom/core/securities/security/headers/cross-origin-embedder-policy/coep.middleware";
+import { createCOEPMiddleware } from "../../package/core/securities/security/headers/cross-origin-embedder-policy/coep.middleware";
 
 
 describe('COEP Middleware', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createFrameguardMiddleware } from "../../subatom/core/securities/security/headers/frameguard/frameguard.middleware";
+import { createFrameguardMiddleware } from "../../package/core/securities/security/headers/frameguard/frameguard.middleware";
 
 describe('Frameguard Middleware', () => {
   it('should apply SAMEORIGIN by default', () => {

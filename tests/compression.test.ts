@@ -22,7 +22,7 @@ import {
   createCompression,
   type CompressionAlgorithm,
   type CompressionOptions,
-} from "../subatom/core/http/compression/index.js";
+} from "../package/core/http/compression/index.js";
 
 /**
  * ============================================================================

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createPermissionsPolicyMiddleware } from "../../subatom/core/securities/security/headers/permissions-policy/permissions-policy.middleware";
+import { createPermissionsPolicyMiddleware } from "../../package/core/securities/security/headers/permissions-policy/permissions-policy.middleware";
 
 describe('Permissions Policy Middleware', () => {
   it('should format permissions policy accurately', () => {

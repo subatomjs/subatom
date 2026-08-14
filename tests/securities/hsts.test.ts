@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createHSTSMiddleware } from "../../subatom/core/securities/security/headers/strict-transport-security/hsts.middleware";
+import { createHSTSMiddleware } from "../../package/core/securities/security/headers/strict-transport-security/hsts.middleware";
 
 describe('HSTS Middleware', () => {
   it('should apply default HSTS header correctly', () => {
