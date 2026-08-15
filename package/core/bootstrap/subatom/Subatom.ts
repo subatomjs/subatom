@@ -1,6 +1,5 @@
 // subatom/package/core/bootstrap/subatom/Subatom.ts
-import { configEnv } from "../../../cli-engine/utils/env/env.js";
-import type { EnvOptions } from "../../../types/engine-utils/EnvOptions.js";
+import type { EnvOptions } from "../../../types/config/EnvOptions.js";
 import type {
   IGroupContext,
   ISubatomServerConfig,
@@ -53,6 +52,7 @@ import {
   registerSerializer,
   registerTransformer,
 } from "../../pipeline/modifier/services/pipelineRegistrar.service.js";
+import { configEnv } from "../../../config/env/env.js";
 
 export class Subatom {
   private readonly router = new Router();

@@ -13,8 +13,7 @@ import type {
   ISubatomServerConfig,
 } from "../../../types/framework/core/IFrameworkCore.js";
 
-// ❌ OLD: import type { IRouter } from "../../../types/framework/router/IRouter.js";
-// ✅ NEW: Import the concrete Router class
+// Import the concrete Router class
 import { Router } from "../../router/Router.js";
 
 import type {
@@ -25,7 +24,6 @@ import type { IWebSocketRoute } from "../../../types/websocket/IWebSocket.js";
 import type { IRequestPipelineConfig } from "../../pipeline/modifier/RequestPipeline.js";
 
 // Single-purpose service imports
-import { findAndLoadConfig } from "./services/configLoader.service.js";
 import { tryRecoverFromOrphanedRejection } from "./services/orphanRecovery.service.js";
 import { getAvailablePort } from "./services/portProber.service.js";
 import { processHttpRequest } from "./services/requestHandler.service.js";
@@ -33,10 +31,22 @@ import { closeServer } from "./services/serverShutdown.service.js";
 import { trackSocket } from "./services/socketTracker.service.js";
 import { WebSocketManager } from "../../websocket/WebSocketManager.js";
 import { IRouter } from "../../../types/framework/router/IRouter.js";
+import { ConfigManager } from "../../../config/ConfigManager.js";
+
+// [UPDATE FOR NEW ENV CONFIG]: 
+// Replaced the old isolated `findAndLoadConfig` with the new centralized ConfigManager.
 
 export class SubatomServer {
   private readonly server: Server;
+  
+  // Fully restored original config property to support setConfig API
   private config: ISubatomServerConfig = {};
+  
+  // [UPDATE FOR NEW ENV CONFIG]: 
+  // Added this to cache the final, strictly validated configuration pipeline.
+  // This ensures methods like close() have access to reliable, merged values.
+  private resolvedConfig: any = {};
+  
   private readonly openSockets = new Set<Socket>();
   private readonly webSocketManager: WebSocketManager;
   private pipelineConfig: IRequestPipelineConfig = {
@@ -48,8 +58,7 @@ export class SubatomServer {
   private readonly requestContext = new AsyncLocalStorage<IRequestContext>();
 
   constructor(
-    // 👈 Change `IRouter` to `Router` here
-    private readonly router: Router |IRouter,
+    private readonly router: Router | IRouter,
     private readonly middlewares: MiddlewareHandler[] = [],
     private readonly errorMiddlewares: ErrorMiddlewareHandler[] = [],
     private readonly wsRoutes: IWebSocketRoute[] = [],
@@ -78,10 +87,12 @@ export class SubatomServer {
     });
   }
 
+  // Feature Restored: Keeps the public API intact for any middleware or plugins modifying config before start.
   public setConfig(config: ISubatomServerConfig): void {
     this.config = { ...this.config, ...config };
   }
 
+  // Feature Restored: Keeps pipeline configuration intact.
   public setPipelineConfig(config: IRequestPipelineConfig): void {
     this.pipelineConfig = config;
   }
@@ -93,7 +104,7 @@ export class SubatomServer {
     await processHttpRequest(
       native_request,
       native_response,
-      this.router, // 👈 No longer raises TS2740
+      this.router,
       this.middlewares,
       this.errorMiddlewares,
       this.requestContext,
@@ -110,18 +121,44 @@ export class SubatomServer {
   }
 
   public async start(overrideConfig?: ISubatomServerConfig): Promise<Server> {
-    const fileConfig = await findAndLoadConfig();
-    const mergedConfig = { ...fileConfig, ...this.config, ...overrideConfig };
+    // [UPDATE FOR NEW ENV CONFIG]: 
+    // 1. First, we merge your legacy instance config (from `setConfig`) with any explicit `start(overrides)`.
+    const combinedOverrides = { ...this.config, ...overrideConfig };
 
-    if (mergedConfig.websocket) {
-      this.webSocketManager.activate(mergedConfig.websocketOptions);
+    // [UPDATE FOR NEW ENV CONFIG]: 
+    // 2. We sanitize these legacy overrides into the strict typing the new ConfigManager expects.
+    // For example, resolving the strict `number` requirement for the `port` property.
+    let safeOverrides: any = undefined;
+    if (Object.keys(combinedOverrides).length > 0) {
+      safeOverrides = {};
+      for (const [key, value] of Object.entries(combinedOverrides)) {
+        if (value !== undefined) {
+          if (key === "port") {
+            safeOverrides.port = Number(value);
+          } else {
+            safeOverrides[key] = value;
+          }
+        }
+      }
     }
 
-    const rawPort = process.env.PORT || mergedConfig.port || 8080;
-    const host = process.env.HOST || mergedConfig.host || "localhost";
-    const appName = mergedConfig.appName || "subatom";
+    // [UPDATE FOR NEW ENV CONFIG]: 
+    // 3. We delegate to the unified ConfigManager. It will handle the `.env` discovery, 
+    // `subatom.config.*` loading, deep merging, validation, and immutability.
+    const finalConfig = await ConfigManager.resolve(safeOverrides);
+    this.resolvedConfig = finalConfig; // Cache for the server lifecycle
 
-    const requestedPort = Number(rawPort);
+    // [UPDATE FOR NEW ENV CONFIG]: 
+    // 4. We rely entirely on the validated source of truth (`finalConfig`) instead of `process.env`.
+    if (finalConfig.websocket) {
+      this.webSocketManager.activate(finalConfig.websocketOptions);
+    }
+
+    const requestedPort = Number(finalConfig.port);
+    const host = finalConfig.host;
+    // Fallback for appName, since it might not be explicitly typed in SubatomConfig yet
+    const appName = (finalConfig as any).appName || combinedOverrides.appName || "subatom";
+
     const availablePort = await getAvailablePort(requestedPort, host);
 
     if (availablePort !== requestedPort) {
@@ -141,6 +178,7 @@ export class SubatomServer {
     appName?: string,
     callback?: (assignedPort: number) => void,
   ): Promise<Server> {
+    // Feature Restored: Fully intact wrapper around start().
     const override: ISubatomServerConfig = {};
     if (port !== undefined) override.port = port;
     if (host !== undefined) override.host = host;
@@ -161,7 +199,13 @@ export class SubatomServer {
   }
 
   public close(callback?: (err?: Error) => void): Server {
-    const timeoutMs = Number(this.config.shutdownTimeoutMs ?? 10_000);
+    // [UPDATE FOR NEW ENV CONFIG]: 
+    // Fallback securely through the pipeline: 1. Resolved deep merged config, 2. Legacy config, 3. Default.
+    const timeoutMs = Number(
+      this.resolvedConfig?.websocketOptions?.shutdownTimeoutMs ?? 
+      this.config.shutdownTimeoutMs ?? 
+      10_000
+    );
     void this.webSocketManager.shutdown(timeoutMs);
     return closeServer(this.server, this.openSockets, timeoutMs, callback);
   }

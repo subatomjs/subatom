@@ -1,7 +1,7 @@
 export * from "./package/core/bootstrap/subatom/Subatom.js";
 export * from "./package/core/router/Router.js";
-export { configEnv, env } from "./package/cli-engine/utils/env/env.js";
-export { parseEnv } from "./package/cli-engine/utils/env/parseEnv.js";
+export { configEnv, env } from "./package/config/env/env.js";
+export { parseEnv } from "./package/config/env/parseEnv.js";
 
 // --- Middleware Functions (Individual Named Exports) ---
 import {
