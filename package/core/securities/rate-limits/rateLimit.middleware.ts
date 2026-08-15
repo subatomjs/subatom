@@ -22,12 +22,10 @@ export function createRateLimitMiddleware(options: RateLimitOptions) {
 					normalized.onLimitExceeded(req, res, decision);
 				}
 				return res.status
-					? res
-							.status(429)
-							.json({
-								error: "Too Many Requests",
-								retryAfterMs: decision.resetMs,
-							})
+					? res.status(429).json({
+							error: "Too Many Requests",
+							retryAfterMs: decision.resetMs,
+						})
 					: res.end();
 			}
 

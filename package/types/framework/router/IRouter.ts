@@ -18,10 +18,14 @@ export interface ISchemaObject {
 }
 
 export interface IRouteSchema {
-	body?: ISchemaObject | Record<string, any> | unknown;
-	query?: ISchemaObject | Record<string, any> | unknown;
-	params?: ISchemaObject | Record<string, any> | unknown;
-	headers?: ISchemaObject | Record<string, any> | unknown;
+	body?: ISchemaObject | Record<string, unknown> | unknown;
+	query?: ISchemaObject | Record<string, unknown> | unknown;
+	params?: ISchemaObject | Record<string, unknown> | unknown;
+	headers?: ISchemaObject | Record<string, unknown> | unknown;
+
+	// Add these for the new file validation capabilities
+	file?: ISchemaObject | Record<string, unknown> | unknown;
+	files?: ISchemaObject | Record<string, unknown> | unknown;
 }
 
 export type IHandler = (

@@ -17,6 +17,14 @@ export function buildRequestValidator(schema: IRouteSchema): MiddlewareHandler {
 		? SchemaValidator.compile(schema.headers)
 		: null;
 
+	// Now strictly typed via IRouteSchema
+	const fileValidator = schema.file
+		? SchemaValidator.compile(schema.file)
+		: null;
+	const filesValidator = schema.files
+		? SchemaValidator.compile(schema.files)
+		: null;
+
 	return async (req, res, next) => {
 		const issues: ValidationIssue[] = [];
 
@@ -27,9 +35,11 @@ export function buildRequestValidator(schema: IRouteSchema): MiddlewareHandler {
 			issues.push(...(await paramsValidator(req.params, "params")));
 		if (headersValidator)
 			issues.push(...(await headersValidator(req.headers, "headers")));
+		if (fileValidator) issues.push(...(await fileValidator(req.file, "file")));
+		if (filesValidator)
+			issues.push(...(await filesValidator(req.files, "files")));
 
 		if (issues.length > 0) {
-			// Passes directly to ErrorHandler pipeline
 			return next(new ValidationError(issues));
 		}
 
