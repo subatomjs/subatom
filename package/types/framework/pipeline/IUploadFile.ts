@@ -1,7 +1,6 @@
-import type { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Readable } from "node:stream";
 import type { NextFunction } from "./INext.js";
-
 
 export interface UploadFileOptions {
 	filename: string;
@@ -12,7 +11,6 @@ export interface UploadFileOptions {
 	path?: string;
 	size?: number;
 }
-
 
 export interface IUploadFile {
 	readonly filename: string;
@@ -39,8 +37,6 @@ export interface IUploadFile {
 }
 
 export type FilesMap = Record<string, IUploadFile | IUploadFile[]>;
-
-
 
 export type StorageStrategy = "memory" | "disk";
 

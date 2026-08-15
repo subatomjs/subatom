@@ -1,8 +1,8 @@
 // subatom/package/core/bootstrap/subatom/services/groupDispatcher.service.ts
 import { Router } from "../../../router/Router.js";
+import { mergeSubRouter } from "../../../router/services/routerMerger.service.js";
 import type { Subatom } from "../Subatom.js";
 import { RouteGroupBuilder } from "../subordinate/RouteGroupBuilder.js";
-import { mergeSubRouter } from "../../../router/services/routerMerger.service.js";
 
 export function dispatchGroup(
 	app: Subatom,

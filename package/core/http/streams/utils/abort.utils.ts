@@ -9,17 +9,17 @@ import type { ServerResponse } from "node:http";
  * and the "we finished normally" case, so we gate on `writableEnded`.
  */
 export function onClientDisconnect(
-  raw: ServerResponse,
-  callback: () => void,
+	raw: ServerResponse,
+	callback: () => void,
 ): () => void {
-  let fired = false;
-  const handler = () => {
-    if (fired || raw.writableEnded) return;
-    fired = true;
-    callback();
-  };
-  raw.on("close", handler);
-  return () => raw.off("close", handler);
+	let fired = false;
+	const handler = () => {
+		if (fired || raw.writableEnded) return;
+		fired = true;
+		callback();
+	};
+	raw.on("close", handler);
+	return () => raw.off("close", handler);
 }
 
 /**
@@ -30,15 +30,15 @@ export function onClientDisconnect(
  * signals (e.g. a shared server-shutdown signal).
  */
 export function bindAbortSignal(
-  signal: AbortSignal | undefined,
-  onAbort: () => void,
+	signal: AbortSignal | undefined,
+	onAbort: () => void,
 ): () => void {
-  if (!signal) return () => {};
-  if (signal.aborted) {
-    onAbort();
-    return () => {};
-  }
-  const handler = () => onAbort();
-  signal.addEventListener("abort", handler, { once: true });
-  return () => signal.removeEventListener("abort", handler);
+	if (!signal) return () => {};
+	if (signal.aborted) {
+		onAbort();
+		return () => {};
+	}
+	const handler = () => onAbort();
+	signal.addEventListener("abort", handler, { once: true });
+	return () => signal.removeEventListener("abort", handler);
 }

@@ -1,11 +1,10 @@
 // middleware/json.ts
 
-import { NextFunction } from "../../types/framework/pipeline/INext.js";
-import { ILimit } from "../../types/framework/pipeline/IPipeline.js";
-import { IRequest } from "../../types/http/IRequest.js";
-import { IResponse } from "../../types/http/IResponse.js";
+import type { NextFunction } from "../../types/framework/pipeline/INext.js";
+import type { ILimit } from "../../types/framework/pipeline/IPipeline.js";
+import type { IRequest } from "../../types/http/IRequest.js";
+import type { IResponse } from "../../types/http/IResponse.js";
 import { parseLimit } from "../utils/parseLimit.js";
-
 
 export function json(options: ILimit = {}) {
 	const maxBytes = parseLimit(options.limit ?? "100kb"); // Default 100kb like Express

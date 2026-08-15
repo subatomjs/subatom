@@ -1,29 +1,29 @@
 export interface PermissionsPolicyDirectives {
-  accelerometer?: string[];
-  camera?: string[];
-  geolocation?: string[];
-  gyroscope?: string[];
-  magnetometer?: string[];
-  microphone?: string[];
-  payment?: string[];
-  usb?: string[];
-  fullscreen?: string[];
-  [key: string]: string[] | undefined;
+	accelerometer?: string[];
+	camera?: string[];
+	geolocation?: string[];
+	gyroscope?: string[];
+	magnetometer?: string[];
+	microphone?: string[];
+	payment?: string[];
+	usb?: string[];
+	fullscreen?: string[];
+	[key: string]: string[] | undefined;
 }
 
 export interface PermissionsPolicyConfig {
-  features?: PermissionsPolicyDirectives;
+	features?: PermissionsPolicyDirectives;
 }
 
 export const defaultPermissionsPolicyConfig: PermissionsPolicyConfig = {
-  features: {
-    accelerometer: [],
-    camera: [],
-    geolocation: [],
-    gyroscope: [],
-    magnetometer: [],
-    microphone: [],
-    payment: [],
-    usb: [],
-  },
+	features: {
+		accelerometer: [],
+		camera: [],
+		geolocation: [],
+		gyroscope: [],
+		magnetometer: [],
+		microphone: [],
+		payment: [],
+		usb: [],
+	},
 };

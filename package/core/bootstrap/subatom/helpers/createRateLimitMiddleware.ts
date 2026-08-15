@@ -1,7 +1,7 @@
 // subatom/package/core/bootstrap/subatom/helpers/createRateLimitMiddleware.ts
 
 import type { MiddlewareHandler } from "../../../../types/http/IMiddleware.js";
-import { IRequest } from "../../../../types/http/IRequest.js";
+import type { IRequest } from "../../../../types/http/IRequest.js";
 import { parseRateLimitSpec } from "./parseRateLimitSpec.js";
 
 export function createRateLimitMiddleware(spec: string): MiddlewareHandler {

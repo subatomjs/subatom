@@ -1,12 +1,10 @@
 // middleware/text.ts
 
-import { NextFunction } from "../../types/framework/pipeline/INext.js";
-import { ITextOptions } from "../../types/framework/pipeline/IPipeline.js";
-import { IRequest } from "../../types/http/IRequest.js";
-import { IResponse } from "../../types/http/IResponse.js";
+import type { NextFunction } from "../../types/framework/pipeline/INext.js";
+import type { ITextOptions } from "../../types/framework/pipeline/IPipeline.js";
+import type { IRequest } from "../../types/http/IRequest.js";
+import type { IResponse } from "../../types/http/IResponse.js";
 import { parseLimit } from "../utils/parseLimit.js";
-
-
 
 export function text(options: ITextOptions = {}) {
 	const maxBytes = parseLimit(options.limit ?? "100kb");

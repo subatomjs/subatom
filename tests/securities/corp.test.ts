@@ -1,13 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createCORPMiddleware } from "../../package/core/securities/security/headers/cross-origin-resource-policy/corp.middleware";
 
-describe('CORP Middleware', () => {
-  it('should set same-origin policy', () => {
-    const middleware = createCORPMiddleware(true);
-    const headers: Record<string, string> = {};
-    const res = { setHeader: (k: string, v: string) => { headers[k] = v; } };
+describe("CORP Middleware", () => {
+	it("should set same-origin policy", () => {
+		const middleware = createCORPMiddleware(true);
+		const headers: Record<string, string> = {};
+		const res = {
+			setHeader: (k: string, v: string) => {
+				headers[k] = v;
+			},
+		};
 
-    middleware({}, res, () => {});
-    expect(headers['Cross-Origin-Resource-Policy']).toBe('same-origin');
-  });
+		middleware({}, res, () => {});
+		expect(headers["Cross-Origin-Resource-Policy"]).toBe("same-origin");
+	});
 });

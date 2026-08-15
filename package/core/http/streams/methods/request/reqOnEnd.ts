@@ -7,12 +7,12 @@ export type EndListener = () => void;
  * Returns an unsubscription function.
  */
 export function reqOnEnd(
-    req: IncomingMessage,
-    listener: EndListener
+	req: IncomingMessage,
+	listener: EndListener,
 ): () => void {
-    req.once("end", listener);
+	req.once("end", listener);
 
-    return (): void => {
-        req.off("end", listener);
-    };
+	return (): void => {
+		req.off("end", listener);
+	};
 }

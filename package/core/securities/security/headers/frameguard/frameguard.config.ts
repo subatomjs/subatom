@@ -1,9 +1,9 @@
-export type FrameguardAction = 'DENY' | 'SAMEORIGIN';
+export type FrameguardAction = "DENY" | "SAMEORIGIN";
 
 export interface FrameguardConfig {
-  action?: FrameguardAction;
+	action?: FrameguardAction;
 }
 
 export const defaultFrameguardConfig: FrameguardConfig = {
-  action: 'SAMEORIGIN',
+	action: "SAMEORIGIN",
 };

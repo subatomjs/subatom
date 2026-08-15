@@ -1,95 +1,95 @@
 {
-  "name": "subatom",
-  "version": "0.3.2",
-  "description": "Subatom is a modern, high-performance, enterprise-grade web framework for Node.js.",
-  "license": "MIT",
-  "author": "Kunal Chandra Das <kunalchandradasofficial@gmail.com>",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "subatom": "./dist/package/cli-engine/cli.js"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    },
-    "./package.json": "./package.json",
-    "./*": {
-      "types": "./dist/*.d.ts",
-      "import": "./dist/*.js",
-      "default": "./dist/*.js"
-    }
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "keywords": [
-    "subatom",
-    "framework",
-    "node",
-    "nodejs",
-    "backend",
-    "web",
-    "http",
-    "server",
-    "rest",
-    "rest-api",
-    "api",
-    "router",
-    "typescript",
-    "fast",
-    "performance",
-    "enterprise"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/subatomjs/subatom.git"
-  },
-  "bugs": {
-    "url": "https://github.com/subatomjs/subatom/issues"
-  },
-  "homepage": "https://github.com/subatomjs/subatom#readme",
-  "engines": {
-    "node": ">=18"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "sideEffects": false,
-  "scripts": {
-    "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.build.json && node --import tsx ./package/cli-engine/postbuild.ts",
-    "prepublishOnly": "npm run clean && npm run build",
-    "dev": "tsx watch ./index.ts",
-    "cli:dev": "tsx watch ./package/cli-engine/cli.ts",
-    "unit:test": "vitest run",
-    "lint": "biome check .",
-    "lint-fix": "biome check --write .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
-  },
-  "dependencies": {
-    "@parcel/watcher": "^2.6.0",
-    "busboy": "^1.6.0",
-    "commander": "^15.0.0",
-    "esbuild": "^0.28.1",
-    "picocolors": "^1.1.1",
-    "tsx": "^4.23.5",
-    "ws": "^8.21.3"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.5.7",
-    "@types/busboy": "^1.5.4",
-    "@types/node": "^26.1.2",
-    "@types/ws": "^8.18.1",
-    "@vitest/coverage-v8": "^4.1.10",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
-  }
+	"name": "subatom",
+	"version": "0.3.2",
+	"description": "Subatom is a modern, high-performance, enterprise-grade web framework for Node.js.",
+	"license": "MIT",
+	"author": "Kunal Chandra Das <kunalchandradasofficial@gmail.com>",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"subatom": "./dist/package/cli-engine/cli.js"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json",
+		"./*": {
+			"types": "./dist/*.d.ts",
+			"import": "./dist/*.js",
+			"default": "./dist/*.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
+	"keywords": [
+		"subatom",
+		"framework",
+		"node",
+		"nodejs",
+		"backend",
+		"web",
+		"http",
+		"server",
+		"rest",
+		"rest-api",
+		"api",
+		"router",
+		"typescript",
+		"fast",
+		"performance",
+		"enterprise"
+	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/subatomjs/subatom.git"
+	},
+	"bugs": {
+		"url": "https://github.com/subatomjs/subatom/issues"
+	},
+	"homepage": "https://github.com/subatomjs/subatom#readme",
+	"engines": {
+		"node": ">=18"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"clean": "rm -rf dist",
+		"build": "tsc -p tsconfig.build.json && node --import tsx ./package/cli-engine/postbuild.ts",
+		"prepublishOnly": "npm run clean && npm run build",
+		"dev": "tsx watch ./index.ts",
+		"cli:dev": "tsx watch ./package/cli-engine/cli.ts",
+		"unit:test": "vitest run",
+		"lint": "biome check .",
+		"lint-fix": "biome check --write .",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@parcel/watcher": "^2.6.0",
+		"busboy": "^1.6.0",
+		"commander": "^15.0.0",
+		"esbuild": "^0.28.1",
+		"picocolors": "^1.1.1",
+		"tsx": "^4.23.5",
+		"ws": "^8.21.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.7",
+		"@types/busboy": "^1.5.4",
+		"@types/node": "^26.1.2",
+		"@types/ws": "^8.18.1",
+		"@vitest/coverage-v8": "^4.1.10",
+		"typescript": "^7.0.2",
+		"vitest": "^4.1.10"
+	}
 }

@@ -1,9 +1,10 @@
 // src/rate-limit/index.ts
+
+import type { RateLimitOptions } from "./rateLimit.config.js";
 import { createRateLimitMiddleware } from "./rateLimit.middleware.js";
-import { RateLimitOptions } from "./rateLimit.config.js";
 
 export function rateLimit(options: RateLimitOptions) {
-  return createRateLimitMiddleware(options);
+	return createRateLimitMiddleware(options);
 }
 
 export type { RateLimitOptions, RateLimitResult } from "./rateLimit.config.js";

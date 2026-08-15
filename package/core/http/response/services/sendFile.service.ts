@@ -52,5 +52,3 @@ export function pipeFile(
 	);
 	fileStream.pipe(raw);
 }
-
-

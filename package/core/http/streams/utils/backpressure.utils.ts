@@ -9,27 +9,27 @@ import type { ServerResponse } from "node:http";
  * the producer is faster than the client can consume.
  */
 export function writeWithBackpressure(
-  raw: ServerResponse,
-  chunk: Buffer | string,
+	raw: ServerResponse,
+	chunk: Buffer | string,
 ): Promise<void> {
-  if (raw.writableEnded || raw.destroyed) {
-    return Promise.reject(new Error("Cannot write: response already ended"));
-  }
-  return new Promise((resolve, reject) => {
-    const onError = (err: Error) => reject(err);
-    raw.once("error", onError);
+	if (raw.writableEnded || raw.destroyed) {
+		return Promise.reject(new Error("Cannot write: response already ended"));
+	}
+	return new Promise((resolve, reject) => {
+		const onError = (err: Error) => reject(err);
+		raw.once("error", onError);
 
-    const ok = raw.write(chunk, (err) => {
-      raw.off("error", onError);
-      if (err) reject(err);
-      else if (ok) resolve();
-    });
+		const ok = raw.write(chunk, (err) => {
+			raw.off("error", onError);
+			if (err) reject(err);
+			else if (ok) resolve();
+		});
 
-    if (!ok) {
-      raw.once("drain", () => {
-        raw.off("error", onError);
-        resolve();
-      });
-    }
-  });
+		if (!ok) {
+			raw.once("drain", () => {
+				raw.off("error", onError);
+				resolve();
+			});
+		}
+	});
 }

@@ -1,7 +1,6 @@
-import { NextFunction } from "../framework/pipeline/INext.js";
-import { IRequest } from "../http/IRequest.js";
-import { IResponse } from "../http/IResponse.js";
-
+import type { NextFunction } from "../framework/pipeline/INext.js";
+import type { IRequest } from "../http/IRequest.js";
+import type { IResponse } from "../http/IResponse.js";
 
 export type StaticOrigin = string | boolean | RegExp | (string | RegExp)[];
 
@@ -16,7 +15,10 @@ export type AsyncOriginFunction = (
 	requestOrigin: string | undefined,
 ) => Promise<boolean>;
 
-export type CorsOrigin = StaticOrigin | CustomOriginFunction | AsyncOriginFunction;
+export type CorsOrigin =
+	| StaticOrigin
+	| CustomOriginFunction
+	| AsyncOriginFunction;
 
 export interface ICorsOptions {
 	origin?: CorsOrigin;

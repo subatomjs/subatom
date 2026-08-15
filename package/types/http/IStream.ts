@@ -5,29 +5,29 @@
  */
 
 export interface StreamPipeOptions {
-  /**
-   * Abort signal that cancels the stream. Typically tied to a request
-   * timeout, an upstream fetch's controller, or manual cancellation.
-   */
-  signal?: AbortSignal;
-  /**
-   * Called when the stream fails - either because the source errored,
-   * or because it was aborted/disconnected. Distinguish the two via
-   * `error instanceof StreamAbortedError`.
-   */
-  onError?: (error: Error) => void;
-  /** Called once the stream has been fully flushed to the client. */
-  onFinish?: () => void;
-  /**
-   * Called if the client disconnects before the stream finishes. Fires
-   * in addition to (before) `onError` with a StreamAbortedError.
-   */
-  onClientDisconnect?: () => void;
+	/**
+	 * Abort signal that cancels the stream. Typically tied to a request
+	 * timeout, an upstream fetch's controller, or manual cancellation.
+	 */
+	signal?: AbortSignal;
+	/**
+	 * Called when the stream fails - either because the source errored,
+	 * or because it was aborted/disconnected. Distinguish the two via
+	 * `error instanceof StreamAbortedError`.
+	 */
+	onError?: (error: Error) => void;
+	/** Called once the stream has been fully flushed to the client. */
+	onFinish?: () => void;
+	/**
+	 * Called if the client disconnects before the stream finishes. Fires
+	 * in addition to (before) `onError` with a StreamAbortedError.
+	 */
+	onClientDisconnect?: () => void;
 }
 
 export interface RangeSpec {
-  start: number;
-  end: number; // inclusive
+	start: number;
+	end: number; // inclusive
 }
 
 /**
@@ -35,16 +35,16 @@ export interface RangeSpec {
  * an AbortSignal fired - i.e. not a "real" failure of the data source.
  */
 export class StreamAbortedError extends Error {
-  constructor(message = "Stream aborted by client or signal") {
-    super(message);
-    this.name = "StreamAbortedError";
-  }
+	constructor(message = "Stream aborted by client or signal") {
+		super(message);
+		this.name = "StreamAbortedError";
+	}
 }
 
 /** Raised when a `Range` request header can't be satisfied for the resource. */
 export class RangeNotSatisfiableError extends Error {
-  constructor(public readonly size: number) {
-    super(`Range not satisfiable for resource of size ${size}`);
-    this.name = "RangeNotSatisfiableError";
-  }
+	constructor(public readonly size: number) {
+		super(`Range not satisfiable for resource of size ${size}`);
+		this.name = "RangeNotSatisfiableError";
+	}
 }

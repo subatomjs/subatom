@@ -1,14 +1,14 @@
 import type { ServerResponse } from "node:http";
 import type { Readable } from "node:stream";
+import type { StreamPipeOptions } from "../../../../types/http/IStream.js";
 import { pipeToResponse } from "./pipeline.service.js";
-import { StreamPipeOptions } from "../../../../types/http/IStream.js";
 
 export interface StreamResponseOptions extends StreamPipeOptions {
-  status?: number;
-  contentType?: string;
-  /** Set only when known ahead of time (e.g. from a file stat). Omit for chunked transfer. */
-  contentLength?: number;
-  headers?: Record<string, string>;
+	status?: number;
+	contentType?: string;
+	/** Set only when known ahead of time (e.g. from a file stat). Omit for chunked transfer. */
+	contentLength?: number;
+	headers?: Record<string, string>;
 }
 
 /**
@@ -17,21 +17,21 @@ export interface StreamResponseOptions extends StreamPipeOptions {
  * Range support, use `streamFileToResponse` instead.
  */
 export async function streamResponse(
-  raw: ServerResponse,
-  source: Readable,
-  options: StreamResponseOptions = {},
+	raw: ServerResponse,
+	source: Readable,
+	options: StreamResponseOptions = {},
 ): Promise<void> {
-  if (!raw.headersSent) {
-    raw.statusCode = options.status ?? raw.statusCode ?? 200;
-    if (options.contentType) raw.setHeader("Content-Type", options.contentType);
-    if (options.contentLength !== undefined) {
-      raw.setHeader("Content-Length", options.contentLength);
-    }
-    if (options.headers) {
-      for (const [key, value] of Object.entries(options.headers)) {
-        raw.setHeader(key, value);
-      }
-    }
-  }
-  await pipeToResponse(raw, source, options);
+	if (!raw.headersSent) {
+		raw.statusCode = options.status ?? raw.statusCode ?? 200;
+		if (options.contentType) raw.setHeader("Content-Type", options.contentType);
+		if (options.contentLength !== undefined) {
+			raw.setHeader("Content-Length", options.contentLength);
+		}
+		if (options.headers) {
+			for (const [key, value] of Object.entries(options.headers)) {
+				raw.setHeader(key, value);
+			}
+		}
+	}
+	await pipeToResponse(raw, source, options);
 }

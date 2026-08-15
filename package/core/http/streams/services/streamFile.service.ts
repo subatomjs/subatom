@@ -1,22 +1,22 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { createReadStream } from "node:fs";
 import { stat as statAsync } from "node:fs/promises";
-import { pipeToResponse } from "./pipeline.service.js";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import {
-  RangeNotSatisfiableError,
-  RangeSpec,
-  StreamPipeOptions,
+	RangeNotSatisfiableError,
+	type RangeSpec,
+	type StreamPipeOptions,
 } from "../../../../types/http/IStream.js";
+import { pipeToResponse } from "./pipeline.service.js";
 
 export interface StreamFileOptions extends StreamPipeOptions {
-  contentType?: string;
-  /**
-   * Enables byte-range requests (206 Partial Content) - required for
-   * video/audio scrubbing and resumable downloads. Default true.
-   */
-  acceptRanges?: boolean;
-  /** Extra headers (e.g. ETag, Last-Modified, Cache-Control). */
-  headers?: Record<string, string>;
+	contentType?: string;
+	/**
+	 * Enables byte-range requests (206 Partial Content) - required for
+	 * video/audio scrubbing and resumable downloads. Default true.
+	 */
+	acceptRanges?: boolean;
+	/** Extra headers (e.g. ETag, Last-Modified, Cache-Control). */
+	headers?: Record<string, string>;
 }
 
 /**
@@ -29,39 +29,39 @@ export interface StreamFileOptions extends StreamPipeOptions {
  * outright so the caller doesn't silently get an incomplete resource.
  */
 export function parseRange(
-  rangeHeader: string | undefined,
-  size: number,
+	rangeHeader: string | undefined,
+	size: number,
 ): RangeSpec | null {
-  if (!rangeHeader || !rangeHeader.startsWith("bytes=")) return null;
-  const spec = rangeHeader.slice("bytes=".length);
-  if (spec.includes(",")) {
-    // Multi-range: not supported, treat as unsatisfiable rather than guess.
-    throw new RangeNotSatisfiableError(size);
-  }
+	if (!rangeHeader || !rangeHeader.startsWith("bytes=")) return null;
+	const spec = rangeHeader.slice("bytes=".length);
+	if (spec.includes(",")) {
+		// Multi-range: not supported, treat as unsatisfiable rather than guess.
+		throw new RangeNotSatisfiableError(size);
+	}
 
-  const [startStr = "", endStr = ""] = spec.split("-");
-  let start: number;
-  let end: number;
+	const [startStr = "", endStr = ""] = spec.split("-");
+	let start: number;
+	let end: number;
 
-  if (startStr === "") {
-    // Suffix range: "bytes=-500" -> last 500 bytes.
-    const suffixLength = parseInt(endStr, 10);
-    if (Number.isNaN(suffixLength) || suffixLength <= 0) {
-      throw new RangeNotSatisfiableError(size);
-    }
-    start = Math.max(size - suffixLength, 0);
-    end = size - 1;
-  } else {
-    start = parseInt(startStr, 10);
-    end = endStr === "" ? size - 1 : parseInt(endStr, 10);
-  }
+	if (startStr === "") {
+		// Suffix range: "bytes=-500" -> last 500 bytes.
+		const suffixLength = parseInt(endStr, 10);
+		if (Number.isNaN(suffixLength) || suffixLength <= 0) {
+			throw new RangeNotSatisfiableError(size);
+		}
+		start = Math.max(size - suffixLength, 0);
+		end = size - 1;
+	} else {
+		start = parseInt(startStr, 10);
+		end = endStr === "" ? size - 1 : parseInt(endStr, 10);
+	}
 
-  if (Number.isNaN(start) || Number.isNaN(end) || start > end || start < 0) {
-    throw new RangeNotSatisfiableError(size);
-  }
-  end = Math.min(end, size - 1);
+	if (Number.isNaN(start) || Number.isNaN(end) || start > end || start < 0) {
+		throw new RangeNotSatisfiableError(size);
+	}
+	end = Math.min(end, size - 1);
 
-  return { start, end };
+	return { start, end };
 }
 
 /**
@@ -72,55 +72,55 @@ export function parseRange(
  * `Content-Range: bytes *\/<size>`.
  */
 export async function streamFileToResponse(
-  req: IncomingMessage,
-  raw: ServerResponse,
-  filePath: string,
-  options: StreamFileOptions = {},
+	req: IncomingMessage,
+	raw: ServerResponse,
+	filePath: string,
+	options: StreamFileOptions = {},
 ): Promise<void> {
-  const { acceptRanges = true, contentType, headers, ...pipeOptions } = options;
-  const fileStat = await statAsync(filePath);
+	const { acceptRanges = true, contentType, headers, ...pipeOptions } = options;
+	const fileStat = await statAsync(filePath);
 
-  if (headers) {
-    for (const [key, value] of Object.entries(headers))
-      raw.setHeader(key, value);
-  }
-  if (contentType) raw.setHeader("Content-Type", contentType);
-  if (acceptRanges) raw.setHeader("Accept-Ranges", "bytes");
+	if (headers) {
+		for (const [key, value] of Object.entries(headers))
+			raw.setHeader(key, value);
+	}
+	if (contentType) raw.setHeader("Content-Type", contentType);
+	if (acceptRanges) raw.setHeader("Accept-Ranges", "bytes");
 
-  const rangeHeader = req.headers["range"] as string | undefined;
-  let range: RangeSpec | null = null;
+	const rangeHeader = req.headers["range"] as string | undefined;
+	let range: RangeSpec | null = null;
 
-  if (acceptRanges && rangeHeader) {
-    try {
-      range = parseRange(rangeHeader, fileStat.size);
-    } catch (err) {
-      if (err instanceof RangeNotSatisfiableError) {
-        raw.setHeader("Content-Range", `bytes */${fileStat.size}`);
-        raw.statusCode = 416;
-        raw.end();
-        return;
-      }
-      throw err;
-    }
-  }
+	if (acceptRanges && rangeHeader) {
+		try {
+			range = parseRange(rangeHeader, fileStat.size);
+		} catch (err) {
+			if (err instanceof RangeNotSatisfiableError) {
+				raw.setHeader("Content-Range", `bytes */${fileStat.size}`);
+				raw.statusCode = 416;
+				raw.end();
+				return;
+			}
+			throw err;
+		}
+	}
 
-  if (range) {
-    raw.statusCode = 206;
-    raw.setHeader(
-      "Content-Range",
-      `bytes ${range.start}-${range.end}/${fileStat.size}`,
-    );
-    raw.setHeader("Content-Length", range.end - range.start + 1);
-    await pipeToResponse(
-      raw,
-      createReadStream(filePath, { start: range.start, end: range.end }),
-      pipeOptions,
-    );
-    return;
-  }
+	if (range) {
+		raw.statusCode = 206;
+		raw.setHeader(
+			"Content-Range",
+			`bytes ${range.start}-${range.end}/${fileStat.size}`,
+		);
+		raw.setHeader("Content-Length", range.end - range.start + 1);
+		await pipeToResponse(
+			raw,
+			createReadStream(filePath, { start: range.start, end: range.end }),
+			pipeOptions,
+		);
+		return;
+	}
 
-  raw.statusCode =
-    raw.statusCode && raw.statusCode !== 200 ? raw.statusCode : 200;
-  raw.setHeader("Content-Length", fileStat.size);
-  await pipeToResponse(raw, createReadStream(filePath), pipeOptions);
+	raw.statusCode =
+		raw.statusCode && raw.statusCode !== 200 ? raw.statusCode : 200;
+	raw.setHeader("Content-Length", fileStat.size);
+	await pipeToResponse(raw, createReadStream(filePath), pipeOptions);
 }

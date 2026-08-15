@@ -1,19 +1,18 @@
-
 // src/rate-limit/stores/redis.store.ts
-import { RateLimitStore, StoreEvalParams } from "./rateLimit.store.js";
+import type { RateLimitStore, StoreEvalParams } from "./rateLimit.store.js";
 
 export class RedisStore implements RateLimitStore {
-  private client: any;
+	private client: any;
 
-  constructor(client: any) {
-    this.client = client;
-  }
+	constructor(client: any) {
+		this.client = client;
+	}
 
-  async evaluate(p: StoreEvalParams) {
-    const key = `rl:${p.key}`;
+	async evaluate(p: StoreEvalParams) {
+		const key = `rl:${p.key}`;
 
-    if (p.algorithm === "fixed-window") {
-      const lua = `
+		if (p.algorithm === "fixed-window") {
+			const lua = `
         local current = redis.call("INCR", KEYS[1])
         if current == 1 then
           redis.call("PEXPIRE", KEYS[1], ARGV[2])
@@ -21,14 +20,18 @@ export class RedisStore implements RateLimitStore {
         local ttl = redis.call("PTTL", KEYS[1])
         return { current, ttl }
       `;
-      const res = await this.client.eval(lua, 1, key, p.limit, p.windowMs);
-      const count = Number(res[0]);
-      const ttl = Number(res[1]);
-      return { allowed: count <= p.limit, remaining: Math.max(0, p.limit - count), resetMs: ttl > 0 ? ttl : p.windowMs };
-    }
+			const res = await this.client.eval(lua, 1, key, p.limit, p.windowMs);
+			const count = Number(res[0]);
+			const ttl = Number(res[1]);
+			return {
+				allowed: count <= p.limit,
+				remaining: Math.max(0, p.limit - count),
+				resetMs: ttl > 0 ? ttl : p.windowMs,
+			};
+		}
 
-    if (p.algorithm === "sliding-window") {
-      const lua = `
+		if (p.algorithm === "sliding-window") {
+			const lua = `
         local now = tonumber(ARGV[1])
         local window = tonumber(ARGV[2])
         local limit = tonumber(ARGV[3])
@@ -53,12 +56,23 @@ export class RedisStore implements RateLimitStore {
 
         return { allowed, limit - count, resetMs }
       `;
-      const res = await this.client.eval(lua, 1, key, p.now, p.windowMs, p.limit);
-      return { allowed: res[0] === 1, remaining: Math.max(0, Number(res[1])), resetMs: Math.max(0, Number(res[2])) };
-    }
+			const res = await this.client.eval(
+				lua,
+				1,
+				key,
+				p.now,
+				p.windowMs,
+				p.limit,
+			);
+			return {
+				allowed: res[0] === 1,
+				remaining: Math.max(0, Number(res[1])),
+				resetMs: Math.max(0, Number(res[2])),
+			};
+		}
 
-    // Token Bucket LUA
-    const lua = `
+		// Token Bucket LUA
+		const lua = `
       local capacity = tonumber(ARGV[1])
       local refillRate = tonumber(ARGV[2])
       local refillInterval = tonumber(ARGV[3])
@@ -91,7 +105,19 @@ export class RedisStore implements RateLimitStore {
 
       return { allowed, tokens, refillInterval }
     `;
-    const res = await this.client.eval(lua, 1, key, p.capacity, p.refillRate, p.refillIntervalMs, p.now);
-    return { allowed: res[0] === 1, remaining: Math.max(0, Number(res[1])), resetMs: Number(res[2]) };
-  }
+		const res = await this.client.eval(
+			lua,
+			1,
+			key,
+			p.capacity,
+			p.refillRate,
+			p.refillIntervalMs,
+			p.now,
+		);
+		return {
+			allowed: res[0] === 1,
+			remaining: Math.max(0, Number(res[1])),
+			resetMs: Number(res[2]),
+		};
+	}
 }

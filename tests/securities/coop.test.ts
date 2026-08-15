@@ -1,13 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createCOOPMiddleware } from "../../package/core/securities/security/headers/cross-origin-opener-policy/coop.middleware";
 
-describe('COOP Middleware', () => {
-  it('should set same-origin policy', () => {
-    const middleware = createCOOPMiddleware(true);
-    const headers: Record<string, string> = {};
-    const res = { setHeader: (k: string, v: string) => { headers[k] = v; } };
+describe("COOP Middleware", () => {
+	it("should set same-origin policy", () => {
+		const middleware = createCOOPMiddleware(true);
+		const headers: Record<string, string> = {};
+		const res = {
+			setHeader: (k: string, v: string) => {
+				headers[k] = v;
+			},
+		};
 
-    middleware({}, res, () => {});
-    expect(headers['Cross-Origin-Opener-Policy']).toBe('same-origin');
-  });
+		middleware({}, res, () => {});
+		expect(headers["Cross-Origin-Opener-Policy"]).toBe("same-origin");
+	});
 });

@@ -1,12 +1,11 @@
 // middleware/serveStatic.ts
 import fs from "node:fs";
 import path from "node:path";
-import { IStaticOptions } from "../../types/framework/pipeline/IPipeline.js";
-import { IRequest } from "../../types/http/IRequest.js";
-import { IResponse } from "../../types/http/IResponse.js";
-import { NextFunction } from "../../types/framework/pipeline/INext.js";
+import type { NextFunction } from "../../types/framework/pipeline/INext.js";
+import type { IStaticOptions } from "../../types/framework/pipeline/IPipeline.js";
+import type { IRequest } from "../../types/http/IRequest.js";
+import type { IResponse } from "../../types/http/IResponse.js";
 import { getMimeType } from "../utils/mime.js";
-
 
 export function serveStatic(rootPath: string, options: IStaticOptions = {}) {
 	const absoluteRoot = path.resolve(rootPath);

@@ -1,11 +1,10 @@
 // middleware/urlencoded.ts
 import querystring from "node:querystring"; // Or: import querystring from "node:querystring";
-import { ILimit } from "../../types/framework/pipeline/IPipeline.js";
+import type { NextFunction } from "../../types/framework/pipeline/INext.js";
+import type { ILimit } from "../../types/framework/pipeline/IPipeline.js";
+import type { IRequest } from "../../types/http/IRequest.js";
+import type { IResponse } from "../../types/http/IResponse.js";
 import { parseLimit } from "../utils/parseLimit.js";
-import { IRequest } from "../../types/http/IRequest.js";
-import { IResponse } from "../../types/http/IResponse.js";
-import { NextFunction } from "../../types/framework/pipeline/INext.js";
-
 
 export function urlencoded(options: ILimit = {}) {
 	const maxBytes = parseLimit(options.limit ?? "100kb"); // Default 100kb limit

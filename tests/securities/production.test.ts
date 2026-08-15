@@ -1,14 +1,18 @@
-import { describe, it, expect } from "vitest";
-import { productionProfile } from '../../package/core/securities/security/profiles/production.profile.js';
+import { describe, expect, it } from "vitest";
+import { productionProfile } from "../../package/core/securities/security/profiles/production.profile.js";
 import { subatomSecurity } from "../../package/core/securities/security/security.middleware";
 
-describe('Production Profile Test', () => {
-  it('should enforce strict max-age HSTS header', () => {
-    const middleware = subatomSecurity(productionProfile);
-    const headers: Record<string, string> = {};
-    const res = { setHeader: (k: string, v: string) => { headers[k] = v; } };
+describe("Production Profile Test", () => {
+	it("should enforce strict max-age HSTS header", () => {
+		const middleware = subatomSecurity(productionProfile);
+		const headers: Record<string, string> = {};
+		const res = {
+			setHeader: (k: string, v: string) => {
+				headers[k] = v;
+			},
+		};
 
-    middleware({}, res, () => {});
-    expect(headers['Strict-Transport-Security']).toContain('max-age=31536000');
-  });
+		middleware({}, res, () => {});
+		expect(headers["Strict-Transport-Security"]).toContain("max-age=31536000");
+	});
 });

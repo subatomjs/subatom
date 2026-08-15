@@ -1,2 +1,2 @@
-export * from './hsts.config.js';
-export * from './hsts.middleware.js';
+export * from "./hsts.config.js";
+export * from "./hsts.middleware.js";

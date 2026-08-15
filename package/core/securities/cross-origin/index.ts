@@ -1,9 +1,9 @@
-export { createCors as cors } from "./corsMiddleware.js";
 export type {
-	ICorsOptions,
-	CorsOrigin,
-	StaticOrigin,
-	CustomOriginFunction,
 	AsyncOriginFunction,
 	CorsMiddleware,
+	CorsOrigin,
+	CustomOriginFunction,
+	ICorsOptions,
+	StaticOrigin,
 } from "../../../types/securities/ICors.js";
+export { createCors as cors } from "./corsMiddleware.js";

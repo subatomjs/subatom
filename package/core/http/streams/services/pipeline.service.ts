@@ -1,9 +1,9 @@
 import type { ServerResponse } from "node:http";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { bindAbortSignal, onClientDisconnect } from "../utils/abort.utils.js";
-import { StreamAbortedError } from "../../../../types/http/IStream.js";
 import type { StreamPipeOptions } from "../../../../types/http/IStream.js";
+import { StreamAbortedError } from "../../../../types/http/IStream.js";
+import { bindAbortSignal, onClientDisconnect } from "../utils/abort.utils.js";
 
 /**
  * Pipes a Readable (or the tail of a Transform chain built with
@@ -19,52 +19,52 @@ import type { StreamPipeOptions } from "../../../../types/http/IStream.js";
  * listening to anymore.
  */
 export async function pipeToResponse(
-  raw: ServerResponse,
-  source: Readable,
-  options: StreamPipeOptions = {},
+	raw: ServerResponse,
+	source: Readable,
+	options: StreamPipeOptions = {},
 ): Promise<void> {
-  const {
-    signal,
-    onError,
-    onFinish,
-    onClientDisconnect: onDisconnect,
-  } = options;
+	const {
+		signal,
+		onError,
+		onFinish,
+		onClientDisconnect: onDisconnect,
+	} = options;
 
-  const controller = new AbortController();
-  const unbindSignal = bindAbortSignal(signal, () => controller.abort());
-  const unbindDisconnect = onClientDisconnect(raw, () => {
-    onDisconnect?.();
-    controller.abort();
-  });
+	const controller = new AbortController();
+	const unbindSignal = bindAbortSignal(signal, () => controller.abort());
+	const unbindDisconnect = onClientDisconnect(raw, () => {
+		onDisconnect?.();
+		controller.abort();
+	});
 
-  try {
-    await pipeline(source, raw, { signal: controller.signal });
-    onFinish?.();
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException & { name: string };
-    const wasCancelled =
-      err.name === "AbortError" || err.code === "ERR_STREAM_PREMATURE_CLOSE";
+	try {
+		await pipeline(source, raw, { signal: controller.signal });
+		onFinish?.();
+	} catch (error) {
+		const err = error as NodeJS.ErrnoException & { name: string };
+		const wasCancelled =
+			err.name === "AbortError" || err.code === "ERR_STREAM_PREMATURE_CLOSE";
 
-    if (wasCancelled) {
-      onError?.(new StreamAbortedError());
-      // Not rethrown: cancellation is an expected outcome, not a bug for
-      // the caller to handle as a 500.
-      return;
-    }
+		if (wasCancelled) {
+			onError?.(new StreamAbortedError());
+			// Not rethrown: cancellation is an expected outcome, not a bug for
+			// the caller to handle as a 500.
+			return;
+		}
 
-    onError?.(err);
-    if (!raw.headersSent) {
-      // Headers not sent yet - safe to let the caller catch this and
-      // respond with a proper error status instead of a half-open stream.
-      throw err;
-    }
-    // Headers already sent: nothing left to do but ensure the socket
-    // doesn't hang open.
-    if (!raw.writableEnded) raw.destroy(err);
-  } finally {
-    unbindSignal();
-    unbindDisconnect();
-  }
+		onError?.(err);
+		if (!raw.headersSent) {
+			// Headers not sent yet - safe to let the caller catch this and
+			// respond with a proper error status instead of a half-open stream.
+			throw err;
+		}
+		// Headers already sent: nothing left to do but ensure the socket
+		// doesn't hang open.
+		if (!raw.writableEnded) raw.destroy(err);
+	} finally {
+		unbindSignal();
+		unbindDisconnect();
+	}
 }
 
 /**
@@ -77,19 +77,19 @@ export async function pipeToResponse(
  * `pipeToResponse` (or another consumer) drives it.
  */
 export function composePipeline(
-  source: Readable,
-  ...transforms: NodeJS.ReadWriteStream[]
+	source: Readable,
+	...transforms: NodeJS.ReadWriteStream[]
 ): Readable {
-  if (transforms.length === 0) return source;
-  let current: Readable = source;
-  for (const transform of transforms) {
-    current = current.pipe(transform as any);
-    // Surface upstream errors on the downstream stream too, so a single
-    // `pipeline()` call at the end still catches failures anywhere in
-    // the chain instead of only at the tail.
-    current.on("error", (err) => {
-      if (!(transform as any).destroyed) (transform as any).destroy(err);
-    });
-  }
-  return current as unknown as Readable;
+	if (transforms.length === 0) return source;
+	let current: Readable = source;
+	for (const transform of transforms) {
+		current = current.pipe(transform as any);
+		// Surface upstream errors on the downstream stream too, so a single
+		// `pipeline()` call at the end still catches failures anywhere in
+		// the chain instead of only at the tail.
+		current.on("error", (err) => {
+			if (!(transform as any).destroyed) (transform as any).destroy(err);
+		});
+	}
+	return current as unknown as Readable;
 }

@@ -1,8 +1,8 @@
 // config/env.ts
 import fs from "node:fs";
 import path from "node:path";
+import type { EnvOptions } from "../../types/config/EnvOptions.js";
 import { parseEnv } from "./parseEnv.js";
-import { EnvOptions } from "../../types/config/EnvOptions.js";
 
 /** Tracks which keys were loaded from file, and whether loading has happened. */
 export let loadedKeys: string[] = [];

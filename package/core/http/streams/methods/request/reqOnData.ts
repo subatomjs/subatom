@@ -7,19 +7,19 @@ export type DataListener = (chunk: Buffer) => void;
  * Returns an unsubscription function to remove the listener.
  */
 export function reqOnData(
-    req: IncomingMessage,
-    listener: DataListener
+	req: IncomingMessage,
+	listener: DataListener,
 ): () => void {
-    const wrappedListener = (chunk: unknown): void => {
-        const bufferChunk = Buffer.isBuffer(chunk)
-            ? chunk
-            : Buffer.from(chunk as string | Uint8Array);
-        listener(bufferChunk);
-    };
+	const wrappedListener = (chunk: unknown): void => {
+		const bufferChunk = Buffer.isBuffer(chunk)
+			? chunk
+			: Buffer.from(chunk as string | Uint8Array);
+		listener(bufferChunk);
+	};
 
-    req.on("data", wrappedListener);
+	req.on("data", wrappedListener);
 
-    return (): void => {
-        req.off("data", wrappedListener);
-    };
+	return (): void => {
+		req.off("data", wrappedListener);
+	};
 }

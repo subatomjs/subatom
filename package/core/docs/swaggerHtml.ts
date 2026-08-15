@@ -1,11 +1,11 @@
 // subatom/package/core/docs/swaggerHtml.ts
 export function renderSwaggerUiHtml(
-  openApiUrl: string = "/openapi.json",
-  logoUrl: string = "https://res.cloudinary.com/drdfur81n/image/upload/v1786723813/SubAtom_no_background_lbmgvu.png", // Replace with your logo path/URL
-  appName: string = "",
-  shortLogo: string = "https://res.cloudinary.com/drdfur81n/image/upload/v1786723815/SubAtom_short_logo_a3aa59.png"
+	openApiUrl: string = "/openapi.json",
+	logoUrl: string = "https://res.cloudinary.com/drdfur81n/image/upload/v1786723813/SubAtom_no_background_lbmgvu.png", // Replace with your logo path/URL
+	appName: string = "",
+	shortLogo: string = "https://res.cloudinary.com/drdfur81n/image/upload/v1786723815/SubAtom_short_logo_a3aa59.png",
 ): string {
-  return `<!DOCTYPE html>
+	return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">

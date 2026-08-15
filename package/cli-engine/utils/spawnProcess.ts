@@ -7,54 +7,54 @@ const activeChildren = new Set<ChildProcess>();
 let globalSignalHandlersAttached = false;
 
 function setupGlobalSignalHandlers() {
-    if (globalSignalHandlersAttached) return;
-    globalSignalHandlersAttached = true;
+	if (globalSignalHandlersAttached) return;
+	globalSignalHandlersAttached = true;
 
-    const shutdown = (signal: NodeJS.Signals) => {
-        for (const child of activeChildren) {
-            if (!child.killed) {
-                child.kill(signal);
-            }
-        }
-        process.exit(0);
-    };
+	const shutdown = (signal: NodeJS.Signals) => {
+		for (const child of activeChildren) {
+			if (!child.killed) {
+				child.kill(signal);
+			}
+		}
+		process.exit(0);
+	};
 
-    process.once("SIGINT", () => shutdown("SIGINT"));
-    process.once("SIGTERM", () => shutdown("SIGTERM"));
+	process.once("SIGINT", () => shutdown("SIGINT"));
+	process.once("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 export function runProcess(
-    command: string,
-    args: string[],
-    opts: RunOptions,
+	command: string,
+	args: string[],
+	opts: RunOptions,
 ): ChildProcess {
-    setupGlobalSignalHandlers();
+	setupGlobalSignalHandlers();
 
-    const child = spawn(command, args, {
-        cwd: opts.cwd ?? process.cwd(),
-        env: { ...process.env, ...opts.env },
-        stdio: "inherit",
-        shell: process.platform === "win32",
-    });
+	const child = spawn(command, args, {
+		cwd: opts.cwd ?? process.cwd(),
+		env: { ...process.env, ...opts.env },
+		stdio: "inherit",
+		shell: process.platform === "win32",
+	});
 
-    activeChildren.add(child);
+	activeChildren.add(child);
 
-    child.on("exit", (code, signal) => {
-        activeChildren.delete(child);
+	child.on("exit", (code, signal) => {
+		activeChildren.delete(child);
 
-        if (code !== 0 && code !== null) {
-            logger.error(
-                `${opts.label} exited with code ${code}${signal ? ` (${signal})` : ""}`,
-            );
-            process.exit(code);
-        }
-    });
+		if (code !== 0 && code !== null) {
+			logger.error(
+				`${opts.label} exited with code ${code}${signal ? ` (${signal})` : ""}`,
+			);
+			process.exit(code);
+		}
+	});
 
-    child.on("error", (err) => {
-        activeChildren.delete(child);
-        logger.error(`Failed to start ${opts.label}: ${err.message}`);
-        process.exit(1);
-    });
+	child.on("error", (err) => {
+		activeChildren.delete(child);
+		logger.error(`Failed to start ${opts.label}: ${err.message}`);
+		process.exit(1);
+	});
 
-    return child;
+	return child;
 }

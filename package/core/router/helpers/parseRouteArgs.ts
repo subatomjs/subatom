@@ -1,19 +1,22 @@
 // core/router/helpers/parseRouteArgs.ts
 
-import { IHandler, IRouteOptions } from "../../../types/framework/router/IRouter.js";
+import type {
+	IHandler,
+	IRouteOptions,
+} from "../../../types/framework/router/IRouter.js";
 
 export interface ParsedRouteArgs {
-  handlers: IHandler[];
-  options: IRouteOptions;
+	handlers: IHandler[];
+	options: IRouteOptions;
 }
 
 function isRouteOptions(value: unknown): value is IRouteOptions {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof value !== "function"
-  );
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		!Array.isArray(value) &&
+		typeof value !== "function"
+	);
 }
 
 /**
@@ -28,19 +31,19 @@ function isRouteOptions(value: unknown): value is IRouteOptions {
  * correct behavior (options only make sense as the final argument).
  */
 export function parseRouteArgs(
-  args: Array<IHandler | IRouteOptions>,
+	args: Array<IHandler | IRouteOptions>,
 ): ParsedRouteArgs {
-  if (args.length === 0) {
-    return { handlers: [], options: {} };
-  }
+	if (args.length === 0) {
+		return { handlers: [], options: {} };
+	}
 
-  const last = args[args.length - 1];
-  if (isRouteOptions(last)) {
-    return {
-      handlers: args.slice(0, -1) as IHandler[],
-      options: last,
-    };
-  }
+	const last = args[args.length - 1];
+	if (isRouteOptions(last)) {
+		return {
+			handlers: args.slice(0, -1) as IHandler[],
+			options: last,
+		};
+	}
 
-  return { handlers: args as IHandler[], options: {} };
+	return { handlers: args as IHandler[], options: {} };
 }

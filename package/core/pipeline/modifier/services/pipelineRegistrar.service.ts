@@ -1,76 +1,76 @@
 import {
-  IInterceptor,
-  ISerializer,
-  ITransformer,
-  sortedByPriority,
+	type IInterceptor,
+	type ISerializer,
+	type ITransformer,
+	sortedByPriority,
 } from "../../../../types/framework/pipeline/IPipeline.js";
 
 function assertPlainObject(
-  value: unknown,
-  label: string,
+	value: unknown,
+	label: string,
 ): asserts value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new TypeError(`[Subatom] ${label} must be a plain object.`);
-  }
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		throw new TypeError(`[Subatom] ${label} must be a plain object.`);
+	}
 }
 
 function resortInPlace<T extends { priority?: number }>(bucket: T[]): void {
-  const sorted = sortedByPriority(bucket);
-  bucket.length = 0;
-  bucket.push(...sorted);
+	const sorted = sortedByPriority(bucket);
+	bucket.length = 0;
+	bucket.push(...sorted);
 }
 
 export function registerTransformer(
-  bucket: ITransformer[],
-  transformer: ITransformer,
+	bucket: ITransformer[],
+	transformer: ITransformer,
 ): void {
-  assertPlainObject(transformer, "transformer()");
+	assertPlainObject(transformer, "transformer()");
 
-  const hasAnyHook =
-    typeof transformer.beforeRequest === "function" ||
-    typeof transformer.afterRequest === "function" ||
-    typeof transformer.beforeResponse === "function" ||
-    typeof transformer.afterResponse === "function";
+	const hasAnyHook =
+		typeof transformer.beforeRequest === "function" ||
+		typeof transformer.afterRequest === "function" ||
+		typeof transformer.beforeResponse === "function" ||
+		typeof transformer.afterResponse === "function";
 
-  if (!hasAnyHook) {
-    throw new TypeError(
-      "[Subatom] transformer() requires at least one of: " +
-        "beforeRequest, afterRequest, beforeResponse, afterResponse.",
-    );
-  }
+	if (!hasAnyHook) {
+		throw new TypeError(
+			"[Subatom] transformer() requires at least one of: " +
+				"beforeRequest, afterRequest, beforeResponse, afterResponse.",
+		);
+	}
 
-  bucket.push(transformer);
-  resortInPlace(bucket);
+	bucket.push(transformer);
+	resortInPlace(bucket);
 }
 
 export function registerInterceptor(
-  bucket: IInterceptor[],
-  interceptor: IInterceptor,
+	bucket: IInterceptor[],
+	interceptor: IInterceptor,
 ): void {
-  assertPlainObject(interceptor, "intercept()");
+	assertPlainObject(interceptor, "intercept()");
 
-  if (typeof interceptor.intercept !== "function") {
-    throw new TypeError(
-      "[Subatom] intercept() requires an `intercept(ctx, next)` function.",
-    );
-  }
+	if (typeof interceptor.intercept !== "function") {
+		throw new TypeError(
+			"[Subatom] intercept() requires an `intercept(ctx, next)` function.",
+		);
+	}
 
-  bucket.push(interceptor);
-  resortInPlace(bucket);
+	bucket.push(interceptor);
+	resortInPlace(bucket);
 }
 
 export function registerSerializer(
-  bucket: ISerializer[],
-  serializer: ISerializer,
+	bucket: ISerializer[],
+	serializer: ISerializer,
 ): void {
-  assertPlainObject(serializer, "serializer()");
+	assertPlainObject(serializer, "serializer()");
 
-  if (typeof serializer.serialize !== "function") {
-    throw new TypeError(
-      "[Subatom] serializer() requires a `serialize(data, ctx)` function.",
-    );
-  }
+	if (typeof serializer.serialize !== "function") {
+		throw new TypeError(
+			"[Subatom] serializer() requires a `serialize(data, ctx)` function.",
+		);
+	}
 
-  bucket.push(serializer);
-  resortInPlace(bucket);
+	bucket.push(serializer);
+	resortInPlace(bucket);
 }

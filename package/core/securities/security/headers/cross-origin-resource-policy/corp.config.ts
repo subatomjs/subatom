@@ -1,9 +1,9 @@
-export type CORPValue = 'same-site' | 'same-origin' | 'cross-origin';
+export type CORPValue = "same-site" | "same-origin" | "cross-origin";
 
 export interface CORPConfig {
-  policy?: CORPValue;
+	policy?: CORPValue;
 }
 
 export const defaultCORPConfig: CORPConfig = {
-  policy: 'same-origin',
+	policy: "same-origin",
 };
