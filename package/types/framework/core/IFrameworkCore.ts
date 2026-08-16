@@ -12,7 +12,7 @@ export interface ISubatomServerConfig {
 	host?: string;
 	appName?: string;
 	shutdownTimeoutMs?: number;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 export interface IGroupContext {

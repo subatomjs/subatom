@@ -1,4 +1,9 @@
-// subatom/package/core/bootstrap/subatom-server/SubatomServer.ts
+/*!
+ * subatom
+ * Copyright(c) 2026 Kunal Chandra Das <kunalchandradasofficial@gmail.com.
+ * MIT Licensed
+ */
+
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
 	createServer,
@@ -46,6 +51,8 @@ export class SubatomServer {
 
 	private readonly openSockets = new Set<Socket>();
 	private readonly webSocketManager: WebSocketManager;
+
+
 	private pipelineConfig: IRequestPipelineConfig = {
 		transformers: [],
 		interceptors: [],
@@ -55,13 +62,21 @@ export class SubatomServer {
 	private readonly requestContext = new AsyncLocalStorage<IRequestContext>();
 
 	constructor(
+		// Router 
 		private readonly router: Router | IRouter,
+
+		// Middlewares 
 		private readonly middlewares: MiddlewareHandler[] = [],
 		private readonly errorMiddlewares: ErrorMiddlewareHandler[] = [],
+
+		// Websocket 
 		private readonly wsRoutes: IWebSocketRoute[] = [],
 	) {
+
+		// Http server creation 
 		this.server = createServer((req, res) => this.handleRequest(req, res));
 
+		// Websocket connection
 		this.webSocketManager = new WebSocketManager(this.server);
 		for (const route of this.wsRoutes) {
 			this.webSocketManager.register(route.path, route.handlers);
@@ -84,16 +99,17 @@ export class SubatomServer {
 		});
 	}
 
-	// Feature Restored: Keeps the public API intact for any middleware or plugins modifying config before start.
+	// Feature: Keeps the public API intact for any middleware or plugins modifying config before start.
 	public setConfig(config: ISubatomServerConfig): void {
 		this.config = { ...this.config, ...config };
 	}
 
-	// Feature Restored: Keeps pipeline configuration intact.
+	// Feature: Keeps pipeline configuration intact.
 	public setPipelineConfig(config: IRequestPipelineConfig): void {
 		this.pipelineConfig = config;
 	}
 
+	// Request response handler 
 	private async handleRequest(
 		native_request: IncomingMessage,
 		native_response: ServerResponse,
@@ -118,11 +134,9 @@ export class SubatomServer {
 	}
 
 	public async start(overrideConfig?: ISubatomServerConfig): Promise<Server> {
-		// [UPDATE FOR NEW ENV CONFIG]:
 		// 1. First, we merge your legacy instance config (from `setConfig`) with any explicit `start(overrides)`.
 		const combinedOverrides = { ...this.config, ...overrideConfig };
 
-		// [UPDATE FOR NEW ENV CONFIG]:
 		// 2. We sanitize these legacy overrides into the strict typing the new ConfigManager expects.
 		// For example, resolving the strict `number` requirement for the `port` property.
 		let safeOverrides: any;
@@ -138,8 +152,6 @@ export class SubatomServer {
 				}
 			}
 		}
-
-		// [UPDATE FOR NEW ENV CONFIG]:
 		// 3. We delegate to the unified ConfigManager. It will handle the `.env` discovery,
 		// `subatom.config.*` loading, deep merging, validation, and immutability.
 		const finalConfig = await ConfigManager.resolve(safeOverrides);
@@ -155,7 +167,7 @@ export class SubatomServer {
 		const host = finalConfig.host;
 		// Fallback for appName, since it might not be explicitly typed in SubatomConfig yet
 		const appName =
-			(finalConfig as any).appName || combinedOverrides.appName || "subatom";
+			(finalConfig as unknown as ISubatomServerConfig).appName || combinedOverrides.appName || "subatom";
 
 		const availablePort = await getAvailablePort(requestedPort, host);
 
@@ -176,7 +188,7 @@ export class SubatomServer {
 		appName?: string,
 		callback?: (assignedPort: number) => void,
 	): Promise<Server> {
-		// Feature Restored: Fully intact wrapper around start().
+		// Feature: Fully intact wrapper around start().
 		const override: ISubatomServerConfig = {};
 		if (port !== undefined) override.port = port;
 		if (host !== undefined) override.host = host;
@@ -197,7 +209,6 @@ export class SubatomServer {
 	}
 
 	public close(callback?: (err?: Error) => void): Server {
-		// [UPDATE FOR NEW ENV CONFIG]:
 		// Fallback securely through the pipeline: 1. Resolved deep merged config, 2. Legacy config, 3. Default.
 		const timeoutMs = Number(
 			this.resolvedConfig?.websocketOptions?.shutdownTimeoutMs ??

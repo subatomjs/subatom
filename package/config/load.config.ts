@@ -27,7 +27,7 @@ export async function findAndLoadConfig(
 	try {
 		const userConfig = await readUserConfig(found);
 		return { ...DEFAULT_CONFIG, ...userConfig };
-	} catch (err) {
+	} catch (err:unknown) {
 		console.warn(
 			`[subatom] Failed to load config from ${path.basename(found)}`,
 			err,
@@ -52,7 +52,7 @@ async function readUserConfig(filePath: string): Promise<SubatomUserConfig> {
 		const { code } = await transform(source, {
 			loader: "ts",
 			format: "esm",
-			target: "node18",
+			target: "node24",
 		});
 
 		const dataUrl = `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;

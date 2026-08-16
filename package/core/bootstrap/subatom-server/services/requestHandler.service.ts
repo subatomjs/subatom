@@ -12,6 +12,9 @@ import { Response } from "../../../http/response/Response.js";
 import type { IRequestPipelineConfig } from "../../../pipeline/modifier/RequestPipeline.js";
 import { handleRequestWithPipeline } from "../../../pipeline/modifier/RouterPipelineAdapter.js";
 import { handleErrorPipeline } from "./errorPipeline.service.js";
+import { Router } from "../../../router/Router.js";
+
+
 
 export async function processHttpRequest(
 	native_request: IncomingMessage,
@@ -33,7 +36,7 @@ export async function processHttpRequest(
 			// Only route once, through the pipeline. handleRequestWithPipeline's
 			// runControllerChain is responsible for invoking router.dispatch(...).
 			await handleRequestWithPipeline(
-				router as any,
+				router as Router,
 				request,
 				response,
 				pipelineConfig,
