@@ -11,10 +11,8 @@ import { Request } from "../../../http/request/Request.js";
 import { Response } from "../../../http/response/Response.js";
 import type { IRequestPipelineConfig } from "../../../pipeline/modifier/RequestPipeline.js";
 import { handleRequestWithPipeline } from "../../../pipeline/modifier/RouterPipelineAdapter.js";
+import type { Router } from "../../../router/Router.js";
 import { handleErrorPipeline } from "./errorPipeline.service.js";
-import { Router } from "../../../router/Router.js";
-
-
 
 export async function processHttpRequest(
 	native_request: IncomingMessage,

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const cliPath = path.resolve("dist/package/cli-engine/cli.js");
+const cliPath = path.resolve("dist/package/watch-engine/cli.js");
 
 if (fs.existsSync(cliPath)) {
 	const content = fs.readFileSync(cliPath, "utf8");

@@ -1,5 +1,5 @@
 export interface RunOptions {
-	cwd?: string;
-	env?: NodeJS.ProcessEnv;
-	label: string;
+    readonly cwd?: string | undefined;
+    readonly env?: Readonly<Record<string, string | undefined>> | undefined;
+    readonly label: string;
 }

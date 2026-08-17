@@ -52,7 +52,6 @@ export class SubatomServer {
 	private readonly openSockets = new Set<Socket>();
 	private readonly webSocketManager: WebSocketManager;
 
-
 	private pipelineConfig: IRequestPipelineConfig = {
 		transformers: [],
 		interceptors: [],
@@ -62,18 +61,17 @@ export class SubatomServer {
 	private readonly requestContext = new AsyncLocalStorage<IRequestContext>();
 
 	constructor(
-		// Router 
+		// Router
 		private readonly router: Router | IRouter,
 
-		// Middlewares 
+		// Middlewares
 		private readonly middlewares: MiddlewareHandler[] = [],
 		private readonly errorMiddlewares: ErrorMiddlewareHandler[] = [],
 
-		// Websocket 
+		// Websocket
 		private readonly wsRoutes: IWebSocketRoute[] = [],
 	) {
-
-		// Http server creation 
+		// Http server creation
 		this.server = createServer((req, res) => this.handleRequest(req, res));
 
 		// Websocket connection
@@ -109,7 +107,7 @@ export class SubatomServer {
 		this.pipelineConfig = config;
 	}
 
-	// Request response handler 
+	// Request response handler
 	private async handleRequest(
 		native_request: IncomingMessage,
 		native_response: ServerResponse,
@@ -167,7 +165,9 @@ export class SubatomServer {
 		const host = finalConfig.host;
 		// Fallback for appName, since it might not be explicitly typed in SubatomConfig yet
 		const appName =
-			(finalConfig as unknown as ISubatomServerConfig).appName || combinedOverrides.appName || "subatom";
+			(finalConfig as unknown as ISubatomServerConfig).appName ||
+			combinedOverrides.appName ||
+			"subatom";
 
 		const availablePort = await getAvailablePort(requestedPort, host);
 

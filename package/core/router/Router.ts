@@ -354,7 +354,7 @@ export class Router implements IRouter {
 
 		this.routes.push(route);
 	}
-	
+
 	/**
 	 * Finds a route by its registered name. Scans the live route table
 	 * on every call rather than maintaining a cached index, since routes

@@ -10,36 +10,36 @@ import type { ServerResponse } from "node:http";
  */
 
 export function writeWithBackpressure(
-  raw: ServerResponse,
-  chunk: Buffer | string,
+	raw: ServerResponse,
+	chunk: Buffer | string,
 ): Promise<void> {
-  if (raw.writableEnded || raw.destroyed) {
-    return Promise.reject(new Error("Cannot write: response already ended"));
-  }
-  return new Promise((resolve, reject) => {
-    let callbackExecuted = false;
-    let isSyncError: Error | null = null;
+	if (raw.writableEnded || raw.destroyed) {
+		return Promise.reject(new Error("Cannot write: response already ended"));
+	}
+	return new Promise((resolve, reject) => {
+		let callbackExecuted = false;
+		const isSyncError: Error | null = null;
 
-    const onError = (err: Error) => reject(err);
-    raw.once("error", onError);
+		const onError = (err: Error) => reject(err);
+		raw.once("error", onError);
 
-    const ok = raw.write(chunk, (err) => {
-      raw.off("error", onError);
-      callbackExecuted = true;
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
+		const ok = raw.write(chunk, (err) => {
+			raw.off("error", onError);
+			callbackExecuted = true;
+			if (err) {
+				reject(err);
+			} else {
+				resolve();
+			}
+		});
 
-    if (!ok && !callbackExecuted) {
-      raw.once("drain", () => {
-        raw.off("error", onError);
-        resolve();
-      });
-    }
-  });
+		if (!ok && !callbackExecuted) {
+			raw.once("drain", () => {
+				raw.off("error", onError);
+				resolve();
+			});
+		}
+	});
 }
 
 // export function writeWithBackpressure(

@@ -27,7 +27,7 @@ export async function findAndLoadConfig(
 	try {
 		const userConfig = await readUserConfig(found);
 		return { ...DEFAULT_CONFIG, ...userConfig };
-	} catch (err:unknown) {
+	} catch (err: unknown) {
 		console.warn(
 			`[subatom] Failed to load config from ${path.basename(found)}`,
 			err,

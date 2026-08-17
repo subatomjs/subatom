@@ -8,7 +8,7 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
-		"subatom": "./dist/package/cli-engine/cli.js"
+		"subatom": "./dist/package/watch-engine/cli.js"
 	},
 	"exports": {
 		".": {
@@ -63,10 +63,10 @@
 	"sideEffects": false,
 	"scripts": {
 		"clean": "rm -rf dist",
-		"build": "tsc -p tsconfig.build.json && node --import tsx ./package/cli-engine/postbuild.ts",
+		"build": "tsc -p tsconfig.build.json && node --import tsx ./package/watch-engine/postbuild.ts",
 		"prepublishOnly": "npm run clean && npm run build",
 		"dev": "tsx watch ./index.ts",
-		"cli:dev": "tsx watch ./package/cli-engine/cli.ts",
+		"cli:dev": "tsx watch ./package/watch-engine/cli.ts",
 		"unit:test": "vitest run",
 		"lint": "biome check .",
 		"lint-fix": "biome check --write .",

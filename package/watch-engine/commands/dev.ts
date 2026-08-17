@@ -1,18 +1,17 @@
-// commands/dev.ts
 import { createRequire } from "node:module";
 import path from "node:path";
 import { findAndLoadConfig } from "../../config/load.config.js";
+import type { NormalizedWatchEvent } from "../../types/engine-utils/WatchConfig.js";
+import { ProcessLifecycle } from "../lifecycle/ProcessLifecycle.js";
 import { resolveEntry } from "../utils/findEntry.js";
 import { logger } from "../utils/logger.js";
 import { FrameworkWatcher } from "../watch/FrameworkWatcher.js";
 import { ProcessManager } from "../watch/ProcessManager.js";
 
 interface DevOptions {
-    port?: string;
-    host?: string;
+    readonly port?: string | undefined;
+    readonly host?: string | undefined;
 }
-
-let isDevShutdownHookAttached = false;
 
 export async function runDev(opts: DevOptions): Promise<void> {
     const cwd = process.cwd();
@@ -49,26 +48,27 @@ export async function runDev(opts: DevOptions): Promise<void> {
     const watcher = new FrameworkWatcher({
         watchPaths: [cwd],
         extensions: ["ts", "tsx", "js", "jsx", "mjs", "cjs", "json"],
-        debounceMs: 250,
-        onChange: (filePath: string) => {
+        debounceMs: 150,
+        onChange: (filePath: string, batch?: readonly NormalizedWatchEvent[]) => {
             const relPath = path.relative(cwd, filePath);
-            void manager.restart(relPath);
+            const summary =
+                batch && batch.length > 1
+                    ? `${batch.length} files (${relPath} and others)`
+                    : relPath;
+
+            void manager.restart(summary);
+        },
+        onError: (error: Error) => {
+            logger.error(`Watcher error: ${error.message}`);
         },
     });
 
     await watcher.start();
 
-    if (!isDevShutdownHookAttached) {
-        isDevShutdownHookAttached = true;
-
-        const shutdown = async () => {
-            logger.info("Shutting down dev server...");
-            await watcher.close();
-            await manager.stop();
-            process.exit(0);
-        };
-
-        process.once("SIGINT", shutdown);
-        process.once("SIGTERM", shutdown);
-    }
+    const lifecycle = ProcessLifecycle.getInstance();
+    lifecycle.onShutdown(async () => {
+        logger.info("Shutting down dev server...");
+        await watcher.close();
+        await manager.stop();
+    });
 }

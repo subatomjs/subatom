@@ -4,12 +4,12 @@ import { readText } from "../../../../package/core/http/request/services/readTex
 import { createMockIncomingMessage } from "../helpers/mockIncomingMessage.js";
 
 describe("readText service", () => {
-    it("should decode incoming buffer chunks into utf-8 string", async () => {
-        const raw = createMockIncomingMessage({
-            bodyChunks: ["Subatom ", "Framework ⚡"],
-        });
+	it("should decode incoming buffer chunks into utf-8 string", async () => {
+		const raw = createMockIncomingMessage({
+			bodyChunks: ["Subatom ", "Framework ⚡"],
+		});
 
-        const text = await readText(raw);
-        expect(text).toBe("Subatom Framework ⚡");
-    });
+		const text = await readText(raw);
+		expect(text).toBe("Subatom Framework ⚡");
+	});
 });

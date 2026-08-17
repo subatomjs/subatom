@@ -1,9 +1,11 @@
-// watch/FrameworkWatcher.ts
 import path from "node:path";
-import watcher, { type AsyncSubscription } from "@parcel/watcher";
-import type { WatcherOptions } from "../../types/engine-utils/WatchConfig.js";
+import watcher, { type AsyncSubscription, type Event as ParcelEvent } from "@parcel/watcher";
+import type {
+    WatcherOptions,
+} from "../../types/engine-utils/WatchConfig.js";
+import { EventFilter } from "./EventFilter.js";
 
-const DEFAULT_IGNORED_PATTERNS = [
+const DEFAULT_IGNORED_PATTERNS: readonly string[] = [
     "**/node_modules/**",
     "**/.git/**",
     "**/dist/**",
@@ -20,7 +22,7 @@ const DEFAULT_IGNORED_PATTERNS = [
     "**/.DS_Store",
 ];
 
-const DEFAULT_EXTENSIONS = [
+const DEFAULT_EXTENSIONS: readonly string[] = [
     ".ts",
     ".tsx",
     ".js",
@@ -35,34 +37,31 @@ const DEFAULT_EXTENSIONS = [
 export class FrameworkWatcher {
     private subscriptions: AsyncSubscription[] = [];
     private debounceTimer: NodeJS.Timeout | null = null;
-    private readonly watchPaths: string[];
-    private readonly extensions: Set<string>;
+    private readonly watchPaths: readonly string[];
+    private readonly filter: EventFilter;
     private readonly debounceMs: number;
-    private readonly onChange: (filePath: string) => void;
-    private readonly ignoredPatterns: string[];
+    private readonly onChange: (filePath: string) => void | Promise<void>;
+    private readonly ignoredPatterns: readonly string[];
+    private readonly onError: ((error: Error) => void) | undefined;
     private isClosed = false;
 
-    constructor(options: WatcherOptions & { ignored?: string[] }) {
+    constructor(options: WatcherOptions & { ignored?: readonly string[] | undefined }) {
         this.watchPaths =
             options.watchPaths && options.watchPaths.length > 0
                 ? options.watchPaths
                 : [process.cwd()];
 
         const rawExts = options.extensions ?? DEFAULT_EXTENSIONS;
-        this.extensions = new Set(
-            rawExts.map((ext) =>
-                ext.startsWith(".") ? ext.toLowerCase() : `.${ext.toLowerCase()}`,
-            ),
-        );
-
+        this.ignoredPatterns = options.ignored ?? DEFAULT_IGNORED_PATTERNS;
+        this.filter = new EventFilter(rawExts, this.ignoredPatterns);
         this.debounceMs = options.debounceMs ?? 150;
         this.onChange = options.onChange;
-        this.ignoredPatterns = options.ignored ?? DEFAULT_IGNORED_PATTERNS;
+        this.onError = options.onError;
     }
 
     public async start(): Promise<void> {
-        await this.close(); // Clean up any existing subscriptions first
-        this.isClosed = false; // Reset closed state after cleanup completes
+        await this.close();
+        this.isClosed = false;
 
         const uniquePaths = Array.from(
             new Set(this.watchPaths.map((p) => path.resolve(p))),
@@ -71,13 +70,20 @@ export class FrameworkWatcher {
         const subscriptionPromises = uniquePaths.map((watchDir) =>
             watcher.subscribe(
                 watchDir,
-                (err, events) => {
-                    if (err || this.isClosed) return;
+                (err: Error | null, events: ParcelEvent[]) => {
+                    if (err) {
+                        if (this.onError) {
+                            this.onError(err);
+                        }
+                        return;
+                    }
+                    if (this.isClosed || !events || events.length === 0) {
+                        return;
+                    }
 
-                    const relevantEvent = events.find((event) => {
-                        const ext = path.extname(event.path).toLowerCase();
-                        return this.extensions.has(ext);
-                    });
+                    const relevantEvent = events.find((event) =>
+                        this.filter.shouldProcess(event.path),
+                    );
 
                     if (relevantEvent) {
                         if (this.debounceTimer) {
@@ -86,13 +92,13 @@ export class FrameworkWatcher {
 
                         this.debounceTimer = setTimeout(() => {
                             if (!this.isClosed) {
-                                this.onChange(relevantEvent.path);
+                                void this.onChange(relevantEvent.path);
                             }
                         }, this.debounceMs);
                     }
                 },
                 {
-                    ignore: this.ignoredPatterns,
+                    ignore: [...this.ignoredPatterns],
                 },
             ),
         );
@@ -109,9 +115,9 @@ export class FrameworkWatcher {
         }
 
         if (this.subscriptions.length > 0) {
-            const subs = [...this.subscriptions];
+            const activeSubscriptions = [...this.subscriptions];
             this.subscriptions = [];
-            await Promise.all(subs.map((s) => s.unsubscribe()));
+            await Promise.all(activeSubscriptions.map((sub) => sub.unsubscribe()));
         }
     }
 }
