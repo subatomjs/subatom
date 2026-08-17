@@ -29,41 +29,44 @@ export interface StreamFileOptions extends StreamPipeOptions {
  * outright so the caller doesn't silently get an incomplete resource.
  */
 export function parseRange(
-	rangeHeader: string | undefined,
-	size: number,
+    rangeHeader: string | undefined,
+    size: number,
 ): RangeSpec | null {
-	if (!rangeHeader || !rangeHeader.startsWith("bytes=")) return null;
-	const spec = rangeHeader.slice("bytes=".length);
-	if (spec.includes(",")) {
-		// Multi-range: not supported, treat as unsatisfiable rather than guess.
-		throw new RangeNotSatisfiableError(size);
-	}
+    if (!rangeHeader || !rangeHeader.startsWith("bytes=")) return null;
+    const spec = rangeHeader.slice("bytes=".length);
+    if (spec.includes(",")) {
+        throw new RangeNotSatisfiableError(size);
+    }
 
-	const [startStr = "", endStr = ""] = spec.split("-");
-	let start: number;
-	let end: number;
+    const [startStr = "", endStr = ""] = spec.split("-");
+    let start: number;
+    let end: number;
 
-	if (startStr === "") {
-		// Suffix range: "bytes=-500" -> last 500 bytes.
-		const suffixLength = parseInt(endStr, 10);
-		if (Number.isNaN(suffixLength) || suffixLength <= 0) {
-			throw new RangeNotSatisfiableError(size);
-		}
-		start = Math.max(size - suffixLength, 0);
-		end = size - 1;
-	} else {
-		start = parseInt(startStr, 10);
-		end = endStr === "" ? size - 1 : parseInt(endStr, 10);
-	}
+    if (startStr === "") {
+        const suffixLength = parseInt(endStr, 10);
+        if (Number.isNaN(suffixLength) || suffixLength <= 0) {
+            throw new RangeNotSatisfiableError(size);
+        }
+        start = Math.max(size - suffixLength, 0);
+        end = size - 1;
+    } else {
+        start = parseInt(startStr, 10);
+        end = endStr === "" ? size - 1 : parseInt(endStr, 10);
+    }
 
-	if (Number.isNaN(start) || Number.isNaN(end) || start > end || start < 0) {
-		throw new RangeNotSatisfiableError(size);
-	}
-	end = Math.min(end, size - 1);
+    if (
+        Number.isNaN(start) ||
+        Number.isNaN(end) ||
+        start > end ||
+        start < 0 ||
+        start >= size
+    ) {
+        throw new RangeNotSatisfiableError(size);
+    }
+    end = Math.min(end, size - 1);
 
-	return { start, end };
+    return { start, end };
 }
-
 /**
  * Streams a file to the response, transparently handling conditional
  * range requests. On a satisfiable `Range` header, responds 206 with

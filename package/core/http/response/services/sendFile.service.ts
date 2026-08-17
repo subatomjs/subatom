@@ -1,9 +1,6 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream } from "node:fs";
 import type { ServerResponse } from "node:http";
-import { extname, isAbsolute, resolve } from "node:path";
-import type { SendFileOptions } from "../../../../types/http/IResponse.js";
-import { MIME_TYPES } from "../../../utils/mime.js";
-import { setHeader } from "./setHeader.service.js";
+import { isAbsolute, resolve } from "node:path";
 
 export function resolveSafePath(
 	filePath: string,

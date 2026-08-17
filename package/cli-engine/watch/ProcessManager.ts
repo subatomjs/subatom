@@ -4,91 +4,96 @@ import type { ProcessManagerOptions } from "../../types/engine-utils/WatchConfig
 import { logger } from "../utils/logger.js";
 
 export class ProcessManager {
-	private child: ChildProcess | null = null;
-	private opts: ProcessManagerOptions;
-	private isRestarting = false;
+    private child: ChildProcess | null = null;
+    private opts: ProcessManagerOptions;
+    private isRestarting = false;
 
-	constructor(opts: ProcessManagerOptions) {
-		this.opts = opts;
-	}
+    constructor(opts: ProcessManagerOptions) {
+        this.opts = opts;
+    }
 
-	public start(): void {
-		this.child = spawn(this.opts.command, this.opts.args, {
-			cwd: this.opts.cwd,
-			env: { ...process.env, ...this.opts.env },
-			stdio: "inherit",
-		});
+    public start(): void {
+        const child = spawn(this.opts.command, this.opts.args, {
+            cwd: this.opts.cwd,
+            env: { ...process.env, ...this.opts.env },
+            stdio: "inherit",
+        });
 
-		this.child.on("exit", (code) => {
-			const wasRestarting = this.isRestarting;
-			this.child = null;
+        this.child = child;
 
-			if (!wasRestarting && code !== 0 && code !== null) {
-				logger.error(`${this.opts.label} crashed (exit code ${code})`);
-			}
-		});
+        const onExit = (code: number | null) => {
+            if (this.child === child) {
+                this.child = null;
+            }
+            if (!this.isRestarting && code !== 0 && code !== null) {
+                logger.error(`${this.opts.label} crashed (exit code ${code})`);
+            }
+        };
 
-		this.child.on("error", (err) => {
-			logger.error(`Failed to start ${this.opts.label}: ${err.message}`);
-		});
-	}
+        const onError = (err: Error) => {
+            if (this.child === child) {
+                this.child = null;
+            }
+            logger.error(`Failed to start ${this.opts.label}: ${err.message}`);
+        };
 
-	public async restart(reason?: string): Promise<void> {
-		if (this.isRestarting) return;
-		this.isRestarting = true;
+        child.once("exit", onExit);
+        child.once("error", onError);
+    }
 
-		if (reason) {
-			logger.info(`File changed: ${reason}`);
-		}
+    public async restart(reason?: string): Promise<void> {
+        if (this.isRestarting) return;
+        this.isRestarting = true;
 
-		if (this.child) {
-			await this.killChildProcess(this.child);
-		}
+        if (reason) {
+            logger.info(`File changed: ${reason}`);
+        }
 
-		this.isRestarting = false;
-		this.start();
-	}
+        if (this.child) {
+            const currentChild = this.child;
+            this.child = null;
+            currentChild.removeAllListeners();
+            await this.killChildProcess(currentChild);
+        }
 
-	public async stop(): Promise<void> {
-		if (this.child) {
-			await this.killChildProcess(this.child);
-			this.child = null;
-		}
-	}
+        this.isRestarting = false;
+        this.start();
+    }
 
-	private killChildProcess(child: ChildProcess): Promise<void> {
-		return new Promise((resolve) => {
-			if (child.killed || child.exitCode !== null || child.pid === undefined) {
-				return resolve();
-			}
+    public async stop(): Promise<void> {
+        if (this.child) {
+            const currentChild = this.child;
+            this.child = null;
+            currentChild.removeAllListeners();
+            await this.killChildProcess(currentChild);
+        }
+    }
 
-			const pid = child.pid;
+    private killChildProcess(child: ChildProcess): Promise<void> {
+        return new Promise((resolve) => {
+            if (child.killed || child.exitCode !== null || child.pid === undefined) {
+                return resolve();
+            }
 
-			const cleanup = () => {
-				// Wait 100ms for OS kernel to mark socket closed
-				setTimeout(resolve, 100);
-			};
+            const pid = child.pid;
 
-			child.once("exit", cleanup);
+            if (process.platform === "win32") {
+                try {
+                    execSync(`taskkill /pid ${pid} /T /F`, { stdio: "ignore" });
+                } catch {}
+                return setTimeout(resolve, 50);
+            }
 
-			if (process.platform === "win32") {
-				try {
-					execSync(`taskkill /pid ${pid} /T /F`, { stdio: "ignore" });
-				} catch {}
-			} else {
-				try {
-					// Kill all child processes spawned under this PID on macOS/Linux
-					execSync(`pkill -9 -P ${pid}`, { stdio: "ignore" });
-				} catch {}
+            try {
+                // Terminate the child process tree cleanly
+                execSync(`pkill -9 -P ${pid}`, { stdio: "ignore" });
+            } catch {}
 
-				try {
-					// Kill the main process PID directly
-					process.kill(pid, "SIGKILL");
-				} catch {}
-			}
+            try {
+                process.kill(pid, "SIGKILL");
+            } catch {}
 
-			// Safety fallback in case 'exit' event was already consumed
-			setTimeout(cleanup, 300);
-		});
-	}
+            setTimeout(resolve, 50);
+        });
+    }
 }
