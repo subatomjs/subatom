@@ -1,403 +1,319 @@
-// tests/package/subatom/Subatom.test.ts
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Subatom } from "../../../package/core/bootstrap/subatom/Subatom.js";
+import { Router } from "../../../package/core/router/Router.js";
+import * as envConfig from "../../../package/config/env/env.js";
+import * as processBoundaryService from "../../../package/core/bootstrap/subatom/services/processBoundary.service.js";
+import * as serverManagerService from "../../../package/core/bootstrap/subatom/services/serverManager.service.js";
+import * as routeRegistrar from "../../../package/core/router/services/routeRegistrar.service.js";
+import * as routerMerger from "../../../package/core/router/services/routerMerger.service.js";
+import * as pipelineRegistrar from "../../../package/core/pipeline/modifier/services/pipelineRegistrar.service.js";
 
-import {
-	afterEach,
-	beforeEach,
-	describe,
-	expect,
-	it,
-	type Mock,
-	vi,
-} from "vitest";
-
-// 1. Mock External and Internal Dependencies (Hoisted by Vitest)
 vi.mock("../../../package/config/env/env.js", () => ({
-	configEnv: vi.fn(),
+  configEnv: vi.fn(),
+  env: { isProd: false },
 }));
 
 vi.mock(
-	"../../../package/core/pipeline/modifier/services/pipelineRegistrar.service.js",
-	() => ({
-		registerInterceptor: vi.fn((arr, item) => arr.push(item)),
-		registerSerializer: vi.fn((arr, item) => arr.push(item)),
-		registerTransformer: vi.fn((arr, item) => arr.push(item)),
-	}),
-);
-
-vi.mock("../../../package/core/router/Router.js", () => {
-	class Router {
-		use = vi.fn();
-	}
-	return { Router };
-});
-
-vi.mock(
-	"../../../package/core/router/services/routeRegistrar.service.js",
-	() => ({
-		registerGroupRoute: vi.fn(),
-		registerPossiblyGrouped: vi.fn(),
-	}),
+  "../../../package/core/bootstrap/subatom/services/processBoundary.service.js",
+  () => ({
+    registerProcessBoundary: vi.fn(() => vi.fn()),
+  }),
 );
 
 vi.mock(
-	"../../../package/core/router/services/routerMerger.service.js",
-	() => ({
-		mergeSubRouter: vi.fn(),
-	}),
+  "../../../package/core/bootstrap/subatom/services/serverManager.service.js",
+  () => ({
+    ensureServerInstance: vi.fn(),
+    performGracefulShutdown: vi.fn(),
+  }),
 );
 
 vi.mock(
-	"../../../package/core/bootstrap/subatom/services/groupDispatcher.service.js",
-	() => ({
-		dispatchGroup: vi.fn(),
-	}),
+  "../../../package/core/router/services/routeRegistrar.service.js",
+  () => ({
+    registerPossiblyGrouped: vi.fn(),
+    registerGroupRoute: vi.fn(),
+  }),
 );
 
 vi.mock(
-	"../../../package/core/bootstrap/subatom/services/middlewareRegistrar.service.js",
-	() => ({
-		registerMiddleware: vi.fn((mws, _errMws, item) => mws.push(item)),
-	}),
+  "../../../package/core/router/services/routerMerger.service.js",
+  () => ({
+    mergeRouter: vi.fn(),
+    mergeSubRouter: vi.fn(),
+  }),
 );
 
 vi.mock(
-	"../../../package/core/bootstrap/subatom/services/processBoundary.service.js",
-	() => ({
-		registerProcessBoundary: vi.fn(),
-	}),
+  "../../../package/core/pipeline/modifier/services/pipelineRegistrar.service.js",
+  () => ({
+    registerTransformer: vi.fn(),
+    registerInterceptor: vi.fn(),
+    registerSerializer: vi.fn(),
+  }),
 );
 
-vi.mock(
-	"../../../package/core/bootstrap/subatom/services/serverManager.service.js",
-	() => ({
-		ensureServerInstance: vi.fn(),
-		performGracefulShutdown: vi.fn(),
-	}),
-);
+describe("Unit: Subatom Core Class", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-import { configEnv } from "../../../package/config/env/env.js";
-// 2. Imports of Tested Class and Mocked Functions
-import { Subatom } from "../../../package/core/bootstrap/subatom/Subatom.js";
-import { dispatchGroup } from "../../../package/core/bootstrap/subatom/services/groupDispatcher.service.js";
-import { registerMiddleware } from "../../../package/core/bootstrap/subatom/services/middlewareRegistrar.service.js";
-import { registerProcessBoundary } from "../../../package/core/bootstrap/subatom/services/processBoundary.service.js";
-import {
-	ensureServerInstance,
-	performGracefulShutdown,
-} from "../../../package/core/bootstrap/subatom/services/serverManager.service.js";
-import { Router } from "../../../package/core/router/Router.js";
-import {
-	registerGroupRoute,
-	registerPossiblyGrouped,
-} from "../../../package/core/router/services/routeRegistrar.service.js";
-import { mergeSubRouter } from "../../../package/core/router/services/routerMerger.service.js";
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-describe("Subatom Framework App Instance", () => {
-	let app: Subatom;
-	let mockServerInstance: any;
+  describe("Constructor & Initialization", () => {
+    it("should initialize envConfig and register process boundary on instantiating Subatom", () => {
+      const app = new Subatom({ path: ".env.test" });
 
-	beforeEach(() => {
-		vi.clearAllMocks();
+      expect(envConfig.configEnv).toHaveBeenCalledWith({ path: ".env.test" });
+      expect(
+        processBoundaryService.registerProcessBoundary,
+      ).toHaveBeenCalledTimes(1);
+      expect(app).toBeInstanceOf(Subatom);
+    });
+  });
 
-		mockServerInstance = {
-			start: vi.fn().mockResolvedValue(true),
-			listen: vi.fn().mockReturnValue(true),
-			setConfig: vi.fn(),
-			setPipelineConfig: vi.fn(),
-			shutdown: vi.fn().mockResolvedValue(undefined),
-		};
+  describe("HTTP Method Shortcuts", () => {
+    it.each([
+      ["get", "GET"],
+      ["post", "POST"],
+      ["put", "PUT"],
+      ["patch", "PATCH"],
+      ["delete", "DELETE"],
+    ] as const)(
+      "should register %s method route correctly",
+      (methodName, httpMethod) => {
+        const app = new Subatom();
+        const handler = vi.fn();
 
-		(ensureServerInstance as Mock).mockReturnValue(mockServerInstance);
-		app = new Subatom();
-	});
+        const result = app[methodName]("/resource", handler);
 
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
+        expect(result).toBe(app);
+        expect(routeRegistrar.registerPossiblyGrouped).toHaveBeenCalledWith(
+          expect.any(Router),
+          undefined,
+          httpMethod,
+          "/resource",
+          [handler],
+        );
+      },
+    );
+  });
 
-	describe("Initialization & Process Boundary", () => {
-		it("should initialize environment variables with provided options", () => {
-			const envOptions = { path: ".env.custom" };
-			new Subatom(envOptions as any);
-			expect(configEnv).toHaveBeenCalledWith(envOptions);
-		});
+  describe("Middleware & Routing Integration (app.use)", () => {
+    it("should register top-level middleware function", () => {
+      const app = new Subatom();
+      const middleware = (_req: any, _res: any, _next: any) => {};
 
-		it("should register process boundaries for graceful shutdown", () => {
-			expect(registerProcessBoundary).toHaveBeenCalledOnce();
+      const result = app.use(middleware);
 
-			const [getServerCb, shutdownCb] = vi.mocked(registerProcessBoundary).mock
-				.calls[0];
+      expect(result).toBe(app);
+    });
 
-			expect(getServerCb()).toBeUndefined();
+    it("should merge SubRouter when path and Router instance are passed to app.use", () => {
+      const app = new Subatom();
+      const subRouter = new Router();
 
-			const spy = vi.spyOn(app, "gracefulShutdown");
-			shutdownCb(1);
-			expect(spy).toHaveBeenCalledWith(1);
-		});
-	});
+      const result = app.use("/api", subRouter);
 
-	describe("Configuration API", () => {
-		it("should merge configuration options", () => {
-			app.setConfig({ appName: "TestApp", port: 8080 });
-			app.setConfig({ host: "localhost" });
+      expect(result).toBe(app);
+      expect(routerMerger.mergeSubRouter).toHaveBeenCalledWith(
+        expect.any(Router),
+        "/api",
+        subRouter,
+      );
+    });
 
-			app.start();
+    it("should delegate to router.use when path and middleware function are passed", () => {
+      const app = new Subatom();
+      const middleware = vi.fn();
+      const routerSpy = vi.spyOn((app as any).router, "use");
 
-			expect(ensureServerInstance).toHaveBeenCalledWith(
-				undefined,
-				expect.any(Object),
-				expect.any(Array),
-				expect.any(Array),
-				{ appName: "TestApp", port: 8080, host: "localhost" },
-				expect.any(Array),
-			);
-		});
+      app.use("/api", middleware);
 
-		it("should forward setConfig to server instance if it is already running", async () => {
-			await app.start();
-			app.setConfig({ port: 9000 });
-			expect(mockServerInstance.setConfig).toHaveBeenCalledWith(
-				expect.objectContaining({ port: 9000 }),
-			);
-		});
+      expect(routerSpy).toHaveBeenCalledWith("/api", middleware);
+    });
 
-		it("should register websocket routes and warn if registered after startup", async () => {
-			const consoleWarnSpy = vi
-				.spyOn(console, "warn")
-				.mockImplementation(() => {});
-			const handler = { open: vi.fn() };
+    it("should throw TypeError when first argument is neither a string nor a function", () => {
+      const app = new Subatom();
+      expect(() => {
+        app.use(123 as any);
+      }).toThrow(TypeError);
+    });
 
-			app.ws("/chat", handler as any);
-			await app.start();
+    it("should throw TypeError when path prefix provided without any handlers", () => {
+      const app = new Subatom();
+      expect(() => {
+        app.use("/empty");
+      }).toThrow(TypeError);
+    });
 
-			expect(consoleWarnSpy).not.toHaveBeenCalled();
-			expect(ensureServerInstance).toHaveBeenCalledWith(
-				undefined,
-				expect.anything(),
-				expect.anything(),
-				expect.anything(),
-				expect.anything(),
-				[{ path: "/chat", handlers: handler }],
-			);
+    it("should throw TypeError when an argument after prefix is invalid", () => {
+      const app = new Subatom();
+      expect(() => {
+        app.use("/invalid", {} as any);
+      }).toThrow(TypeError);
+    });
+  });
 
-			app.ws("/notifications", handler as any);
-			expect(consoleWarnSpy).toHaveBeenCalledWith(
-				expect.stringContaining("registered after start()"),
-			);
-		});
-	});
+  describe("Pipeline Registration", () => {
+    it("should register transformer", () => {
+      const app = new Subatom();
+      const transformer = { transform: vi.fn() } as any;
 
-	describe("Middleware & Router Orchestration (use)", () => {
-		it("should register global middleware via registerMiddleware service", () => {
-			const mw = vi.fn();
-			app.use(mw);
-			expect(registerMiddleware).toHaveBeenCalledWith(
-				expect.any(Array),
-				expect.any(Array),
-				mw,
-			);
-		});
+      const result = app.transformer(transformer);
 
-		it("should mount a sub-router using mergeSubRouter", () => {
-			const subRouter = new Router();
-			app.use("/api", subRouter);
-			expect(mergeSubRouter).toHaveBeenCalledWith(
-				expect.any(Object),
-				"/api",
-				subRouter,
-			);
-		});
+      expect(result).toBe(app);
+      expect(pipelineRegistrar.registerTransformer).toHaveBeenCalledWith(
+        expect.any(Array),
+        transformer,
+      );
+    });
 
-		it("should mount a path-scoped middleware directly onto the main router", () => {
-			const mw = vi.fn();
-			app.use("/api", mw);
+    it("should register interceptor", () => {
+      const app = new Subatom();
+      const interceptor = { intercept: vi.fn() } as any;
 
-			app.start();
-			const internalRouter = vi.mocked(ensureServerInstance).mock.calls[0][1];
-			expect(internalRouter.use).toHaveBeenCalledWith("/api", mw);
-		});
+      const result = app.intercept(interceptor);
 
-		it("should throw TypeError if the first argument is neither a string nor a function", () => {
-			expect(() => app.use(123 as any)).toThrowError(TypeError);
-		});
+      expect(result).toBe(app);
+      expect(pipelineRegistrar.registerInterceptor).toHaveBeenCalledWith(
+        expect.any(Array),
+        interceptor,
+      );
+    });
 
-		it("should throw TypeError if a path is provided but no handlers/routers are passed", () => {
-			expect(() => app.use("/api")).toThrowError(TypeError);
-		});
+    it("should register serializer", () => {
+      const app = new Subatom();
+      const serializer = { serialize: vi.fn() } as any;
 
-		it("should throw TypeError if an invalid handler type is passed after the path", () => {
-			expect(() => app.use("/api", {} as any)).toThrowError(TypeError);
-		});
+      const result = app.serializer(serializer);
 
-		it("should register an error middleware", () => {
-			const errMw = vi.fn();
-			app.useError(errMw);
+      expect(result).toBe(app);
+      expect(pipelineRegistrar.registerSerializer).toHaveBeenCalledWith(
+        expect.any(Array),
+        serializer,
+      );
+    });
+  });
 
-			app.start();
-			const errorMiddlewaresList =
-				vi.mocked(ensureServerInstance).mock.calls[0][3];
-			expect(errorMiddlewaresList).toContain(errMw);
-		});
-	});
+  describe("WebSocket Registration", () => {
+    it("should register WS routes and warn if registered after server starts", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const app = new Subatom();
+      const wsHandlers = { onMessage: vi.fn() } as any;
 
-	describe("Pipeline Composition", () => {
-		it("should register and export transformers, interceptors, and serializers", () => {
-			const transformer = { transform: vi.fn() };
-			const interceptor = { intercept: vi.fn() };
-			const serializer = { serialize: vi.fn() };
+      app.ws("/ws/chat", wsHandlers);
+      expect((app as any).wsRoutes).toEqual([
+        { path: "/ws/chat", handlers: wsHandlers },
+      ]);
+      expect(warnSpy).not.toHaveBeenCalled();
 
-			app.transformer(transformer as any);
-			app.intercept(interceptor as any);
-			app.serializer(serializer as any);
+      (app as any).serverInstance = {};
+      app.ws("/ws/feed", wsHandlers);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[Subatom WS] Route "/ws/feed" registered after start()',
+        ),
+      );
+    });
+  });
 
-			const pipelineConfig = app._getPipelineConfig();
+  describe("Lifecycle & Server Execution", () => {
+    it("should start server, configure pipeline and pass overrides", async () => {
+      const app = new Subatom();
+      const mockServer = {
+        setPipelineConfig: vi.fn(),
+        start: vi.fn().mockResolvedValue("STARTED"),
+      };
+      vi.mocked(serverManagerService.ensureServerInstance).mockReturnValue(
+        mockServer as any,
+      );
 
-			expect(pipelineConfig.transformers).toContain(transformer);
-			expect(pipelineConfig.interceptors).toContain(interceptor);
-			expect(pipelineConfig.serializers).toContain(serializer);
-		});
-	});
+      const result = await app.start({ port: 9000 });
 
-	describe("HTTP Routing Integrations", () => {
-		it("should register GET, POST, PUT, PATCH, DELETE properly", () => {
-			const handler = vi.fn();
+      expect(serverManagerService.ensureServerInstance).toHaveBeenCalled();
+      expect(mockServer.setPipelineConfig).toHaveBeenCalledWith({
+        transformers: [],
+        interceptors: [],
+        serializers: [],
+      });
+      expect(mockServer.start).toHaveBeenCalledWith({ port: 9000 });
+      expect(result).toBe("STARTED");
+    });
 
-			app.get("/get", handler);
-			expect(registerPossiblyGrouped).toHaveBeenCalledWith(
-				expect.any(Object),
-				undefined,
-				"GET",
-				"/get",
-				[handler],
-			);
+    it("should listen on specified port, host and appName", () => {
+      const app = new Subatom();
+      const mockServer = {
+        setPipelineConfig: vi.fn(),
+        listen: vi.fn().mockReturnValue("LISTENING"),
+      };
+      vi.mocked(serverManagerService.ensureServerInstance).mockReturnValue(
+        mockServer as any,
+      );
 
-			app.post("/post", handler);
-			expect(registerPossiblyGrouped).toHaveBeenCalledWith(
-				expect.any(Object),
-				undefined,
-				"POST",
-				"/post",
-				[handler],
-			);
+      const result = app.listen(3000, "0.0.0.0", "MainApp");
 
-			app.put("/put", handler);
-			expect(registerPossiblyGrouped).toHaveBeenCalledWith(
-				expect.any(Object),
-				undefined,
-				"PUT",
-				"/put",
-				[handler],
-			);
+      expect(serverManagerService.ensureServerInstance).toHaveBeenCalled();
+      expect(mockServer.listen).toHaveBeenCalledWith(
+        3000,
+        "0.0.0.0",
+        "MainApp",
+      );
+      expect(result).toBe("LISTENING");
+    });
 
-			app.patch("/patch", handler);
-			expect(registerPossiblyGrouped).toHaveBeenCalledWith(
-				expect.any(Object),
-				undefined,
-				"PATCH",
-				"/patch",
-				[handler],
-			);
+    it("should unregister process boundary and invoke graceful shutdown", () => {
+      const app = new Subatom();
+      const unregMock = vi.fn();
+      (app as any).unregisterProcessBoundary = unregMock;
 
-			app.delete("/delete", handler);
-			expect(registerPossiblyGrouped).toHaveBeenCalledWith(
-				expect.any(Object),
-				undefined,
-				"DELETE",
-				"/delete",
-				[handler],
-			);
-		});
+      app.gracefulShutdown(0);
 
-		it("should dispatch group calls to groupDispatcher", () => {
-			app.group("/v1");
-			expect(dispatchGroup).toHaveBeenCalledWith(
-				app,
-				expect.any(Object),
-				"/v1",
-				undefined,
-			);
-		});
-	});
+      expect(unregMock).toHaveBeenCalled();
+      expect(serverManagerService.performGracefulShutdown).toHaveBeenCalledWith(
+        undefined,
+        0,
+      );
+    });
+  });
 
-	describe("Internal Group Context Management", () => {
-		it("should manage group context stack correctly", () => {
-			const context1 = {
-				prefix: "/api",
-				middlewares: [],
-				tags: [],
-				rateLimitSpec: undefined,
-				rateLimitMiddleware: undefined,
-			};
-			const context2 = {
-				prefix: "/v1",
-				middlewares: [],
-				tags: [],
-				rateLimitSpec: undefined,
-				rateLimitMiddleware: undefined,
-			};
+  describe("Group Context Stack Internals", () => {
+    it("should manage group contexts in stack", () => {
+      const app = new Subatom();
+      expect(app._currentGroupContext()).toBeUndefined();
 
-			expect(app._currentGroupContext()).toBeUndefined();
+      const ctx1 = { prefix: "/api" } as any;
+      const ctx2 = { prefix: "/v1" } as any;
 
-			app._pushGroupContext(context1 as any);
-			expect(app._currentGroupContext()).toBe(context1);
+      app._pushGroupContext(ctx1);
+      expect(app._currentGroupContext()).toBe(ctx1);
 
-			app._pushGroupContext(context2 as any);
-			expect(app._currentGroupContext()).toBe(context2);
+      app._pushGroupContext(ctx2);
+      expect(app._currentGroupContext()).toBe(ctx2);
 
-			app._popGroupContext();
-			expect(app._currentGroupContext()).toBe(context1);
-		});
+      app._popGroupContext();
+      expect(app._currentGroupContext()).toBe(ctx1);
 
-		it("should register an explicit group route", () => {
-			const handler = vi.fn();
-			const meta = {};
-			app._registerGroupRoute("GET", "/test", [handler], meta);
-			expect(registerGroupRoute).toHaveBeenCalledWith(
-				expect.any(Object),
-				"GET",
-				"/test",
-				[handler],
-				meta,
-			);
-		});
-	});
+      app._popGroupContext();
+      expect(app._currentGroupContext()).toBeUndefined();
+    });
 
-	describe("Server Lifecycle Actions", () => {
-		it("should orchestrate server start and inject pipeline config", async () => {
-			const overrides = { port: 3000 };
-			await app.start(overrides);
+    it("should register group routes via _registerGroupRoute", () => {
+      const app = new Subatom();
+      const handlers = [vi.fn()];
+      const meta = { auth: true };
 
-			expect(ensureServerInstance).toHaveBeenCalled();
-			expect(mockServerInstance.setPipelineConfig).toHaveBeenCalledWith(
-				app._getPipelineConfig(),
-			);
-			expect(mockServerInstance.start).toHaveBeenCalledWith(overrides);
-		});
+      app._registerGroupRoute("GET", "/test", handlers, meta as any);
 
-		it("should orchestrate server listen with parameters", () => {
-			app.listen(9090, "0.0.0.0", "ProductionApp");
-
-			expect(ensureServerInstance).toHaveBeenCalled();
-			expect(mockServerInstance.setPipelineConfig).toHaveBeenCalledWith(
-				app._getPipelineConfig(),
-			);
-			expect(mockServerInstance.listen).toHaveBeenCalledWith(
-				9090,
-				"0.0.0.0",
-				"ProductionApp",
-			);
-		});
-
-		it("should pass gracefulShutdown to the manager service", () => {
-			app.gracefulShutdown(0);
-			expect(performGracefulShutdown).toHaveBeenCalledWith(undefined, 0);
-
-			app.start();
-			app.gracefulShutdown(1);
-			expect(performGracefulShutdown).toHaveBeenCalledWith(
-				mockServerInstance,
-				1,
-			);
-		});
-	});
+      expect(routeRegistrar.registerGroupRoute).toHaveBeenCalledWith(
+        (app as any).router,
+        "GET",
+        "/test",
+        handlers,
+        meta,
+      );
+    });
+  });
 });
