@@ -1,6 +1,6 @@
 {
 	"name": "subatom",
-	"version": "1.3.2",
+	"version": "1.4.0",
 	"description": "Subatom is a modern, high-performance, enterprise-grade web framework for Node.js.",
 	"license": "MIT",
 	"author": "Kunal Chandra Das <kunalchandradasofficial@gmail.com>",
