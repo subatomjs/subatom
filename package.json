@@ -26,7 +26,8 @@
 	"files": [
 		"dist",
 		"README.md",
-		"LICENSE"
+		"LICENSE",
+		"tests"
 	],
 	"keywords": [
 		"subatom",
@@ -80,6 +81,7 @@
 		"commander": "^15.0.0",
 		"esbuild": "^0.28.1",
 		"picocolors": "^1.1.1",
+		"subatom": "^1.3.2",
 		"tsx": "^4.23.5",
 		"ws": "^8.21.3"
 	},
