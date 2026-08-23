@@ -11,8 +11,7 @@
 import type { IGroupContext } from "../../../types/framework/core/IFrameworkCore.js";
 import type {
 	IHandler,
-	IRouteMeta,
-	IRouteOptions,
+	IRouteMetaOptions,
 } from "../../../types/framework/router/IRouter.js";
 import { combinePaths } from "../../bootstrap/subatom/helpers/combinePath.js";
 import type { HttpMethod } from "../../bootstrap/subatom/subordinate/RouteGroupBuilder.js";
@@ -24,9 +23,9 @@ export function registerGroupRoute(
 	method: HttpMethod,
 	fullPath: string,
 	handlers: IHandler[],
-	meta: IRouteMeta,
+	meta: IRouteMetaOptions,
 ): void {
-	const cleanMeta: Partial<IRouteMeta> = {};
+	const cleanMeta: Partial<IRouteMetaOptions> = {};
 	if (meta.tags !== undefined) cleanMeta.tags = meta.tags;
 	if (meta.rateLimit !== undefined) cleanMeta.rateLimit = meta.rateLimit;
 	if (meta.name !== undefined) cleanMeta.name = meta.name;
@@ -38,7 +37,7 @@ export function registerPossiblyGrouped(
 	currentContext: IGroupContext | undefined,
 	method: HttpMethod,
 	path: string,
-	args: Array<IHandler | IRouteOptions>,
+	args: Array<IHandler | IRouteMetaOptions>,
 ): void {
 	if (typeof path !== "string" || path.length === 0) {
 		throw new TypeError(
@@ -61,7 +60,7 @@ export function registerPossiblyGrouped(
 			...handlers,
 		] as unknown as IHandler[];
 
-		const groupMeta: Partial<IRouteMeta> = {};
+		const groupMeta: Partial<IRouteMetaOptions> = {};
 		if (currentContext.tags.length > 0) groupMeta.tags = currentContext.tags;
 		if (currentContext.rateLimitSpec !== undefined) {
 			groupMeta.rateLimit = currentContext.rateLimitSpec;
@@ -75,7 +74,7 @@ export function registerPossiblyGrouped(
 			groupMeta,
 		);
 	} else {
-		const meta: Partial<IRouteMeta> = {};
+		const meta: Partial<IRouteMetaOptions> = {};
 		if (options.name !== undefined) meta.name = options.name;
 		targetRouter.registerWithMeta(method, path, handlers, meta);
 	}

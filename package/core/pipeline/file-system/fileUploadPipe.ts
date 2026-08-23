@@ -13,12 +13,20 @@ import {
 } from "../../http/errors/Error.js";
 import { parseMultipart } from "./multipartParser.js";
 
+// export interface FileConfigMeta {
+// 	type: "single" | "array" | "fields" | "any" | "none";
+// 	fieldname?: string | undefined;
+// 	maxCount?: number | undefined;
+// 	fields?: Array<{ name: string; maxCount?: number | undefined }> | undefined;
+// 	options?: FileUploadPipelineOptions | undefined;
+// }
+
 export interface FileConfigMeta {
-	type: "single" | "array" | "fields" | "any" | "none";
-	fieldname?: string | undefined;
-	maxCount?: number | undefined;
-	fields?: Array<{ name: string; maxCount?: number | undefined }> | undefined;
-	options?: FileUploadPipelineOptions | undefined;
+  type: "single" | "array" | "fields" | "any" | "none";
+  fieldname?: string;
+  maxCount?: number;
+  fields?: Array<{ name: string; maxCount?: number }>;
+  options?: FileUploadPipelineOptions; // storage, allowedMimeTypes, limits...
 }
 
 export interface DocumentedMiddleware extends Middleware {
@@ -185,7 +193,7 @@ export function array(
 		fieldname,
 		maxCount,
 		options,
-	};
+	} as any;
 
 	return handler;
 }
@@ -351,3 +359,5 @@ async function cleanupFiles(
 	}
 	await Promise.all(destroyTasks);
 }
+
+

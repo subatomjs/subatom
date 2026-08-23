@@ -1,4 +1,4 @@
-import type { IHandler, IRouteMeta } from "./IRouter.js";
+import type { IHandler, IRouteMetaOptions } from "./IRouter.js";
 
 /**
  * The set of CRUD actions a resource controller may implement.
@@ -43,12 +43,12 @@ export interface IResourceOptions {
 	/** Also register PATCH for `update`, aliasing the same handlers as PUT. Defaults to true. */
 	allowPatch?: boolean;
 	tags?: string[];
-	rateLimit?: IRouteMeta["rateLimit"];
+	rateLimit?: IRouteMetaOptions["rateLimit"];
 }
 
 export interface IResourceRouteDefinition {
 	method: string;
 	path: string;
 	handlers: IHandler[];
-	meta?: IRouteMeta;
+	meta?: IRouteMetaOptions;
 }

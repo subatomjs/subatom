@@ -2,15 +2,15 @@
 
 import type {
 	IHandler,
-	IRouteOptions,
+	IRouteMetaOptions,
 } from "../../../types/framework/router/IRouter.js";
 
 export interface ParsedRouteArgs {
 	handlers: IHandler[];
-	options: IRouteOptions;
+	options: IRouteMetaOptions;
 }
 
-function isRouteOptions(value: unknown): value is IRouteOptions {
+function isRouteOptions(value: unknown): value is IRouteMetaOptions {
 	return (
 		typeof value === "object" &&
 		value !== null &&
@@ -31,7 +31,7 @@ function isRouteOptions(value: unknown): value is IRouteOptions {
  * correct behavior (options only make sense as the final argument).
  */
 export function parseRouteArgs(
-	args: Array<IHandler | IRouteOptions>,
+	args: Array<IHandler | IRouteMetaOptions>,
 ): ParsedRouteArgs {
 	if (args.length === 0) {
 		return { handlers: [], options: {} };

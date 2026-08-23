@@ -1,0 +1,22 @@
+{
+  "name": "http_ops",
+  "version": "1.0.0",
+  "description": "This is http operations example in typescript of subatom backend framework.",
+  "keywords": [
+    "Subatom",
+    "node-js"
+  ],
+  "license": "MIT",
+  "author": "Kunal Chandra Das <kunalchandradasofficial@gmail.com>",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "subatom dev",
+    "build": "subatom build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

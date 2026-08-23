@@ -4,7 +4,7 @@ import type {
 	IResourceRouteDefinition,
 	ResourceAction,
 } from "../../../types/framework/router/IResourceRouter.js";
-import type { IRouteMeta } from "../../../types/framework/router/IRouter.js";
+import type { IRouteMetaOptions } from "../../../types/framework/router/IRouter.js";
 import { normalizeHandlers } from "./normalizeHandlers.js";
 
 const PLURAL_ACTION_ORDER: ResourceAction[] = [
@@ -136,7 +136,7 @@ export function buildResourceRoutes(
 		const path = joinPath(basePath, pathSuffix);
 		const name = options.names?.[action] ?? `${namePrefix}.${action}`;
 
-		const meta: IRouteMeta = { name };
+		const meta: IRouteMetaOptions = { name };
 		if (options.tags) meta.tags = options.tags;
 		if (options.rateLimit) meta.rateLimit = options.rateLimit;
 
@@ -147,7 +147,7 @@ export function buildResourceRoutes(
 		// alias is intentionally unnamed so it can't collide with `meta.name`
 		// uniqueness checks in Router.registerWithMeta.
 		if (action === "update" && allowPatch) {
-			const aliasMeta: IRouteMeta = {};
+			const aliasMeta: IRouteMetaOptions = {};
 			if (options.tags) aliasMeta.tags = options.tags;
 			if (options.rateLimit) aliasMeta.rateLimit = options.rateLimit;
 			// aliasMeta may be an empty object but meta is required on
@@ -156,7 +156,7 @@ export function buildResourceRoutes(
 				method: "PATCH",
 				path,
 				handlers,
-				meta: aliasMeta as IRouteMeta,
+				meta: aliasMeta as IRouteMetaOptions,
 			});
 		}
 	}

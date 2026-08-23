@@ -19,7 +19,7 @@ export const file = {
 // Export config
 export { defineConfig } from "./package/config/load.config.js";
 //Docs
-export * from "./package/core/docs/registerDocs.js";
+export * from "./package/core/openapi/registerDocs.js";
 export { json } from "./package/core/factory-functions/json.js";
 export { raw } from "./package/core/factory-functions/raw.js";
 export { serveStatic } from "./package/core/factory-functions/serveStatic.js";
@@ -64,3 +64,6 @@ export type {
 	IResponse,
 	SendFileOptions,
 } from "./package/types/http/IResponse.js";
+
+// For file upload middleware 
+export {type RouteArgument} from "./package/types/framework/router/IRouter.js"

@@ -1,15 +1,16 @@
 import type {
 	IHandler,
 	IRoute,
-	IRouteMeta,
+	IRouteMetaOptions,
 } from "../../../types/framework/router/IRouter.js";
+import { uuid } from "../../helpers/framework/uuid.js";
 
 export function registerWithMeta(
 	routes: IRoute[],
 	method: string,
 	path: string,
 	handlers: IHandler[],
-	meta?: IRouteMeta,
+	meta?: IRouteMetaOptions,
 ): void {
 	if (!method || typeof method !== "string") {
 		throw new TypeError(
@@ -39,6 +40,7 @@ export function registerWithMeta(
 
 	const route: IRoute = {
 		method: method.toUpperCase(),
+		name: meta?.name || uuid.short(8),
 		path: cleanPath,
 		handlers,
 	};
