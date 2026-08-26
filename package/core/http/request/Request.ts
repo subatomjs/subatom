@@ -32,7 +32,7 @@ import { resolveOrigin } from "./services/resolveOrigin.service.js";
 // Import exact service per function
 
 export class Request<
-	Body = unknown,
+	Body = any,
 	Query = Record<string, string>,
 	Params = Record<string, string>,
 	Cookies = Record<string, string>,

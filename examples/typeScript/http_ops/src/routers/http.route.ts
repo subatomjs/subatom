@@ -23,7 +23,7 @@ const postSchema = {
 const gallarySchema = {
   files: infer.array(
     // Call as a function with zero arguments based on your type definition
-    infer.file()
+    infer.file(),
   ),
   body: infer.object({
     name: infer.string().min(1),
@@ -31,11 +31,6 @@ const gallarySchema = {
     age: infer.coerce.number(),
   }),
 };
-
-
-
-
-
 
 httpRouter.post(
   "/users/:id/avatar",
@@ -88,8 +83,6 @@ httpRouter.post(
   },
 );
 
-
-
 httpRouter.post(
   "/gallary",
   file.array("photos", 5, {
@@ -98,10 +91,10 @@ httpRouter.post(
     allowedMimeTypes: ["image/webp", "image/jpeg", "image/png"],
   }) as RouteArgument,
   handleGalleryController,
-   {
+  {
     name: "users.upload-gallary",
     tags: ["Gallary"],
-    schema: gallarySchema
+    schema: gallarySchema,
   },
 );
 
@@ -112,7 +105,7 @@ httpRouter.post(
       { name: "document", maxCount: 1 },
       { name: "gallery", maxCount: 3 },
     ],
-    { storage: "memory" }
+    { storage: "memory" },
   ) as RouteArgument,
   handleGalleryController,
   {
@@ -124,7 +117,7 @@ httpRouter.post(
         document: infer.array(infer.file()),
         gallery: infer.array(infer.file()),
       }),
-      
+
       // Keep your text body inputs here if applicable
       body: infer.object({
         name: infer.string().min(1),
@@ -134,6 +127,7 @@ httpRouter.post(
     },
   },
 );
+
 
 
 export default httpRouter;

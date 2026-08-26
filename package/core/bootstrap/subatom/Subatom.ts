@@ -1,4 +1,3 @@
-import { IRouter } from "subatom/package/types/framework/router/IRouter";
 import { configEnv } from "../../../config/env/env.js";
 import type { EnvOptions } from "../../../types/config/EnvOptions.js";
 import type {
@@ -12,9 +11,18 @@ import type {
   ITransformer,
 } from "../../../types/framework/pipeline/IPipeline.js";
 import type {
+  IGroupOptions,
   IHandler,
-  IRouteMetaOptions
+  IRouteMetaOptions,
+  IRouteOptions,
+  IRouteSchema,
+  IRouter,
+  RouteArgument,
 } from "../../../types/framework/router/IRouter.js";
+import type {
+  IResourceController,
+  IResourceOptions,
+} from "../../../types/framework/router/IResourceRouter.js";
 import type {
   ErrorMiddlewareHandler,
   MiddlewareHandler,
@@ -149,12 +157,30 @@ export class Subatom {
     return this;
   }
 
+  public group(prefix: string, options?: IGroupOptions): this;
   public group(prefix: string, router: Router): this;
   public group(prefix?: string): RouteGroupBuilder;
-  public group(prefix?: string, router?: Router): this | RouteGroupBuilder {
-    return dispatchGroup(this, this.router, prefix, router) as unknown as
-      | this
-      | RouteGroupBuilder;
+  public group(
+    prefix?: string,
+    optionsOrRouter?: IGroupOptions | Router,
+  ): this | RouteGroupBuilder {
+    if (optionsOrRouter instanceof Router) {
+      return dispatchGroup(this, this.router, prefix, optionsOrRouter) as this;
+    }
+    if (typeof prefix === "string" && optionsOrRouter && typeof optionsOrRouter === "object") {
+      this.router.group(prefix, optionsOrRouter);
+      return this;
+    }
+    return dispatchGroup(this, this.router, prefix) as unknown as RouteGroupBuilder;
+  }
+
+  public resource(
+    basePath: string,
+    optionsOrController: IResourceOptions | IResourceController,
+    legacyOptions?: IResourceOptions,
+  ): this {
+    this.router.resource(basePath, optionsOrController, legacyOptions);
+    return this;
   }
 
   public useError(handler: ErrorMiddlewareHandler): this {
@@ -162,7 +188,12 @@ export class Subatom {
     return this;
   }
 
-  public get(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this {
+  public get<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public get(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public get(path: string, ...args: any[]): this {
     registerPossiblyGrouped(
       this.router,
       this._currentGroupContext(),
@@ -173,7 +204,12 @@ export class Subatom {
     return this;
   }
 
-  public post(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this {
+  public post<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public post(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public post(path: string, ...args: any[]): this {
     registerPossiblyGrouped(
       this.router,
       this._currentGroupContext(),
@@ -184,7 +220,12 @@ export class Subatom {
     return this;
   }
 
-  public put(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this {
+  public put<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public put(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public put(path: string, ...args: any[]): this {
     registerPossiblyGrouped(
       this.router,
       this._currentGroupContext(),
@@ -195,7 +236,12 @@ export class Subatom {
     return this;
   }
 
-  public patch(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this {
+  public patch<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public patch(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public patch(path: string, ...args: any[]): this {
     registerPossiblyGrouped(
       this.router,
       this._currentGroupContext(),
@@ -206,7 +252,12 @@ export class Subatom {
     return this;
   }
 
-  public delete(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this {
+  public delete<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public delete(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public delete(path: string, ...args: any[]): this {
     registerPossiblyGrouped(
       this.router,
       this._currentGroupContext(),

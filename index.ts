@@ -67,3 +67,6 @@ export type {
 
 // For file upload middleware 
 export {type RouteArgument} from "./package/types/framework/router/IRouter.js"
+
+export * from './package/types/context/IContext.js'
+export * from './package/core/context/Context.js'

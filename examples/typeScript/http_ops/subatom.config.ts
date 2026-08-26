@@ -3,7 +3,7 @@ import { defineConfig } from "subatom";
 export default defineConfig({
   port: 8080,
   host: "localhost",
-  outDir: "build",
+  outDir: "dist",
   sourcemap: true,
   minify: true,
   entry: "index.js",

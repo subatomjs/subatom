@@ -1,49 +1,49 @@
-// core/router/helpers/parseRouteArgs.ts
-
 import type {
-	IHandler,
-	IRouteMetaOptions,
+  IHandler,
+  IRouteMetaOptions,
+  IRouteOptions,
 } from "../../../types/framework/router/IRouter.js";
 
 export interface ParsedRouteArgs {
-	handlers: IHandler[];
-	options: IRouteMetaOptions;
+  handlers: IHandler[];
+  options: IRouteMetaOptions;
 }
 
-function isRouteOptions(value: unknown): value is IRouteMetaOptions {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		!Array.isArray(value) &&
-		typeof value !== "function"
-	);
+export function isRouteOptions(value: unknown): value is IRouteOptions {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof value !== "function" &&
+    "controller" in value &&
+    typeof (value as any).controller === "function"
+  );
 }
 
-/**
- * Splits a verb registration's variadic arguments into handler functions
- * and an optional trailing options object, e.g.
- *   get("/users/:id", auth, getUser, { name: "users.get" })
- * → { handlers: [auth, getUser], options: { name: "users.get" } }
- *
- * Only the *last* argument is checked — options in the middle of a
- * handler list is treated as a handler and will fail the existing
- * "non-function handler" validation in registerWithMeta, which is the
- * correct behavior (options only make sense as the final argument).
- */
+export function isRouteMetaOptions(value: unknown): value is IRouteMetaOptions {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof value !== "function" &&
+    !("controller" in value)
+  );
+}
+
 export function parseRouteArgs(
-	args: Array<IHandler | IRouteMetaOptions>,
+  args: Array<any>,
 ): ParsedRouteArgs {
-	if (args.length === 0) {
-		return { handlers: [], options: {} };
-	}
+  if (args.length === 0) {
+    return { handlers: [], options: {} };
+  }
 
-	const last = args[args.length - 1];
-	if (isRouteOptions(last)) {
-		return {
-			handlers: args.slice(0, -1) as IHandler[],
-			options: last,
-		};
-	}
+  const last = args[args.length - 1];
+  if (isRouteMetaOptions(last)) {
+    return {
+      handlers: args.slice(0, -1) as IHandler[],
+      options: last,
+    };
+  }
 
-	return { handlers: args as IHandler[], options: {} };
+  return { handlers: args as IHandler[], options: {} };
 }

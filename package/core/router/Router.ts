@@ -1,5 +1,6 @@
 // subatom/package/core/router/Router.ts
 
+import { getOrCreateContext } from "../context/Context.js";
 import type {
   IInterceptor,
   ISerializer,
@@ -10,14 +11,26 @@ import type {
   IResourceOptions,
 } from "../../types/framework/router/IResourceRouter.js";
 import type {
+  IGroupOptions,
   IHandler,
   IMatchResult,
   IRoute,
   IRouteMetaOptions,
+  IRouteOptions,
+  IRouteSchema,
   IRouter,
+  RouteArgument,
 } from "../../types/framework/router/IRouter.js";
+import type {
+  IContext,
+  IController,
+  IContextMiddleware,
+  ILegacyHandler,
+  IRouteMiddleware,
+} from "../../types/context/IContext.js";
 import type { IRequest } from "../../types/http/IRequest.js";
 import type { IResponse } from "../../types/http/IResponse.js";
+import type { NextFunction } from "../../types/framework/pipeline/INext.js";
 import { uuid } from "../helpers/framework/uuid.js";
 import {
   MethodNotAllowedError,
@@ -35,7 +48,7 @@ import { Next } from "../pipeline/next-pipeline/Next.js";
 import { buildRequestValidator } from "../validation/RequestValidator.js";
 import { buildUrl } from "./helpers/buildUrl.js";
 import isRouterInstance from "./helpers/isRouterInstance.js";
-import { parseRouteArgs } from "./helpers/parseRouteArgs.js";
+import { isRouteOptions, parseRouteArgs } from "./helpers/parseRouteArgs.js";
 import { buildResourceRoutes } from "./helpers/resourceRouteBuilder.js";
 
 const MIDDLEWARE_METHOD = "USE";
@@ -43,16 +56,84 @@ const WILDCARD_METHOD = "ALL";
 const QUERY_METHOD = "QUERY";
 
 export type { IRouter };
+
+/**
+ * Checks if a value is the Context or HTTP request/response object to avoid auto-serializing it.
+ */
+function isContextOrHttpInstance(
+  val: unknown,
+  ctx: IContext,
+  req: IRequest,
+  res: IResponse,
+): boolean {
+  return (
+    val === ctx ||
+    val === res ||
+    val === req ||
+    val === (ctx as any)?.req ||
+    val === (ctx as any)?.res ||
+    val === (req as any)?.raw ||
+    val === (res as any)?.raw
+  );
+}
+
+/**
+ * Adapts context middlewares or legacy request/response handlers to an internal IHandler.
+ */
+function normalizeMiddlewareToHandler(mw: IRouteMiddleware): IHandler {
+  return async (req: IRequest, res: IResponse, next: NextFunction) => {
+    if (mw.length >= 3) {
+      return (mw as ILegacyHandler)(req, res, next);
+    }
+    const ctx = getOrCreateContext(req, res);
+    return (mw as IContextMiddleware)(ctx, next);
+  };
+}
+
+/**
+ * Wraps a context controller into an internal IHandler.
+ */
+function createControllerHandler(
+  controller: IController<any, any, any, any>,
+): IHandler {
+  return async (req: IRequest, res: IResponse, next: NextFunction) => {
+    if (res.writableEnded || res.headersSent) return;
+    const ctx = getOrCreateContext(req, res);
+    try {
+      const result = await controller(ctx);
+      if (
+        result !== undefined &&
+        !res.writableEnded &&
+        !res.headersSent &&
+        !isContextOrHttpInstance(result, ctx, req, res)
+      ) {
+        if (
+          typeof result === "object" &&
+          result !== null &&
+          !(result instanceof Buffer) &&
+          !(result instanceof Uint8Array)
+        ) {
+          ctx.json(result);
+        } else if (
+          typeof result === "string" ||
+          typeof result === "number" ||
+          typeof result === "boolean"
+        ) {
+          ctx.send(String(result));
+        }
+      }
+    } catch (err) {
+      return next(err);
+    }
+  };
+}
+
 export class Router implements IRouter {
   protected routes: IRoute[] = [];
 
   private readonly transformers: ITransformer[] = [];
   private readonly interceptors: IInterceptor[] = [];
   private readonly serializers: ISerializer[] = [];
-
-  // ============================================================
-  // Router-level pipeline registration
-  // ============================================================
 
   public transformer(transformer: ITransformer): void {
     registerTransformer(this.transformers, transformer);
@@ -75,166 +156,306 @@ export class Router implements IRouter {
   }
 
   // ============================================================
-  // Verb registration
+  // Verb Registration
   // ============================================================
 
-  public get(path: string, ...args: Array<IHandler | IRouteMetaOptions>): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("GET", path, handlers, options);
-  }
-  public post(
+  public get<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
     path: string,
-    ...args: Array<IHandler | IRouteMetaOptions>
-  ): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("POST", path, handlers, options);
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public get(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public get(path: string, ...args: any[]): this {
+    this.registerMethod("GET", path, args);
+    return this;
   }
-  public put(path: string, ...args: Array<IHandler | IRouteMetaOptions>): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("PUT", path, handlers, options);
+
+  public post<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public post(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public post(path: string, ...args: any[]): this {
+    this.registerMethod("POST", path, args);
+    return this;
   }
+
+  public put<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public put(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public put(path: string, ...args: any[]): this {
+    this.registerMethod("PUT", path, args);
+    return this;
+  }
+
+  public patch<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
   public patch(
     path: string,
     ...args: Array<IHandler | IRouteMetaOptions>
-  ): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("PATCH", path, handlers, options);
+  ): this;
+  public patch(path: string, ...args: any[]): this {
+    this.registerMethod("PATCH", path, args);
+    return this;
   }
+
+  public delete<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
   public delete(
     path: string,
     ...args: Array<IHandler | IRouteMetaOptions>
-  ): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("DELETE", path, handlers, options);
+  ): this;
+  public delete(path: string, ...args: any[]): this {
+    this.registerMethod("DELETE", path, args);
+    return this;
   }
 
+  public options<
+    TSchema extends IRouteSchema = IRouteSchema,
+    TReturn = unknown,
+  >(path: string, options: IRouteOptions<TSchema, any, any, TReturn>): this;
   public options(
     path: string,
     ...args: Array<IHandler | IRouteMetaOptions>
-  ): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("OPTIONS", path, handlers, options);
+  ): this;
+  public options(path: string, ...args: any[]): this {
+    this.registerMethod("OPTIONS", path, args);
+    return this;
   }
 
-  public head(
+  public head<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
     path: string,
-    ...args: Array<IHandler | IRouteMetaOptions>
-  ): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("HEAD", path, handlers, options);
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public head(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public head(path: string, ...args: any[]): this {
+    this.registerMethod("HEAD", path, args);
+    return this;
   }
 
+  public trace<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
   public trace(
     path: string,
     ...args: Array<IHandler | IRouteMetaOptions>
-  ): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("TRACE", path, handlers, options);
+  ): this;
+  public trace(path: string, ...args: any[]): this {
+    this.registerMethod("TRACE", path, args);
+    return this;
   }
 
+  public connect<
+    TSchema extends IRouteSchema = IRouteSchema,
+    TReturn = unknown,
+  >(path: string, options: IRouteOptions<TSchema, any, any, TReturn>): this;
   public connect(
     path: string,
     ...args: Array<IHandler | IRouteMetaOptions>
-  ): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route("CONNECT", path, handlers, options);
+  ): this;
+  public connect(path: string, ...args: any[]): this {
+    this.registerMethod("CONNECT", path, args);
+    return this;
   }
 
+  public query<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
   public query(
     path: string,
     ...args: Array<IHandler | IRouteMetaOptions>
+  ): this;
+  public query(path: string, ...args: any[]): this {
+    this.registerMethod(QUERY_METHOD, path, args);
+    return this;
+  }
+
+  public all<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  public all(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+  public all(path: string, ...args: any[]): this {
+    this.registerMethod(WILDCARD_METHOD, path, args);
+    return this;
+  }
+
+  private registerMethod(
+    method: string,
+    path: string,
+    args: Array<RouteArgument>,
   ): void {
-    const { handlers, options } = parseRouteArgs(args);
-    this.register_route(QUERY_METHOD, path, handlers, options);
-  }
+    if (args.length === 1 && isRouteOptions(args[0])) {
+      const opts = args[0] as IRouteOptions;
+      const middlewareFns = (opts.middleware || []).map(
+        normalizeMiddlewareToHandler,
+      );
+      const controllerFn = createControllerHandler(opts.controller);
+      const handlers = [...middlewareFns, controllerFn];
 
-  public all(path: string, ...args: Array<IHandler | IRouteMetaOptions>): void {
+      const meta: IRouteMetaOptions = {};
+      if (opts.name !== undefined) meta.name = opts.name;
+      if (opts.tags !== undefined) meta.tags = opts.tags;
+      if (opts.rateLimit !== undefined) meta.rateLimit = opts.rateLimit;
+      if (opts.schema !== undefined) meta.schema = opts.schema;
+
+      this.registerWithMeta(method, path, handlers, meta);
+      return;
+    }
+
     const { handlers, options } = parseRouteArgs(args);
-    this.register_route(WILDCARD_METHOD, path, handlers, options);
+    this.registerWithMeta(method, path, handlers, options);
   }
 
   // ============================================================
-  // Resource routing
+  // Groups (Style 1 and Style 2)
   // ============================================================
 
-  /**
-   * Registers a full CRUD resource in one call:
-   *
-   *   router.resource("/users", {
-   *     index: getUsers,
-   *     show: getUser,
-   *     create: createUser,
-   *     update: updateUser,
-   *     destroy: deleteUser,
-   *   });
-   *
-   * Generates:
-   *   GET    /users
-   *   POST   /users
-   *   GET    /users/:id
-   *   PUT    /users/:id
-   *   PATCH  /users/:id   (alias of PUT, same handlers)
-   *   DELETE /users/:id
-   *
-   * Only the actions actually implemented on `controller` are registered,
-   * so a read-only resource (just `index` + `show`) works with no extra
-   * config. Use `options.only` / `options.except` when you want to be
-   * explicit and fail loudly if an expected action is missing.
-   *
-   * Each action may be a single handler or an array of handlers, so you
-   * can attach per-action middleware:
-   *
-   *   router.resource("/users", {
-   *     index: getUsers,
-   *     destroy: [requireAdmin, deleteUser],
-   *   });
-   *
-   * Route names follow `<namePrefix>.<action>` (e.g. "users.show") and
-   * work with `urlFor` out of the box.
-   *
-   * Nested resources: mount a child router under the member path rather
-   * than special-casing nesting here — it composes with the existing
-   * `use()` sub-router mounting instead of duplicating it:
-   *
-   *   const postRouter = new Router();
-   *   postRouter.resource("/", postController, { namePrefix: "posts" });
-   *   userRouter.use("/:userId/posts", postRouter);
-   */
+  public group(prefix: string, options?: IGroupOptions): this;
+  public group(prefix: string, routesCallback: (router: IRouter) => void): this;
+  public group(
+    prefix: string,
+    optionsOrRoutes?: IGroupOptions | ((router: IRouter) => void),
+  ): any {
+    const cleanPrefix = ("/" + (prefix || ""))
+      .replace(/\/+/g, "/")
+      .replace(/\/$/, "");
+    const childRouter = new Router();
+
+    let options: IGroupOptions = {};
+    if (typeof optionsOrRoutes === "function") {
+      options = { routes: optionsOrRoutes };
+    } else if (optionsOrRoutes && typeof optionsOrRoutes === "object") {
+      options = optionsOrRoutes;
+    }
+
+    const groupMiddlewares = (options.middleware || []).map(
+      normalizeMiddlewareToHandler,
+    );
+    const groupTags = options.tags || [];
+    const groupRateLimit = options.rateLimit;
+    const groupNamePrefix = options.name;
+
+    const applyGroupInheritanceAndMount = () => {
+      for (const route of childRouter.getRoutes()) {
+        const routeSuffix = route.path === "/" ? "" : route.path;
+        const combinedPath =
+          (cleanPrefix + routeSuffix).replace(/\/+/g, "/") || "/";
+
+        const mergedMiddlewares = [...groupMiddlewares, ...route.handlers];
+        const mergedTags = Array.from(
+          new Set([...groupTags, ...(route.tags || [])]),
+        );
+        const effectiveRateLimit = route.rateLimit ?? groupRateLimit;
+
+        let effectiveName = route.name;
+        if (
+          groupNamePrefix &&
+          route.name &&
+          !route.name.startsWith(groupNamePrefix)
+        ) {
+          effectiveName = `${groupNamePrefix}.${route.name}`;
+        }
+
+        const newRoute: IRoute = {
+          ...route,
+          path: combinedPath,
+          handlers: mergedMiddlewares,
+        };
+
+        if (mergedTags.length > 0) {
+          newRoute.tags = mergedTags;
+        }
+        if (effectiveRateLimit !== undefined) {
+          newRoute.rateLimit = effectiveRateLimit;
+        }
+        if (effectiveName !== undefined) {
+          newRoute.name = effectiveName;
+        }
+
+        this.routes.push(newRoute);
+      }
+      childRouter.clearRoutes();
+    };
+
+    if (typeof options.routes === "function") {
+      options.routes(childRouter);
+      applyGroupInheritanceAndMount();
+      return this;
+    }
+
+    const proxyHandler: ProxyHandler<Router> = {
+      get: (target, prop, receiver) => {
+        const orig = Reflect.get(target, prop, receiver);
+        if (typeof orig === "function") {
+          return (...fnArgs: any[]) => {
+            const result = orig.apply(target, fnArgs);
+            applyGroupInheritanceAndMount();
+            return result === target ? receiver : result;
+          };
+        }
+        return orig;
+      },
+    };
+
+    return new Proxy(childRouter, proxyHandler);
+  }
+
+  // ============================================================
+  // Resource Routing
+  // ============================================================
+
   public resource(
     basePath: string,
-    controller: IResourceController,
-    options: IResourceOptions = {},
+    optionsOrController: IResourceOptions | IResourceController,
+    legacyOptions: IResourceOptions = {},
   ): void {
+    let controller: IResourceController;
+    let options: IResourceOptions;
+
+    if (
+      optionsOrController &&
+      typeof optionsOrController === "object" &&
+      "controller" in optionsOrController &&
+      optionsOrController.controller
+    ) {
+      options = optionsOrController as IResourceOptions;
+      controller = options.controller!;
+    } else {
+      controller = optionsOrController as IResourceController;
+      options = legacyOptions;
+    }
+
     const routeDefs = buildResourceRoutes(basePath, controller, options);
     for (const def of routeDefs) {
       this.registerWithMeta(def.method, def.path, def.handlers, def.meta);
     }
   }
 
-  // public use(pathOrHandler: string | IHandler, ...handlers: IHandler[]): void {
-  //   if (typeof pathOrHandler === "string") {
-  //     this.register_route(MIDDLEWARE_METHOD, pathOrHandler, handlers);
-  //   } else if (typeof pathOrHandler === "function") {
-  //     this.register_route(MIDDLEWARE_METHOD, "/", [pathOrHandler, ...handlers]);
-  //   } else {
-  //     throw new TypeError(
-  //       "[Subatom] Router.use: first argument must be a string path or a handler function.",
-  //     );
-  //   }
-  // }
+  // ============================================================
+  // Use / Sub-Router Mounting
+  // ============================================================
 
   public use(
-    pathOrHandler: string | IHandler | Router,
-    ...handlers: Array<IHandler | Router>
+    pathOrHandler: string | IHandler | IRouteMiddleware | Router,
+    ...handlers: Array<IHandler | IRouteMiddleware | Router>
   ): void {
     if (typeof pathOrHandler === "string") {
       const path = pathOrHandler;
-
       for (const h of handlers) {
         if (isRouterInstance(h)) {
           this.mountSubRouter(path, h);
         } else if (typeof h === "function") {
-          this.register_route(MIDDLEWARE_METHOD, path, [h]);
+          this.register_route(MIDDLEWARE_METHOD, path, [
+            normalizeMiddlewareToHandler(h),
+          ]);
         } else {
           throw new TypeError(
             "[Subatom] Router.use: expected a handler function or a Router instance.",
@@ -242,10 +463,11 @@ export class Router implements IRouter {
         }
       }
     } else if (typeof pathOrHandler === "function") {
-      this.register_route(MIDDLEWARE_METHOD, "/", [
+      const allHandlers = [
         pathOrHandler,
-        ...(handlers.filter((h) => typeof h === "function") as IHandler[]),
-      ]);
+        ...handlers.filter((h) => typeof h === "function"),
+      ].map(normalizeMiddlewareToHandler);
+      this.register_route(MIDDLEWARE_METHOD, "/", allHandlers);
     } else if (isRouterInstance(pathOrHandler)) {
       this.mountSubRouter("/", pathOrHandler);
     } else {
@@ -255,13 +477,6 @@ export class Router implements IRouter {
     }
   }
 
-  /**
-   * Flattens a sub-router's route table into this router, prefixing every
-   * route path with the mount path. Runs eagerly at .use()-time, so any
-   * sub-routers already merged into `subRouter` come along for free —
-   * that's why postRouter.use("/:postId/comments", commentRouter) must be
-   * called before userRouter.use("/:userId/posts", postRouter).
-   */
   private mountSubRouter(mountPath: string, subRouter: Router): void {
     const cleanMount = ("/" + mountPath)
       .replace(/\/+/g, "/")
@@ -279,7 +494,7 @@ export class Router implements IRouter {
   }
 
   // ============================================================
-  // Route table access
+  // Route Table Access & Registration
   // ============================================================
 
   public getRoutes(): IRoute[] {
@@ -290,98 +505,6 @@ export class Router implements IRouter {
     this.routes = [];
   }
 
-  // ============================================================
-  // registerWithMeta — now accepts + validates `name`
-  // ============================================================
-  // Add this import at the top of Router.ts:
-
-  // Inside Router class, replace `registerWithMeta`:
-
-  // public registerWithMeta(
-  //   method: string,
-  //   path: string,
-  //   handlers: IHandler[],
-  //   meta?: IRouteMetaOptions,
-  // ): void {
-  //   if (!method || typeof method !== "string") {
-  //     throw new TypeError(
-  //       "[Subatom] Router.registerWithMeta: 'method' must be a non-empty string.",
-  //     );
-  //   }
-
-  //   if (!Array.isArray(handlers) || handlers.length === 0) {
-  //     throw new TypeError(
-  //       `[Subatom] Router.registerWithMeta: route "${method.toUpperCase()} ${
-  //         path || "/"
-  //       }" requires at least one handler function.`,
-  //     );
-  //   }
-
-  //   for (const handler of handlers) {
-  //     if (typeof handler !== "function") {
-  //       throw new TypeError(
-  //         `[Subatom] Router.registerWithMeta: route "${method.toUpperCase()} ${
-  //           path || "/"
-  //         }" received a non-function handler.`,
-  //       );
-  //     }
-  //   }
-
-  //   if (meta?.name) {
-  //     const existing = this.findRouteByName(meta.name);
-  //     if (existing) {
-  //       throw new TypeError(
-  //         `[Subatom] Route name "${meta.name}" is already registered ` +
-  //           `(${existing.method} ${existing.path}). Route names must be unique within a Router.`,
-  //       );
-  //     }
-  //   }
-
-  //   const cleanPath = ("/" + (path || "/")).replace(/\/+/g, "/");
-
-  //   // VALIDATION INJECTION LOGIC
-  //   const finalHandlers = [...handlers];
-
-  //   if (meta?.schema) {
-  //     const validatorMw = buildRequestValidator(meta.schema);
-  //     if (finalHandlers.length > 0) {
-  //       // Pop the controller, insert validator, then re-insert controller
-  //       // This ensures validation happens AFTER file/body parsing middlewares
-  //       const controller = finalHandlers.pop()!;
-  //       finalHandlers.push(validatorMw, controller);
-  //     } else {
-  //       finalHandlers.push(validatorMw);
-  //     }
-  //   }
-
-  //   const route: IRoute = {
-  //     method: method.toUpperCase(),
-  //     name: meta?.name || uuid.short(8),
-  //     path: cleanPath,
-  //     handlers: finalHandlers,
-  //     routerPipeline: this.getPipelineConfig(),
-  //   };
-
-  //   if (meta?.tags && meta.tags.length > 0) {
-  //     route.tags = meta.tags;
-  //   }
-
-  //   if (meta?.rateLimit) {
-  //     route.rateLimit = meta.rateLimit;
-  //   }
-
-  //   if (meta?.name) {
-  //     route.name = meta.name;
-  //   }
-
-  //   if (meta?.schema) {
-  //     route.schema = meta.schema;
-  //   }
-
-  //   this.routes.push(route);
-  // }
-
-  // Inside Router.registerWithMeta method:
   public registerWithMeta(
     method: string,
     path: string,
@@ -423,15 +546,12 @@ export class Router implements IRouter {
     }
 
     const cleanPath = ("/" + (path || "/")).replace(/\/+/g, "/");
-
-    // VALIDATION INJECTION LOGIC (FastAPI Parity)
     const finalHandlers = [...handlers];
 
+    // Validation Injection: schema validator runs right before controller
     if (meta?.schema) {
       const validatorMw = buildRequestValidator(meta.schema);
       if (finalHandlers.length > 0) {
-        // Pop the controller, insert validator, then re-insert controller
-        // Ensures validation runs AFTER file/body parsing middlewares
         const controller = finalHandlers.pop()!;
         finalHandlers.push(validatorMw, controller);
       } else {
@@ -439,7 +559,6 @@ export class Router implements IRouter {
       }
     }
 
-    // 1. Construct route with required properties only
     const route: IRoute = {
       method: method.toUpperCase(),
       path: cleanPath,
@@ -447,7 +566,6 @@ export class Router implements IRouter {
       routerPipeline: this.getPipelineConfig(),
     };
 
-    // 2. Conditionally assign optional properties safely for exactOptionalPropertyTypes
     route.name = meta?.name || uuid.short(8);
 
     if (meta?.tags && meta.tags.length > 0) {
@@ -465,23 +583,16 @@ export class Router implements IRouter {
     this.routes.push(route);
   }
 
-  /**
-   * Finds a route by its registered name. Scans the live route table
-   * on every call rather than maintaining a cached index, since routes
-   * can be appended directly (e.g. by mergeSubRouter) without going
-   * through registerWithMeta — a cache would risk going stale.
-   */
   public findRouteByName(name: string): IRoute | undefined {
     return this.routes.find((route) => route.name === name);
   }
 
-  /** Whether a route with the given name is registered. */
   public hasRoute(name: string): boolean {
     return this.findRouteByName(name) !== undefined;
   }
 
   // ============================================================
-  // Matching
+  // Matching & Dispatching
   // ============================================================
 
   public match(
@@ -647,13 +758,6 @@ export class Router implements IRouter {
     return params;
   }
 
-  /**
-   * Generates a concrete URL path for a named route.
-   *
-   *   router.get("/users/:id", getUser, { name: "users.get" });
-   *   router.urlFor("users.get", { id: 42 });          // → "/users/42"
-   *   router.urlFor("users.list", {}, { page: 2 });    // → "/users?page=2"
-   */
   public urlFor(
     name: string,
     params: Record<string, string | number> = {},
@@ -667,8 +771,6 @@ export class Router implements IRouter {
     }
     return buildUrl(route.path, params, query);
   }
-
-  // ...rest of the class (match, dispatch, matchPath, etc.) unchanged...
 
   private register_route(
     method: string,

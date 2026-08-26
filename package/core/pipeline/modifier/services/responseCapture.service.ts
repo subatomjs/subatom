@@ -1,15 +1,6 @@
+// subatom/package/core/pipeline/modifier/services/responseCapture.service.ts
+
 import type { IResponse } from "../../../../types/http/IResponse.js";
-
-export interface ICapturedResponse {
-	method: string;
-	args: unknown[];
-}
-
-export interface IResponseCapture {
-	res: IResponse;
-	captured: Promise<ICapturedResponse>;
-	rejectCaptured: (reason?: unknown) => void;
-}
 
 export interface ICapturedResponse {
 	method: string;
@@ -41,6 +32,14 @@ export function createResponseCapture(
 
 	const proxy = new Proxy(target, {
 		get(t, prop, receiver) {
+			if (
+				prop === "headersSent" ||
+				prop === "writableEnded" ||
+				prop === "finished"
+			) {
+				return settled || Boolean(Reflect.get(t, prop, receiver));
+			}
+
 			const value = Reflect.get(t, prop, receiver);
 
 			// Handle non-terminal methods (status, setHeader, etc.)
@@ -72,6 +71,7 @@ export function createResponseCapture(
 
 	return { res: proxy as unknown as IResponse, captured, rejectCaptured };
 }
+
 export function flushCapturedResponse(
 	realRes: IResponse,
 	method: string,

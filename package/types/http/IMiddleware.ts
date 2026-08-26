@@ -1,27 +1,24 @@
+// subatom/package/types/http/IMiddleware.ts
+
 import type { NextFunction } from "../framework/pipeline/INext.js";
 import type { IRequest } from "./IRequest.js";
 import type { IResponse } from "./IResponse.js";
 
 /**
- * A global or path-scoped middleware. Structurally identical to `IHandler`
- * (a route handler) — kept as a distinct name for readability at call
- * sites like `app.use(...)`.
+ * A global or path-scoped middleware.
  */
 export type MiddlewareHandler = (
-	req: IRequest,
-	res: IResponse,
-	next: NextFunction,
-) => void | Promise<void>;
+  req: IRequest,
+  res: IResponse,
+  next: NextFunction,
+) => unknown | Promise<unknown>;
 
 /**
- * An error-handling middleware, distinguished at runtime by arity (4
- * parameters) — see `Subatom.use()`'s `fn.length === 4` check. `err` is
- * `unknown`, not `Error`, since it may not have been normalized yet by
- * the time it reaches user-defined error middleware.
+ * An error-handling middleware.
  */
 export type ErrorMiddlewareHandler = (
-	err: unknown,
-	req: IRequest,
-	res: IResponse,
-	next: NextFunction,
-) => void | Promise<void>;
+  err: unknown,
+  req: IRequest,
+  res: IResponse,
+  next: NextFunction,
+) => unknown | Promise<unknown>;

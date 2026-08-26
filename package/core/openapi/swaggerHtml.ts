@@ -1003,19 +1003,55 @@ export function renderSwaggerUiHtml(
           }, 100);
         }
 
+                
+        
+        
+        
+        
+  function routeNameMutation() {
+      const operations = document.querySelectorAll(".swagger-ui .opblock-summary");
 
-                function routeNameMutation() {
-          const routePath = document.querySelector(".opblock-summary-path");
-          const routeName = document.querySelector(
-            ".opblock-summary-description",
-          );
+      operations.forEach((opblock) => {
+           const routePath = opblock.querySelector(".opblock-summary-path");
+                  if (!routePath) return;
 
-          if (routePath.attributes[1].nodeValue === "/") {
-            routeName.innerHTML = "Root";
-          }else{
-            return null
-          }
-        }
+    // Check data-path attribute, link text, or fallback textContent
+                      const pathValue = (
+                      routePath.getAttribute("data-path") ||
+                      routePath.textContent ||
+                      ""
+                      ).trim();
+
+            if (pathValue === "/") {
+                let routeName = opblock.querySelector(".opblock-summary-description");
+
+      // Swagger UI does not render this element if no description was defined in OpenAPI
+      if (!routeName) {
+        routeName = document.createElement("div");
+        routeName.className = "opblock-summary-description";
+
+        const container = opblock.querySelector("button") || opblock;
+        container.appendChild(routeName);
+      }
+
+      routeName.textContent = "Root";
+    }
+  });
+}
+    
+  function observeRouteMutations() {
+      const targetNode = document.getElementById("swagger-ui");
+            if (!targetNode) return;
+
+      const observer = new MutationObserver(() => {
+            routeNameMutation();
+            });
+
+      observer.observe(targetNode, {
+              childList: true,
+              subtree: true,
+      });
+  }
 
 
 

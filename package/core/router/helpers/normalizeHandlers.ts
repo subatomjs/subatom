@@ -32,5 +32,5 @@ export function normalizeHandlers(
 		}
 	}
 
-	return handlers;
+	return<any> handlers;
 }

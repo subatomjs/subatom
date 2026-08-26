@@ -1,5 +1,13 @@
+// subatom/package/types/framework/router/IRouter.ts
+
 import type { IRequestPipelineConfig } from "../../../core/pipeline/modifier/RequestPipeline.js";
-import { MiddlewareHandler } from "../../http/IMiddleware.js";
+import type {
+  IContext,
+  IController,
+  IContextMiddleware,
+  ILegacyHandler,
+  IRouteMiddleware,
+} from "../../context/IContext.js";
 import type { IRequest } from "../../http/IRequest.js";
 import type { IResponse } from "../../http/IResponse.js";
 import type { NextFunction } from "../pipeline/INext.js";
@@ -12,6 +20,14 @@ import type {
   IResourceController,
   IResourceOptions,
 } from "./IResourceRouter.js";
+
+export type {
+  IContext,
+  IController,
+  IContextMiddleware,
+  ILegacyHandler,
+  IRouteMiddleware,
+};
 
 export interface IRouteSchema {
   body?: any;
@@ -26,7 +42,7 @@ export type IHandler = (
   req: IRequest,
   res: IResponse,
   next: NextFunction,
-) => void | Promise<void>;
+) => unknown | Promise<unknown>;
 
 export interface IRoutePipelineRef {
   transformers: ITransformer[];
@@ -41,8 +57,10 @@ export interface IRoute {
   name?: string;
   tags?: string[];
   rateLimit?: string;
-  routerPipeline?: IRoutePipelineRef;
+  routerPipeline?: IRequestPipelineConfig;
   schema?: IRouteSchema;
+  controller?: IController<any, Record<string, any>, any, any>;
+  middlewares?: IRouteMiddleware[];
 }
 
 export interface IMatchResult {
@@ -58,20 +76,104 @@ export interface IRouteMetaOptions {
   schema?: IRouteSchema | undefined;
 }
 
-export type RouteArgument = IHandler | MiddlewareHandler | IRouteMetaOptions;
+export interface IRouteOptions<
+  TSchema extends IRouteSchema = IRouteSchema,
+  TLocals extends Record<string, any> = Record<string, any>,
+  TUser = any,
+  TReturn = unknown,
+> {
+  name?: string;
+  tags?: string[];
+  rateLimit?: string;
+  schema?: TSchema;
+  middleware?: Array<IRouteMiddleware>;
+  controller: IController<TSchema, TLocals, TUser, TReturn>;
+}
+
+export interface IGroupOptions {
+  name?: string;
+  prefix?: string;
+  middleware?: Array<IRouteMiddleware>;
+  tags?: string[];
+  rateLimit?: string;
+  routes?: (router: IRouter) => void;
+}
+
+export type RouteArgument<TSchema extends IRouteSchema = IRouteSchema> =
+  | IRouteOptions<TSchema, any, any, any>
+  | IHandler
+  | IRouteMiddleware
+  | IRouteMetaOptions;
 
 export interface IRouter {
-  get(path: string, ...args: RouteArgument[]): void;
-  post(path: string, ...args: RouteArgument[]): void;
-  put(path: string, ...args: RouteArgument[]): void;
-  patch(path: string, ...args: RouteArgument[]): void;
-  delete(path: string, ...args: RouteArgument[]): void;
-  options(path: string, ...args: RouteArgument[]): void;
-  head(path: string, ...args: RouteArgument[]): void;
-  trace(path: string, ...args: RouteArgument[]): void;
-  connect(path: string, ...args: RouteArgument[]): void;
-  query(path: string, ...args: RouteArgument[]): void;
-  all(path: string, ...args: RouteArgument[]): void;
+  get<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  get(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  post<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  post(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  put<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  put(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  patch<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  patch(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  delete<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  delete(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  options<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  options(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  head<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  head(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  trace<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  trace(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  connect<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  connect(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  query<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  query(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  all<TSchema extends IRouteSchema = IRouteSchema, TReturn = unknown>(
+    path: string,
+    options: IRouteOptions<TSchema, any, any, TReturn>,
+  ): this;
+  all(path: string, ...args: Array<IHandler | IRouteMetaOptions>): this;
+
+  group(prefix: string, options?: IGroupOptions): this;
+  group(prefix: string, routesCallback: (router: IRouter) => void): this;
 
   transformer(transformer: ITransformer): void;
   intercept(interceptor: IInterceptor): void;
@@ -80,12 +182,13 @@ export interface IRouter {
 
   resource(
     basePath: string,
-    controller: IResourceController,
-    options?: IResourceOptions,
+    optionsOrController: IResourceOptions | IResourceController,
+    legacyOptions?: IResourceOptions,
   ): void;
+
   use(
-    pathOrHandler: string | IHandler | IRouter,
-    ...handlers: Array<IHandler | IRouter>
+    pathOrHandler: string | IHandler | IRouteMiddleware | IRouter,
+    ...handlers: Array<IHandler | IRouteMiddleware | IRouter>
   ): void;
 
   getRoutes(): IRoute[];
