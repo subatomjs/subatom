@@ -1,0 +1,21 @@
+{
+  "name": "subatom-root-sample",
+  "version": "1.0.0",
+  "description": "Sample code of root file.",
+  "license": "ISC",
+  "author": "Kunal Chandra Das <kunal@subatomjs.dev>",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "subatom dev"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.3.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

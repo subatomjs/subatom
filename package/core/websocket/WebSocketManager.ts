@@ -1,11 +1,14 @@
-import type { Server as HttpServer, IncomingMessage } from "node:http";
-import { type WebSocket, WebSocketServer } from "ws";
+import type { IncomingMessage, Server as HttpServer } from "node:http";
+import type { Socket } from "node:net";
+import { WebSocket, WebSocketServer } from "ws";
 import type {
+	IWebSocketConnection,
 	IWebSocketHandlers,
 	IWebSocketOptions,
 	IWebSocketRoute,
+	WebSocketSendPayload,
 } from "../../types/websocket/IWebSocket.js";
-import { broadcastAll } from "./services/broadcast.service.js";
+import { broadcastAll, broadcastToRoom } from "./services/broadcast.service.js";
 import { ConnectionRegistry } from "./services/connectionRegistry.service.js";
 import { shutdownConnections } from "./services/gracefulShutdown.service.js";
 import { startHeartbeat } from "./services/heartbeat.service.js";
@@ -13,46 +16,60 @@ import { dispatchMessage } from "./services/messageDispatcher.service.js";
 import { handleUpgrade } from "./services/upgradeHandler.service.js";
 import { WebSocketConnection } from "./WebSocketConnection.js";
 
-const DEFAULT_OPTIONS: Required<
-	Pick<
-		IWebSocketOptions,
-		| "heartbeatIntervalMs"
-		| "maxConnections"
-		| "maxMessagesPerSecond"
-		| "maxPayloadBytes"
-		| "shutdownTimeoutMs"
-		| "perMessageDeflate"
-	>
-> = {
+type ResolvedWebSocketOptions = {
+	heartbeatIntervalMs: number;
+	maxConnections: number;
+	maxMessagesPerSecond: number;
+	maxPayloadBytes: number;
+	shutdownTimeoutMs: number;
+	perMessageDeflate: boolean | object;
+	backpressureLimitBytes: number;
+};
+
+const DEFAULT_OPTIONS: Readonly<ResolvedWebSocketOptions> = {
 	heartbeatIntervalMs: 30_000,
 	maxConnections: Infinity,
-	maxMessagesPerSecond: 20,
+	maxMessagesPerSecond: 100,
 	maxPayloadBytes: 1024 * 1024,
 	shutdownTimeoutMs: 5_000,
 	perMessageDeflate: true,
+	backpressureLimitBytes: 1024 * 1024,
 };
 
-/**
- * Owns the `ws.Server` and everything socket-related. Created unconditionally
- * alongside SubatomServer (cheap — no listeners attached yet), but only wired
- * into the http server's 'upgrade' event when config.websocket is true, via
- * activate(). This keeps the feature zero-cost when disabled.
- */
 export class WebSocketManager {
 	private readonly routes = new Map<string, IWebSocketRoute>();
 	private readonly registry = new ConnectionRegistry();
-	private wss?: WebSocketServer;
-	private heartbeatTimer?: NodeJS.Timeout;
+	private wss?: WebSocketServer | undefined;
+	private heartbeatTimer?: NodeJS.Timeout | undefined;
 	private options: IWebSocketOptions = {};
 	private active = false;
+	private upgradeListener?:
+		| ((req: IncomingMessage, socket: Socket, head: Buffer) => void)
+		| undefined;
 
 	constructor(private readonly httpServer: HttpServer) {}
 
-	public register(path: string, handlers: IWebSocketHandlers): void {
+	public register<
+		TParams extends Record<string, string | undefined> = Record<
+			string,
+			string | undefined
+		>,
+		TQuery extends Record<string, string | undefined> = Record<
+			string,
+			string | undefined
+		>,
+		TLocals extends Record<string, any> = Record<string, any>,
+	>(
+		path: string,
+		handlers: IWebSocketHandlers<TParams, TQuery, TLocals>,
+	): void {
 		if (this.routes.has(path)) {
 			throw new Error(`[Subatom WS] Route "${path}" is already registered.`);
 		}
-		this.routes.set(path, { path, handlers });
+		this.routes.set(path, {
+			path,
+			handlers: handlers as unknown as IWebSocketHandlers,
+		});
 	}
 
 	public get connectionCount(): number {
@@ -63,6 +80,26 @@ export class WebSocketManager {
 		return this.active;
 	}
 
+	public getRegistry(): ConnectionRegistry {
+		return this.registry;
+	}
+
+	public getConnection(id: string): IWebSocketConnection | undefined {
+		return this.registry.get(id);
+	}
+
+	public getConnections(): IterableIterator<IWebSocketConnection> {
+		return this.registry.all();
+	}
+
+	public getRoom(room: string): ReadonlyMap<string, IWebSocketConnection> {
+		return this.registry.getRoom(room);
+	}
+
+	public getRoomNames(): string[] {
+		return this.registry.getRoomNames();
+	}
+
 	public activate(userOptions: IWebSocketOptions = {}): void {
 		if (this.active) return;
 		this.active = true;
@@ -70,14 +107,41 @@ export class WebSocketManager {
 
 		this.wss = new WebSocketServer({
 			noServer: true,
-			maxPayload: this.options.maxPayloadBytes,
-			perMessageDeflate: this.options.perMessageDeflate,
+			maxPayload:
+				this.options.maxPayloadBytes ?? DEFAULT_OPTIONS.maxPayloadBytes,
+			perMessageDeflate:
+				this.options.perMessageDeflate ??
+				DEFAULT_OPTIONS.perMessageDeflate,
 		});
 
-		this.httpServer.on("upgrade", (request, socket, head) => {
-			if (this.registry.size() >= (this.options.maxConnections ?? Infinity)) {
+		this.wss.on("connection", (rawSocket, request) => {
+			const route = (request as any).__subatomRoute as IWebSocketRoute;
+			const matchedContext = (request as any).__subatomContext as {
+				params: Record<string, string>;
+				query: Record<string, string>;
+				pathname: string;
+			};
+
+			if (!route || !matchedContext) {
+				rawSocket.terminate();
+				return;
+			}
+
+			this.onConnectionEstablished(
+				rawSocket,
+				request,
+				route,
+				matchedContext,
+			);
+		});
+
+		this.upgradeListener = (request, socket, head) => {
+			const maxConnections =
+				this.options.maxConnections ?? DEFAULT_OPTIONS.maxConnections;
+			if (this.registry.size() >= maxConnections) {
+				const body = "Service Unavailable";
 				socket.write(
-					"HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n",
+					`HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`,
 				);
 				socket.destroy();
 				return;
@@ -85,102 +149,259 @@ export class WebSocketManager {
 
 			handleUpgrade(
 				request,
-				socket as any,
+				socket,
 				head,
 				this.wss!,
 				this.routes,
 				this.options,
-				(rawSocket, req, route) =>
-					this.onConnectionEstablished(rawSocket, req, route),
 			).catch((err) => {
-				console.error("[Subatom WS] Upgrade handling failed:", err.message);
-				socket.destroy();
+				console.error(
+					"[Subatom WS] Upgrade processing failed:",
+					(err as Error).message,
+				);
+				if (!socket.destroyed) {
+					socket.destroy();
+				}
 			});
-		});
+		};
 
-		this.heartbeatTimer = startHeartbeat(
-			this.registry,
-			this.options.heartbeatIntervalMs ?? DEFAULT_OPTIONS.heartbeatIntervalMs,
-		);
+		this.httpServer.on("upgrade", this.upgradeListener);
+
+		const intervalMs: number =
+			this.options.heartbeatIntervalMs ??
+			DEFAULT_OPTIONS.heartbeatIntervalMs;
+		if (intervalMs > 0) {
+			this.heartbeatTimer = startHeartbeat(this.registry, intervalMs);
+		}
 	}
-
-	// WebSocketManager.ts (updated methods)
 
 	private onConnectionEstablished(
 		rawSocket: WebSocket,
 		request: IncomingMessage,
 		route: IWebSocketRoute,
+		matchedContext: {
+			params: Record<string, string>;
+			query: Record<string, string>;
+			pathname: string;
+		},
 	): void {
-		const maxMsgs =
+		const maxMsgs: number =
 			route.handlers.options?.maxMessagesPerSecond ??
 			this.options.maxMessagesPerSecond ??
 			DEFAULT_OPTIONS.maxMessagesPerSecond;
+
+		const backpressureBytes: number =
+			route.handlers.options?.backpressureLimitBytes ??
+			this.options.backpressureLimitBytes ??
+			DEFAULT_OPTIONS.backpressureLimitBytes;
 
 		const connection = new WebSocketConnection(
 			rawSocket,
 			request,
 			this.registry,
-			maxMsgs,
+			{
+				maxMessagesPerSecond: maxMsgs,
+				backpressureLimitBytes: backpressureBytes,
+				params: matchedContext.params,
+				query: matchedContext.query,
+				path: matchedContext.pathname,
+			},
 		);
+
 		this.registry.add(connection);
 
-		rawSocket.on("pong", () => {
+		rawSocket.on("pong", (data: Buffer) => {
 			connection._isAlive = true;
+			try {
+				const result = route.handlers.onPong?.(connection, data);
+				if (result && typeof (result as Promise<void>).catch === "function") {
+					(result as Promise<void>).catch((err) =>
+						console.error(
+							`[Subatom WS] onPong async handler rejected for ${connection.id}:`,
+							(err as Error).message,
+						),
+					);
+				}
+			} catch (err) {
+				console.error(
+					`[Subatom WS] onPong handler threw for ${connection.id}:`,
+					(err as Error).message,
+				);
+			}
+		});
+
+		rawSocket.on("ping", (data: Buffer) => {
+			try {
+				const result = route.handlers.onPing?.(connection, data);
+				if (result && typeof (result as Promise<void>).catch === "function") {
+					(result as Promise<void>).catch((err) =>
+						console.error(
+							`[Subatom WS] onPing async handler rejected for ${connection.id}:`,
+							(err as Error).message,
+						),
+					);
+				}
+			} catch (err) {
+				console.error(
+					`[Subatom WS] onPing handler threw for ${connection.id}:`,
+					(err as Error).message,
+				);
+			}
 		});
 
 		rawSocket.on("message", (data, isBinary) => {
 			dispatchMessage(connection, route.handlers, data, isBinary);
 		});
 
-		rawSocket.on("close", (code, reasonBuf) => {
-			this.registry.remove(connection);
+		(rawSocket as any)._socket?.on("drain", () => {
 			try {
-				route.handlers.onClose?.(connection, code, reasonBuf.toString());
+				const result = route.handlers.onDrain?.(connection);
+				if (result && typeof (result as Promise<void>).catch === "function") {
+					(result as Promise<void>).catch((err) =>
+						console.error(
+							`[Subatom WS] onDrain async handler rejected for ${connection.id}:`,
+							(err as Error).message,
+						),
+					);
+				}
 			} catch (err) {
 				console.error(
-					"[Subatom WS] onClose handler threw:",
+					`[Subatom WS] onDrain handler threw for ${connection.id}:`,
+					(err as Error).message,
+				);
+			}
+		});
+
+		rawSocket.on("close", (code, reasonBuf) => {
+			connection.leaveAll();
+			this.registry.remove(connection);
+			try {
+				const result = route.handlers.onClose?.(
+					connection,
+					code,
+					reasonBuf ? reasonBuf.toString("utf-8") : "",
+				);
+				if (
+					result &&
+					typeof (result as Promise<void>).catch === "function"
+				) {
+					(result as Promise<void>).catch((err) =>
+						console.error(
+							`[Subatom WS] onClose async handler rejected for ${connection.id}:`,
+							(err as Error).message,
+						),
+					);
+				}
+			} catch (err) {
+				console.error(
+					`[Subatom WS] onClose handler threw for ${connection.id}:`,
 					(err as Error).message,
 				);
 			}
 		});
 
 		rawSocket.on("error", (err) => {
-			this.registry.remove(connection); // Fix: Purge connection on error
+			this.registry.remove(connection);
 			try {
-				route.handlers.onError?.(connection, err);
+				const result = route.handlers.onError?.(connection, err);
+				if (
+					result &&
+					typeof (result as Promise<void>).catch === "function"
+				) {
+					(result as Promise<void>).catch((asyncErr) =>
+						console.error(
+							`[Subatom WS] onError async handler rejected for ${connection.id}:`,
+							(asyncErr as Error).message,
+						),
+					);
+				}
 			} catch (handlerErr) {
 				console.error(
-					"[Subatom WS] onError handler threw:",
+					`[Subatom WS] onError handler threw for ${connection.id}:`,
 					(handlerErr as Error).message,
 				);
 			}
 		});
 
 		try {
-			route.handlers.onConnection?.(connection);
+			const connResult = route.handlers.onConnection?.(connection);
+			if (
+				connResult &&
+				typeof (connResult as Promise<void>).catch === "function"
+			) {
+				(connResult as Promise<void>).catch((err) => {
+					console.error(
+						`[Subatom WS] onConnection async handler rejected for ${connection.id}:`,
+						(err as Error).message,
+					);
+					try {
+						route.handlers.onError?.(
+							connection,
+							err instanceof Error ? err : new Error(String(err)),
+						);
+					} catch {
+						// Suppress secondary handler errors
+					}
+				});
+			}
 		} catch (err) {
 			console.error(
-				"[Subatom WS] onConnection handler threw:",
+				`[Subatom WS] onConnection handler threw for ${connection.id}:`,
 				(err as Error).message,
 			);
+			try {
+				route.handlers.onError?.(
+					connection,
+					err instanceof Error ? err : new Error(String(err)),
+				);
+			} catch {
+				// Suppress secondary handler errors
+			}
 		}
 	}
 
-	// Fix: Allow passing excludeId to global broadcast
-	public broadcast(data: string | Buffer | object, excludeId?: string): void {
+	public broadcast(
+		data: WebSocketSendPayload,
+		excludeId?: string,
+	): void {
 		broadcastAll(this.registry, data, excludeId);
+	}
+
+	public broadcastTo(
+		room: string,
+		data: WebSocketSendPayload,
+		excludeId?: string,
+	): void {
+		broadcastToRoom(this.registry, room, data, excludeId);
 	}
 
 	public async shutdown(timeoutMs?: number): Promise<void> {
 		if (!this.active) return;
-		if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
-		await shutdownConnections(
-			this.registry,
+
+		if (this.heartbeatTimer) {
+			clearInterval(this.heartbeatTimer);
+			this.heartbeatTimer = undefined;
+		}
+
+		if (this.upgradeListener) {
+			this.httpServer.removeListener("upgrade", this.upgradeListener);
+			this.upgradeListener = undefined;
+		}
+
+		const effectiveTimeout: number =
 			timeoutMs ??
-				this.options.shutdownTimeoutMs ??
-				DEFAULT_OPTIONS.shutdownTimeoutMs,
-		);
-		this.wss?.close();
+			this.options.shutdownTimeoutMs ??
+			DEFAULT_OPTIONS.shutdownTimeoutMs;
+
+		await shutdownConnections(this.registry, effectiveTimeout);
+
+		if (this.wss) {
+			await new Promise<void>((resolve) => {
+				this.wss!.close(() => resolve());
+			});
+			this.wss = undefined;
+		}
+
 		this.active = false;
 	}
 }

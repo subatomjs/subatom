@@ -17,13 +17,42 @@ interface SchemaRegistry {
   objectNames: WeakMap<object, string>;
 }
 
+function unwrapSchema(schema: any): { unwrapped: any; isOptional: boolean } {
+  let current = schema;
+  let isOptional = false;
+
+  while (current && typeof current === "object") {
+    if (
+      current.isOptional === true ||
+      current._def?.typeName === "ZodOptional" ||
+      current._def?.typeName === "ZodNullable" ||
+      current._def?.typeName === "ZodDefault" ||
+      current.isNullable === true
+    ) {
+      isOptional = true;
+    }
+
+    const inner =
+      current._def?.innerType ??
+      current._def?.schema ??
+      current.innerType ??
+      current.schema ??
+      current._def?.type;
+
+    if (inner && inner !== current) {
+      current = inner;
+    } else {
+      break;
+    }
+  }
+
+  return { unwrapped: current, isOptional };
+}
+
 function isOptionalSchema(schema: unknown): boolean {
-  return (
-    typeof schema === "object" &&
-    schema !== null &&
-    "isOptional" in schema &&
-    (schema as { isOptional?: unknown }).isOptional === true
-  );
+  if (!schema || typeof schema !== "object") return false;
+  const { isOptional } = unwrapSchema(schema);
+  return isOptional || (schema as { isOptional?: unknown }).isOptional === true;
 }
 
 function normalizeSchemaName(name: string): string {
@@ -32,14 +61,8 @@ function normalizeSchemaName(name: string): string {
     .replace(/_+/g, "_")
     .replace(/^_+|_+$/g, "");
 
-  if (!normalized) {
-    return "Schema";
-  }
-
-  if (/^[0-9]/.test(normalized)) {
-    return `Schema_${normalized}`;
-  }
-
+  if (!normalized) return "Schema";
+  if (/^[0-9]/.test(normalized)) return `Schema_${normalized}`;
   return normalized;
 }
 
@@ -65,9 +88,7 @@ function createUniqueSchemaName(
 }
 
 function getSchemaName(schema: any): string | undefined {
-  if (!schema || typeof schema !== "object") {
-    return undefined;
-  }
+  if (!schema || typeof schema !== "object") return undefined;
 
   const candidates = [
     schema.title,
@@ -110,34 +131,31 @@ function isOpenApiSchema(value: any): boolean {
   );
 }
 
-function convertInferSchema(
-  schema: any,
+export function convertInferSchema(
+  rawSchema: any,
   seen: WeakSet<object> = new WeakSet(),
 ): OpenApiSchema | undefined {
-  if (schema === undefined || schema === null) {
-    return undefined;
-  }
+  if (rawSchema === undefined || rawSchema === null) return undefined;
+  if (isOpenApiSchema(rawSchema)) return { ...rawSchema };
 
-  if (isOpenApiSchema(schema)) {
-    return { ...schema };
-  }
+  const { unwrapped: schema } = unwrapSchema(rawSchema);
 
   if (typeof schema !== "object" && typeof schema !== "function") {
     return undefined;
   }
 
   if (typeof schema === "object") {
-    if (seen.has(schema)) {
-      return { type: "object" };
-    }
+    if (seen.has(schema)) return { type: "object" };
     seen.add(schema);
   }
 
+  // Handle plain key-value rule dictionaries
   if (
     typeof schema === "object" &&
     !Array.isArray(schema) &&
     typeof schema.parse !== "function" &&
     typeof schema.validate !== "function" &&
+    typeof schema.safeParse !== "function" &&
     !schema.shape &&
     !schema._def &&
     !schema._type
@@ -155,51 +173,46 @@ function convertInferSchema(
       }
     }
 
-    const result: OpenApiSchema = {
-      type: "object",
-      properties,
-    };
-
-    if (required.length > 0) {
-      result.required = required;
-    }
-
+    const result: OpenApiSchema = { type: "object", properties };
+    if (required.length > 0) result.required = required;
     return result;
   }
 
-  const jsonSchema: OpenApiSchema = {
-    type: "string",
-  };
+  const jsonSchema: OpenApiSchema = { type: "string" };
 
   const typeIndicator = String(
     schema?.type ??
       schema?._type ??
       schema?.typeName ??
       schema?._def?.typeName ??
+      schema?.name ??
       schema?.constructor?.name ??
       "",
   ).toLowerCase();
 
-  if (typeIndicator.includes("file")) {
-    return {
-      type: "string",
-      format: "binary",
-    };
+  if (typeIndicator.includes("file") || typeIndicator.includes("upload")) {
+    return { type: "string", format: "binary" };
   }
 
   if (typeIndicator.includes("integer") || typeIndicator.includes("int")) {
     jsonSchema.type = "integer";
-  } else if (typeIndicator.includes("number") || schema?.coerce) {
+  } else if (
+    typeIndicator.includes("number") ||
+    typeIndicator.includes("float") ||
+    typeIndicator.includes("double") ||
+    schema?.coerce
+  ) {
     jsonSchema.type = "number";
-  } else if (typeIndicator.includes("boolean")) {
+  } else if (
+    typeIndicator.includes("boolean") ||
+    typeIndicator.includes("bool")
+  ) {
     jsonSchema.type = "boolean";
   } else if (typeIndicator.includes("array") || Array.isArray(schema?.items)) {
     jsonSchema.type = "array";
     if (schema?.items && !Array.isArray(schema.items)) {
       const itemsSchema = convertInferSchema(schema.items, seen);
-      if (itemsSchema) {
-        jsonSchema.items = itemsSchema;
-      }
+      if (itemsSchema) jsonSchema.items = itemsSchema;
     }
   } else if (
     typeIndicator.includes("object") ||
@@ -212,12 +225,17 @@ function convertInferSchema(
       const resolvedShape = typeof shape === "function" ? shape() : shape;
       if (resolvedShape && typeof resolvedShape === "object") {
         jsonSchema.properties = {};
+        const required: string[] = [];
         for (const [key, value] of Object.entries(resolvedShape)) {
           const converted = convertInferSchema(value, seen);
           if (converted !== undefined) {
             jsonSchema.properties[key] = converted;
+            if (!isOptionalSchema(value)) {
+              required.push(key);
+            }
           }
         }
+        if (required.length > 0) jsonSchema.required = required;
       }
     }
   } else {
@@ -242,40 +260,6 @@ function convertInferSchema(
     jsonSchema.enum = [...enumValues];
   }
 
-  const minVal =
-    schema?.minValue ??
-    schema?.minVal ??
-    schema?._min ??
-    schema?._def?.checks?.find?.((check: any) => check?.kind === "min")?.value;
-
-  if (minVal !== undefined) {
-    if (jsonSchema.type === "string") jsonSchema.minLength = minVal;
-    if (jsonSchema.type === "number" || jsonSchema.type === "integer")
-      jsonSchema.minimum = minVal;
-    if (jsonSchema.type === "array") jsonSchema.minItems = minVal;
-  }
-
-  const maxVal =
-    schema?.maxValue ??
-    schema?.maxVal ??
-    schema?._max ??
-    schema?._def?.checks?.find?.((check: any) => check?.kind === "max")?.value;
-
-  if (maxVal !== undefined) {
-    if (jsonSchema.type === "string") jsonSchema.maxLength = maxVal;
-    if (jsonSchema.type === "number" || jsonSchema.type === "integer")
-      jsonSchema.maximum = maxVal;
-    if (jsonSchema.type === "array") jsonSchema.maxItems = maxVal;
-  }
-
-  if (typeof schema?.description === "string") {
-    jsonSchema.description = schema.description;
-  }
-
-  if (typeof schema?.title === "string") {
-    jsonSchema.title = schema.title;
-  }
-
   return jsonSchema;
 }
 
@@ -284,15 +268,8 @@ function registerSchema(
   schema: any,
   preferredName: string,
 ): OpenApiSchema {
-  if (schema === undefined || schema === null) {
-    return {};
-  }
-
-  if (
-    typeof schema === "object" &&
-    schema !== null &&
-    typeof schema.$ref === "string"
-  ) {
+  if (schema === undefined || schema === null) return {};
+  if (typeof schema === "object" && typeof schema.$ref === "string") {
     return { $ref: schema.$ref };
   }
 
@@ -304,9 +281,7 @@ function registerSchema(
   }
 
   const converted = convertInferSchema(schema);
-  if (!converted) {
-    return {};
-  }
+  if (!converted) return {};
 
   const schemaName = getSchemaName(schema) ?? preferredName;
   const componentName = createUniqueSchemaName(registry, schemaName);
@@ -315,9 +290,7 @@ function registerSchema(
     registry.objectNames.set(schema, componentName);
   }
 
-  const componentSchema = { ...converted };
-  registry.schemas[componentName] = componentSchema;
-
+  registry.schemas[componentName] = { ...converted };
   return { $ref: `#/components/schemas/${componentName}` };
 }
 
@@ -326,13 +299,8 @@ function createBodySchemaName(
   openApiPath: string,
   method: string,
 ): string {
-  const routeName =
-    typeof route.name === "string" && route.name.trim().length > 0
-      ? route.name.trim()
-      : undefined;
-
-  if (routeName) {
-    return routeName;
+  if (typeof route.name === "string" && route.name.trim().length > 0) {
+    return route.name.trim();
   }
 
   const pathPart = openApiPath
@@ -341,8 +309,7 @@ function createBodySchemaName(
     .replace(/\//g, "_")
     .replace(/[^a-zA-Z0-9_]/g, "_");
 
-  const safePath = pathPart || "root";
-  return `Body_${safePath}_${method}`;
+  return `Body_${pathPart || "root"}_${method}`;
 }
 
 function createMultipartSchema(
@@ -377,9 +344,7 @@ function createMultipartSchema(
     const fileType = fileUploadInfo?.type ?? "single";
     if (fileType === "fields" && Array.isArray(fileUploadInfo?.fields)) {
       for (const field of fileUploadInfo.fields) {
-        if (!field || typeof field.name !== "string" || field.name.length === 0)
-          continue;
-
+        if (!field?.name) continue;
         if (typeof field.maxCount === "number" && field.maxCount > 1) {
           properties[field.name] = {
             type: "array",
@@ -411,11 +376,7 @@ function createMultipartSchema(
     }
   }
 
-  const schema: OpenApiSchema = {
-    type: "object",
-    properties,
-  };
-
+  const schema: OpenApiSchema = { type: "object", properties };
   if (required.length > 0) {
     schema.required = Array.from(new Set(required));
   }
@@ -493,7 +454,9 @@ export function generateOpenApiSpec(
     };
 
     if (paramsSchema?.properties) {
-      for (const [name, propSchema] of Object.entries(paramsSchema.properties)) {
+      for (const [name, propSchema] of Object.entries(
+        paramsSchema.properties,
+      )) {
         operation.parameters.push({
           name,
           in: "path",

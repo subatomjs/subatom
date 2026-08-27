@@ -1,19 +1,26 @@
 /**
- * Simple token bucket. One instance per connection — protects the process
- * from a single misbehaving/malicious client flooding onMessage under load.
+ * Production-grade token bucket rate limiter.
+ * Safeguards WebSocket connections against frame floods and resource exhaustion.
  */
 export class TokenBucket {
 	private tokens: number;
 	private lastRefill = Date.now();
+	private readonly unlimited: boolean;
 
 	constructor(
 		private readonly capacity: number,
 		private readonly refillPerSecond: number,
 	) {
+		this.unlimited =
+			!Number.isFinite(capacity) ||
+			capacity <= 0 ||
+			!Number.isFinite(refillPerSecond) ||
+			refillPerSecond <= 0;
 		this.tokens = capacity;
 	}
 
 	public tryConsume(cost = 1): boolean {
+		if (this.unlimited) return true;
 		this.refill();
 		if (this.tokens < cost) return false;
 		this.tokens -= cost;

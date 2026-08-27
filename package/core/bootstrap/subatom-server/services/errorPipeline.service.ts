@@ -2,6 +2,7 @@
 import type { ErrorMiddlewareHandler } from "../../../../types/http/IMiddleware.js";
 import type { IRequest } from "../../../../types/http/IRequest.js";
 import type { IResponse } from "../../../../types/http/IResponse.js";
+import { ISubatomError } from "../../../../types/ISubatomError.js";
 import { normalizeError } from "../../../http/errors/Error.js";
 import { ErrorFormatter } from "../../../http/errors/errorFormatter.js";
 
@@ -31,7 +32,7 @@ export async function handleErrorPipeline(
 			}
 
 			try {
-				await errorMiddleware(currentErr, req, res, runErrorPipeline);
+				await errorMiddleware(currentErr as ISubatomError, req, res, runErrorPipeline);
 			} catch (nextErr) {
 				await runErrorPipeline(nextErr);
 			}

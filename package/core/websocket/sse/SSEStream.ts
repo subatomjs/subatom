@@ -1,4 +1,3 @@
-// subatom/subatom/core/websocket/sse/SSEStream.ts
 import type { ServerResponse } from "node:http";
 import type {
 	SSEEvent,
@@ -8,20 +7,9 @@ import { onClientDisconnect } from "../../http/streams/utils/abort.utils.js";
 import { writeWithBackpressure } from "../../http/streams/utils/backpressure.utils.js";
 import { formatSSEComment, formatSSEEvent } from "./sse.utils.js";
 
-/**
- * Manages one Server-Sent Events connection: sends the SSE handshake
- * headers on construction, then exposes `.send()` / `.comment()` for
- * pushing events over the connection's lifetime, plus heartbeats and
- * disconnect cleanup.
- *
- * Writes are serialized through an internal queue so concurrent
- * `.send()` calls (e.g. from different async event sources) can't
- * interleave partial frames, and each write still respects backpressure
- * before the next is issued.
- */
 export class SSEStream {
 	private readonly raw: ServerResponse;
-	private heartbeatTimer?: NodeJS.Timeout;
+	private heartbeatTimer?: NodeJS.Timeout | undefined;
 	private _closed = false;
 	private writeQueue: Promise<void> = Promise.resolve();
 	private readonly unbindDisconnect: () => void;
@@ -35,11 +23,10 @@ export class SSEStream {
 				"Content-Type": "text/event-stream",
 				"Cache-Control": "no-cache, no-transform",
 				Connection: "keep-alive",
-				// Disable response buffering on nginx-fronted deployments so
-				// events aren't held back waiting for a buffer to fill.
 				"X-Accel-Buffering": "no",
 				...options.headers,
 			});
+			raw.flushHeaders?.();
 		}
 
 		if (options.retry !== undefined) {
@@ -50,7 +37,7 @@ export class SSEStream {
 		if (heartbeatInterval > 0) {
 			this.heartbeatTimer = setInterval(() => {
 				this.comment("heartbeat").catch(() => {
-					/* connection already gone; close() below will run via 'close' listener */
+					/* Disconnect cleanup handled by close listener */
 				});
 			}, heartbeatInterval);
 			this.heartbeatTimer.unref?.();
@@ -73,18 +60,15 @@ export class SSEStream {
 		return this.writeQueue;
 	}
 
-	/** Pushes one event to the client. Resolves once flushed (backpressure-aware). */
-	send(event: SSEEvent): Promise<void> {
+	public send(event: SSEEvent): Promise<void> {
 		return this.enqueue(formatSSEEvent(event));
 	}
 
-	/** Sends a comment line - invisible to the client's `onmessage`, doubles as a manual ping. */
-	comment(text: string): Promise<void> {
+	public comment(text: string): Promise<void> {
 		return this.enqueue(formatSSEComment(text));
 	}
 
-	/** Registers a callback fired exactly once when the connection closes (client or server initiated). */
-	onClose(callback: () => void): () => void {
+	public onClose(callback: () => void): () => void {
 		if (this._closed) {
 			callback();
 			return () => {};
@@ -93,8 +77,7 @@ export class SSEStream {
 		return () => this.onCloseCallbacks.delete(callback);
 	}
 
-	/** Ends the connection. Idempotent - safe to call from a disconnect handler or explicitly. */
-	close(): void {
+	public close(): void {
 		if (this._closed) return;
 		this._closed = true;
 		if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);

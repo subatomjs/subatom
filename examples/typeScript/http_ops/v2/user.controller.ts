@@ -5,8 +5,10 @@ import type {
   listUsersSchema,
 } from "./user.schema.js";
 
-export const createUserController: IController<typeof createUserSchema> = async (ctx) => {
-  console.log("ctx", ctx)
+export const createUserController: IController<
+  typeof createUserSchema
+> = async (ctx) => {
+  console.log("ctx", ctx);
   // Fully inferred types from createUserSchema
   const { orgId } = ctx.params;
   const { notify } = ctx.query;
@@ -31,7 +33,9 @@ export const createUserController: IController<typeof createUserSchema> = async 
   });
 };
 
-export const getUserController: IController<typeof getUserSchema> = async (ctx) => {
+export const getUserController: IController<typeof getUserSchema> = async (
+  ctx,
+) => {
   const { id } = ctx.params;
 
   return ctx.status(200).json({
@@ -44,7 +48,9 @@ export const getUserController: IController<typeof getUserSchema> = async (ctx) 
   });
 };
 
-export const listUsersController: IController<typeof listUsersSchema> = async (ctx) => {
+export const listUsersController: IController<typeof listUsersSchema> = async (
+  ctx,
+) => {
   const { page, limit, search } = ctx.query;
 
   return ctx.status(200).json({

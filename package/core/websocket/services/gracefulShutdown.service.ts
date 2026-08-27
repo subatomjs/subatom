@@ -12,22 +12,47 @@ export function shutdownConnections(
 		}
 
 		for (const connection of connections) {
-			connection.close(1001, "Server shutting down");
+			try {
+				connection.close(1001, "Server shutting down");
+			} catch {
+				connection.terminate();
+			}
 		}
 
-		const forceTimer = setTimeout(() => {
-			for (const connection of registry.all()) connection.terminate();
-			resolve();
-		}, timeoutMs);
-		forceTimer.unref();
+		let checkInterval: NodeJS.Timeout | undefined;
+		let forceTimer: NodeJS.Timeout | undefined;
 
-		const checkInterval = setInterval(() => {
+		const cleanup = () => {
+			if (checkInterval) clearInterval(checkInterval);
+			if (forceTimer) clearTimeout(forceTimer);
+		};
+
+		forceTimer = setTimeout(() => {
+			cleanup();
+			for (const connection of Array.from(registry.all())) {
+				try {
+					connection.terminate();
+				} catch {
+					// Ignore errors during emergency force termination
+				}
+			}
+			registry.clear();
+			resolve();
+		}, Math.max(timeoutMs, 500));
+
+		if (typeof forceTimer.unref === "function") {
+			forceTimer.unref();
+		}
+
+		checkInterval = setInterval(() => {
 			if (registry.size() === 0) {
-				clearInterval(checkInterval);
-				clearTimeout(forceTimer);
+				cleanup();
 				resolve();
 			}
-		}, 100);
-		checkInterval.unref();
+		}, 50);
+
+		if (typeof checkInterval.unref === "function") {
+			checkInterval.unref();
+		}
 	});
 }

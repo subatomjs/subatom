@@ -70,3 +70,21 @@ export {type RouteArgument} from "./package/types/framework/router/IRouter.js"
 
 export * from './package/types/context/IContext.js'
 export * from './package/core/context/Context.js'
+
+export * from "./package/types/ISubatomError.js"
+
+
+export * from "./package/types/websocket/IServerSendEvents.js"
+export * from "./package/types/websocket/IWebSocket.js"
+
+
+export * from "./package/core/websocket/WebSocketConnection.js"
+export * from "./package/core/websocket/WebSocketManager.js"
+export * from "./package/core/websocket/services/broadcast.service.js"
+export * from "./package/core/websocket/services/connectionRegistry.service.js"
+export * from "./package/core/websocket/services/gracefulShutdown.service.js"
+export * from "./package/core/websocket/services/heartbeat.service.js"
+export * from "./package/core/websocket/services/messageDispatcher.service.js"
+export * from "./package/core/websocket/services/rateLimiter.service.js"
+export * from "./package/core/websocket/services/upgradeHandler.service.js"
+export * from "./package/core/websocket/sse/index.js"

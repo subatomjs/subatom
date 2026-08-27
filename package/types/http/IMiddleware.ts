@@ -1,6 +1,7 @@
 // subatom/package/types/http/IMiddleware.ts
 
 import type { NextFunction } from "../framework/pipeline/INext.js";
+import { ISubatomError } from "../ISubatomError.js";
 import type { IRequest } from "./IRequest.js";
 import type { IResponse } from "./IResponse.js";
 
@@ -17,7 +18,7 @@ export type MiddlewareHandler = (
  * An error-handling middleware.
  */
 export type ErrorMiddlewareHandler = (
-  err: unknown,
+  err: ISubatomError,
   req: IRequest,
   res: IResponse,
   next: NextFunction,

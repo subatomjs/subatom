@@ -61,7 +61,7 @@ userRouter.group("/v1/members", {
 const adminGroup = userRouter.group("/admin/users", {
   name: "admin.users",
   tags: ["Admin Users"],
-  middleware: [authMiddleware],
+  // middleware: [authMiddleware],
 });
 
 adminGroup.get("/", {
@@ -87,7 +87,7 @@ userRouter.resource("/profiles", {
     update: updateUserController,
     delete: deleteUserController,
   },
-  middleware: [authMiddleware],
+  // middleware: [authMiddleware],
   tags: ["User Profiles"],
   only: ["index", "show", "create", "update", "delete"],
   names: {

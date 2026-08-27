@@ -1,44 +1,65 @@
 import type { IWebSocketConnection } from "../../../types/websocket/IWebSocket.js";
 
 /**
- * Central bookkeeping for every live connection and every room. Kept as its
- * own service so heartbeat/broadcast/shutdown can all operate over the same
- * source of truth without reaching into WebSocketManager internals.
+ * High-performance state storage for active connections and rooms.
+ * Stores connection references by unique ID to prevent stale instance leaks
+ * and guarantee broadcast delivery across concurrent socket clients.
  */
 export class ConnectionRegistry {
-	private readonly connections = new Set<IWebSocketConnection>();
-	private readonly rooms = new Map<string, Set<IWebSocketConnection>>();
+	private readonly connections = new Map<string, IWebSocketConnection>();
+	private readonly rooms = new Map<string, Map<string, IWebSocketConnection>>();
 
 	public add(connection: IWebSocketConnection): void {
-		this.connections.add(connection);
+		this.connections.set(connection.id, connection);
 	}
 
 	public remove(connection: IWebSocketConnection): void {
-		this.connections.delete(connection);
-		for (const [room, members] of this.rooms) {
-			members.delete(connection);
-			if (members.size === 0) this.rooms.delete(room);
+		this.connections.delete(connection.id);
+		for (const room of connection.rooms) {
+			const members = this.rooms.get(room);
+			if (members) {
+				members.delete(connection.id);
+				if (members.size === 0) {
+					this.rooms.delete(room);
+				}
+			}
 		}
+	}
+
+	public get(id: string): IWebSocketConnection | undefined {
+		return this.connections.get(id);
+	}
+
+	public has(id: string): boolean {
+		return this.connections.has(id);
 	}
 
 	public joinRoom(room: string, connection: IWebSocketConnection): void {
+		if (!room || typeof room !== "string") return;
 		let members = this.rooms.get(room);
 		if (!members) {
-			members = new Set();
+			members = new Map<string, IWebSocketConnection>();
 			this.rooms.set(room, members);
 		}
-		members.add(connection);
+		members.set(connection.id, connection);
 	}
 
 	public leaveRoom(room: string, connection: IWebSocketConnection): void {
+		if (!room || typeof room !== "string") return;
 		const members = this.rooms.get(room);
 		if (!members) return;
-		members.delete(connection);
-		if (members.size === 0) this.rooms.delete(room);
+		members.delete(connection.id);
+		if (members.size === 0) {
+			this.rooms.delete(room);
+		}
 	}
 
-	public getRoom(room: string): ReadonlySet<IWebSocketConnection> {
-		return this.rooms.get(room) ?? new Set();
+	public getRoom(room: string): ReadonlyMap<string, IWebSocketConnection> {
+		return this.rooms.get(room) ?? new Map<string, IWebSocketConnection>();
+	}
+
+	public getRoomNames(): string[] {
+		return Array.from(this.rooms.keys());
 	}
 
 	public size(): number {
@@ -47,5 +68,10 @@ export class ConnectionRegistry {
 
 	public all(): IterableIterator<IWebSocketConnection> {
 		return this.connections.values();
+	}
+
+	public clear(): void {
+		this.connections.clear();
+		this.rooms.clear();
 	}
 }

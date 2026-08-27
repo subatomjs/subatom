@@ -18,7 +18,6 @@ function inspectRuleExpectedType(rule: any): string | undefined {
     return undefined;
   }
 
-  // 1. Recursively unwrap inner schema wrappers (optional, nullable, default, effects)
   const inner =
     rule._def?.innerType ??
     rule._def?.schema ??
@@ -46,7 +45,8 @@ function inspectRuleExpectedType(rule: any): string | undefined {
     indicator.includes("number") ||
     indicator.includes("integer") ||
     indicator.includes("int") ||
-    indicator.includes("float")
+    indicator.includes("float") ||
+    indicator.includes("double")
   ) {
     return "number";
   }
@@ -85,7 +85,29 @@ export function coerceValue(value: unknown, expectedType?: string): unknown {
     if (trimmed.toLowerCase() === "false" || trimmed === "0") return false;
   }
 
+  // Smart fallback when expectedType is unknown
+  if (trimmed.toLowerCase() === "true") return true;
+  if (trimmed.toLowerCase() === "false") return false;
+  if (!isNaN(Number(trimmed)) && trimmed !== "") return Number(trimmed);
+
   return value;
+}
+
+function autoCoerceObject(
+  data: Record<string, any>,
+  rulesMap?: Record<string, any>,
+): Record<string, any> {
+  const result: Record<string, any> = { ...data };
+
+  for (const [key, value] of Object.entries(result)) {
+    if (typeof value === "string") {
+      const rule = rulesMap ? rulesMap[key] : undefined;
+      const expectedType = inspectRuleExpectedType(rule);
+      result[key] = coerceValue(value, expectedType);
+    }
+  }
+
+  return result;
 }
 
 function formatIssuePath(parentKey: string, subPath?: unknown): string {
@@ -127,153 +149,149 @@ function normalizeFiles<T>(files: T): T {
   return files;
 }
 
-function resolveValidator(schemaPart: unknown) {
+function resolveValidator(schemaPart: unknown, shouldAutoCoerce = false) {
   if (!schemaPart) return null;
 
-  if (typeof (schemaPart as any).safeParse === "function") {
-    return schemaPart as { safeParse: (val: unknown) => Promise<any> | any };
-  }
+  const rulesMap =
+    typeof schemaPart === "object" && schemaPart !== null
+      ? ((schemaPart as any).shape ??
+        (schemaPart as any)._def?.shape?.() ??
+        (schemaPart as any)._def?.shape ??
+        (typeof (schemaPart as any).safeParse !== "function"
+          ? schemaPart
+          : undefined))
+      : undefined;
 
-  if (typeof schemaPart === "object" && schemaPart !== null) {
-    const rules = schemaPart as Record<string, any>;
-    return {
-      safeParse: async (targetVal: unknown) => {
-        if (
-          !targetVal ||
-          typeof targetVal !== "object" ||
-          Array.isArray(targetVal)
-        ) {
-          return {
-            success: false,
-            issues: [
-              {
-                path: "body",
-                rule: "type",
-                message: "Expected object",
-                received: typeof targetVal,
-              } as ValidationIssue,
-            ],
-          };
-        }
+  return {
+    safeParse: async (targetVal: unknown) => {
+      if (
+        !targetVal ||
+        typeof targetVal !== "object" ||
+        Array.isArray(targetVal)
+      ) {
+        return {
+          success: false,
+          issues: [
+            {
+              path: "",
+              rule: "type",
+              message: "Expected object",
+              received: typeof targetVal,
+            } as ValidationIssue,
+          ],
+        };
+      }
 
-        const data = { ...(targetVal as Record<string, any>) };
-        const issues: ValidationIssue[] = [];
+      // Automatically cast string values to numbers/booleans for query, params, and multipart
+      let data = shouldAutoCoerce
+        ? autoCoerceObject(targetVal as Record<string, any>, rulesMap)
+        : { ...(targetVal as Record<string, any>) };
 
-        // Inside resolveValidator loop:
-        for (const [key, rule] of Object.entries(rules)) {
-          let fieldValue = data[key];
-          let expectedType = inspectRuleExpectedType(rule);
-
-          // Fallback: If typeof is string, check if it's an explicit boolean literal
-          if (typeof fieldValue === "string") {
-            const lower = fieldValue.trim().toLowerCase();
-            if (lower === "true" || lower === "false") {
-              expectedType = expectedType ?? "boolean";
-            }
-          }
-
-          // 1. Unwrap single-file array if rule expects single file
-          if (
-            Array.isArray(fieldValue) &&
-            fieldValue.length === 1 &&
-            expectedType !== "array" &&
-            isUploadFileLike(fieldValue[0])
-          ) {
-            fieldValue = fieldValue[0];
-          }
-
-          // 2. Coerce string types
-          if (typeof fieldValue === "string" && expectedType) {
-            fieldValue = coerceValue(fieldValue, expectedType);
-          }
-
-          data[key] = fieldValue;
-          if (rule && typeof rule.safeParse === "function") {
-            const res = await rule.safeParse(fieldValue);
-            if (!res.success) {
-              const subIssues = res.issues ||
-                res.error?.issues ||
-                res.error?.details || [
-                  {
-                    path: "",
-                    rule: "invalid_type",
-                    message:
-                      res.error?.message ||
-                      `Validation failed for field '${key}'`,
-                    received: Array.isArray(fieldValue)
-                      ? "array"
-                      : typeof fieldValue,
-                    expected: expectedType,
-                  },
-                ];
-
-              for (const sub of subIssues) {
-                issues.push({
-                  path: formatIssuePath(key, sub.path),
-                  rule: sub.rule || sub.code || "invalid_type",
-                  message: sub.message || `Invalid value for '${key}'`,
-                  received:
-                    sub.received !== undefined
-                      ? sub.received
-                      : Array.isArray(fieldValue)
-                        ? "array"
-                        : typeof fieldValue,
-                  expected: sub.expected ?? expectedType,
-                });
-              }
-            } else {
-              data[key] = res.data !== undefined ? res.data : fieldValue;
-            }
-          }
-        }
-
-        // for (const [key, rule] of Object.entries(rules)) {
-        //   let fieldValue = data[key];
-        //   const expectedType = inspectRuleExpectedType(rule);
-
-        //   // 1. Unwrap single-file array if the rule expects a single file
-        //   if (
-        //     Array.isArray(fieldValue) &&
-        //     fieldValue.length === 1 &&
-        //     expectedType !== "array" &&
-        //     isUploadFileLike(fieldValue[0])
-        //   ) {
-        //     fieldValue = fieldValue[0];
-        //   }
-
-        //   // 2. Coerce string types to number/boolean when expected
-        //   if (typeof fieldValue === "string" && expectedType) {
-        //     fieldValue = coerceValue(fieldValue, expectedType);
-        //   }
-
-        //   data[key] = fieldValue;
-
-        // }
-
-        if (issues.length > 0) {
+      // Case 1: Schema has its own validator instance (.safeParse)
+      if (typeof (schemaPart as any).safeParse === "function") {
+        const res = await (schemaPart as any).safeParse(data);
+        if (!res.success) {
+          const rawIssues =
+            res.issues || res.error?.issues || res.error?.details || [];
+          const issues: ValidationIssue[] = rawIssues.map((sub: any) => ({
+            path: formatIssuePath("", sub.path),
+            rule: sub.rule || sub.code || "invalid_type",
+            message: sub.message || "Validation failed",
+            received: sub.received,
+            expected: sub.expected,
+          }));
           return { success: false, issues };
         }
+        return {
+          success: true,
+          data: res.data !== undefined ? res.data : data,
+        };
+      }
 
-        return { success: true, data };
-      },
-    };
-  }
+      // Case 2: Schema is a raw key-value dictionary of rules
+      const rules = schemaPart as Record<string, any>;
+      const issues: ValidationIssue[] = [];
 
-  return null;
+      for (const [key, rule] of Object.entries(rules)) {
+        let fieldValue = data[key];
+        const expectedType = inspectRuleExpectedType(rule);
+
+        if (
+          Array.isArray(fieldValue) &&
+          fieldValue.length === 1 &&
+          expectedType !== "array" &&
+          isUploadFileLike(fieldValue[0])
+        ) {
+          fieldValue = fieldValue[0];
+        }
+
+        if (typeof fieldValue === "string") {
+          fieldValue = coerceValue(fieldValue, expectedType);
+        }
+
+        data[key] = fieldValue;
+
+        if (rule && typeof rule.safeParse === "function") {
+          const res = await rule.safeParse(fieldValue);
+          if (!res.success) {
+            const subIssues = res.issues ||
+              res.error?.issues ||
+              res.error?.details || [
+                {
+                  path: "",
+                  rule: "invalid_type",
+                  message:
+                    res.error?.message ||
+                    `Validation failed for field '${key}'`,
+                  received: Array.isArray(fieldValue)
+                    ? "array"
+                    : typeof fieldValue,
+                  expected: expectedType,
+                },
+              ];
+
+            for (const sub of subIssues) {
+              issues.push({
+                path: formatIssuePath(key, sub.path),
+                rule: sub.rule || sub.code || "invalid_type",
+                message: sub.message || `Invalid value for '${key}'`,
+                received:
+                  sub.received !== undefined
+                    ? sub.received
+                    : Array.isArray(fieldValue)
+                      ? "array"
+                      : typeof fieldValue,
+                expected: sub.expected ?? expectedType,
+              });
+            }
+          } else {
+            data[key] = res.data !== undefined ? res.data : fieldValue;
+          }
+        }
+      }
+
+      if (issues.length > 0) {
+        return { success: false, issues };
+      }
+
+      return { success: true, data };
+    },
+  };
 }
 
 export function buildRequestValidator(schema: IRouteSchema): MiddlewareHandler {
-  const bodyValidator = resolveValidator(schema.body);
-  const queryValidator = resolveValidator(schema.query);
-  const paramsValidator = resolveValidator(schema.params);
-  const headersValidator = resolveValidator(schema.headers);
-  const fileValidator = resolveValidator(schema.file);
-  const filesValidator = resolveValidator(schema.files);
+  // Query, params, and headers are always received as strings over HTTP — autoCoerce = true
+  const queryValidator = resolveValidator(schema.query, true);
+  const paramsValidator = resolveValidator(schema.params, true);
+  const headersValidator = resolveValidator(schema.headers, true);
+  const bodyValidator = resolveValidator(schema.body, true);
+  const fileValidator = resolveValidator(schema.file, false);
+  const filesValidator = resolveValidator(schema.files, false);
 
   return async (req, res, next) => {
     const issues: ValidationIssue[] = [];
 
-    // Merge & normalize multipart parsed files into req.body for unified validation
+    // Merge & normalize multipart parsed files into req.body
     if (req.files && typeof req.files === "object") {
       req.files = normalizeFiles(req.files);
       if (

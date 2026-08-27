@@ -1,38 +1,77 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
-import type WebSocket from "ws";
+import WebSocket from "ws";
 import type {
 	IWebSocketConnection,
 	WebSocketReadyState,
+	WebSocketSendPayload,
 } from "../../types/websocket/IWebSocket.js";
 import type { ConnectionRegistry } from "./services/connectionRegistry.service.js";
 import { TokenBucket } from "./services/rateLimiter.service.js";
 
 /**
- * Thin, safe wrapper around a raw `ws` socket. Never expose the raw socket's
- * send() directly to user handlers — this class adds backpressure checks,
- * JSON convenience, and room bookkeeping on top of it.
+ * High-performance, memory-safe wrapper around raw WebSocket instances.
+ * Enforces backpressure checks, safe serialization, room management,
+ * and strongly-typed params, query, and locals.
  */
-export class WebSocketConnection implements IWebSocketConnection {
-	public readonly id = randomUUID();
-	public locals: Record<string, any> = {};
+export class WebSocketConnection<
+	TParams extends Record<string, string | undefined> = Record<
+		string,
+		string | undefined
+	>,
+	TQuery extends Record<string, string | undefined> = Record<
+		string,
+		string | undefined
+	>,
+	TLocals extends Record<string, any> = Record<string, any>,
+> implements IWebSocketConnection<TParams, TQuery, TLocals>
+{
+	public readonly id: string;
+	public locals: TLocals = {} as TLocals;
 
-	/** @internal heartbeat liveness flag, flipped by pong events */
+	/** @internal Heartbeat liveness flag, flipped on receiving pong responses */
 	public _isAlive = true;
-	/** @internal per-connection inbound rate limiter */
+	/** @internal Token-bucket inbound message rate limiter */
 	public readonly _rateLimiter: TokenBucket;
 
+	public readonly params: TParams;
+	public readonly query: TQuery;
+	public readonly path: string;
+	public readonly ip: string;
+
 	private readonly _rooms = new Set<string>();
+	private readonly backpressureLimit: number;
 
 	constructor(
 		public readonly raw: WebSocket,
 		public readonly request: IncomingMessage,
 		private readonly registry: ConnectionRegistry,
-		maxMessagesPerSecond: number,
+		options: {
+			maxMessagesPerSecond: number;
+			backpressureLimitBytes?: number | undefined;
+			params?: TParams | undefined;
+			query?: TQuery | undefined;
+			path?: string | undefined;
+			id?: string | undefined;
+		},
 	) {
+		this.id = options.id ?? randomUUID();
+		this.params = options.params ?? ({} as TParams);
+		this.query = options.query ?? ({} as TQuery);
+		this.path = options.path ?? request.url ?? "/";
+		this.backpressureLimit = options.backpressureLimitBytes ?? 1_048_576; // 1MB default
+
+		const forwardedFor = request.headers["x-forwarded-for"];
+		const clientIp = Array.isArray(forwardedFor)
+			? forwardedFor[0]
+			: typeof forwardedFor === "string"
+				? forwardedFor.split(",")[0]?.trim()
+				: undefined;
+
+		this.ip = clientIp || request.socket.remoteAddress || "127.0.0.1";
 		this._rateLimiter = new TokenBucket(
-			maxMessagesPerSecond,
-			maxMessagesPerSecond,
+			options.maxMessagesPerSecond,
+			options.maxMessagesPerSecond,
 		);
 	}
 
@@ -44,54 +83,170 @@ export class WebSocketConnection implements IWebSocketConnection {
 		return this.raw.readyState as WebSocketReadyState;
 	}
 
-	public send(data: string | Buffer | object): boolean {
-		if (this.raw.readyState !== this.raw.OPEN) return false;
+	public get bufferedAmount(): number {
+		return this.raw.bufferedAmount;
+	}
 
-		// Backpressure guard — drop rather than let a slow client balloon
-		// process memory. Callers can check the return value if delivery matters.
-		if (this.raw.bufferedAmount > 1_000_000) return false;
+	private preparePayload(
+		data: WebSocketSendPayload,
+	): string | Buffer | Uint8Array | ArrayBuffer | null {
+		if (
+			typeof data === "string" ||
+			Buffer.isBuffer(data) ||
+			data instanceof Uint8Array ||
+			data instanceof ArrayBuffer
+		) {
+			return data;
+		}
 
-		const payload =
-			typeof data === "string" || Buffer.isBuffer(data)
-				? data
-				: JSON.stringify(data);
+		try {
+			return JSON.stringify(data);
+		} catch (err) {
+			console.error(
+				`[Subatom WS] Failed to serialize JSON payload for connection ${this.id}:`,
+				(err as Error).message,
+			);
+			return null;
+		}
+	}
 
-		this.raw.send(payload, (err) => {
-			if (err) {
-				console.error(
-					`[Subatom WS] Send failed for connection ${this.id}:`,
-					err.message,
-				);
+	public send(data: WebSocketSendPayload): boolean {
+		if (this.raw.readyState !== WebSocket.OPEN) {
+			return false;
+		}
+
+		if (this.raw.bufferedAmount > this.backpressureLimit) {
+			return false;
+		}
+
+		const payload = this.preparePayload(data);
+		if (payload === null) {
+			return false;
+		}
+
+		try {
+			this.raw.send(payload, (err) => {
+				if (err) {
+					console.error(
+						`[Subatom WS] Send failed for connection ${this.id}:`,
+						err.message,
+					);
+				}
+			});
+			return true;
+		} catch (err) {
+			console.error(
+				`[Subatom WS] Send threw exception for connection ${this.id}:`,
+				(err as Error).message,
+			);
+			return false;
+		}
+	}
+
+	public sendAsync(data: WebSocketSendPayload): Promise<void> {
+		return new Promise<void>((resolve, reject) => {
+			if (this.raw.readyState !== WebSocket.OPEN) {
+				return reject(new Error("WebSocket is not open"));
+			}
+
+			if (this.raw.bufferedAmount > this.backpressureLimit) {
+				return reject(new Error("Backpressure limit exceeded"));
+			}
+
+			const payload = this.preparePayload(data);
+			if (payload === null) {
+				return reject(new Error("Failed to serialize payload"));
+			}
+
+			try {
+				this.raw.send(payload, (err) => {
+					if (err) return reject(err);
+					resolve();
+				});
+			} catch (err) {
+				reject(err);
 			}
 		});
-		return true;
+	}
+
+	public sendJson(data: unknown): boolean {
+		return this.send(data as WebSocketSendPayload);
+	}
+
+	public sendJsonAsync(data: unknown): Promise<void> {
+		return this.sendAsync(data as WebSocketSendPayload);
 	}
 
 	public join(room: string): void {
+		if (!room || typeof room !== "string") return;
 		this._rooms.add(room);
 		this.registry.joinRoom(room, this);
 	}
 
 	public leave(room: string): void {
+		if (!room || typeof room !== "string") return;
 		this._rooms.delete(room);
 		this.registry.leaveRoom(room, this);
 	}
 
-	public broadcast(room: string, data: string | Buffer | object): void {
-		for (const member of this.registry.getRoom(room)) {
-			if (member.id !== this.id) member.send(data);
+	public leaveAll(): void {
+		for (const room of Array.from(this._rooms)) {
+			this.leave(room);
+		}
+	}
+
+	public broadcast(
+		room: string,
+		data: WebSocketSendPayload,
+		excludeSelf = false,
+	): void {
+		const members = this.registry.getRoom(room);
+		for (const member of members.values()) {
+			if (excludeSelf && member.id === this.id) continue;
+			if (member.readyState === 1 /* WebSocket.OPEN */) {
+				member.send(data);
+			}
+		}
+	}
+
+	public ping(data?: any): void {
+		if (this.raw.readyState === WebSocket.OPEN) {
+			try {
+				this.raw.ping(data);
+			} catch {
+				this.terminate();
+			}
+		}
+	}
+
+	public pong(data?: any): void {
+		if (this.raw.readyState === WebSocket.OPEN) {
+			try {
+				this.raw.pong(data);
+			} catch {
+				this.terminate();
+			}
 		}
 	}
 
 	public close(code = 1000, reason = ""): void {
 		try {
-			this.raw.close(code, reason);
+			if (
+				this.raw.readyState === WebSocket.CONNECTING ||
+				this.raw.readyState === WebSocket.OPEN
+			) {
+				this.raw.close(code, reason);
+			}
 		} catch {
-			this.raw.terminate();
+			this.terminate();
 		}
 	}
 
 	public terminate(): void {
-		this.raw.terminate();
+		try {
+			this.raw.terminate();
+		} catch {
+			// Ignore termination errors if already destroyed
+		}
 	}
 }
