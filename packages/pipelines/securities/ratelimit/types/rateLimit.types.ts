@@ -1,5 +1,13 @@
-import type { IRequest } from "../../../core/http/request/types/request.types.js";
-import type { IResponse } from "../../../core/http/response/types/response.types.js";
+/**
+ * @fileoverview Type provider of rate limiting middleware.
+ * @author Kunal Chandra Das <kunal@subatomjs.dev>
+ * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
+ * @license MIT
+ */
+
+
+import type { IRequest } from "../../../../core/http/request/types/request.types.js";
+import type { IResponse } from "../../../../core/http/response/types/response.types.js";
 
 export type AlgorithmType = "fixed-window" | "sliding-window" | "token-bucket";
 

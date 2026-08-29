@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Implements an in-memory rate-limit store supporting fixed-window, 
+ * sliding-window, and token-bucket algorithms with automatic cache cleanup.
+ * @author Kunal Chandra Das <kunal@subatomjs.dev>
+ * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
+ * @license MIT
+ */
+
+
 import type {
 	MemoryStoreEntry,
 	RateLimitStore,

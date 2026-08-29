@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Export hub of rate limiting middleware.
+ * @author Kunal Chandra Das <kunal@subatomjs.dev>
+ * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
+ * @license MIT
+ */
+
+
+
+
 // 1. Export all types
 export type {
 	AlgorithmType,

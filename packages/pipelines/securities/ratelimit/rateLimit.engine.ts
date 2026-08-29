@@ -1,4 +1,13 @@
-import type { IRequest } from "../../core/http/request/types/request.types.js";
+/**
+ * @fileoverview Manages rate-limit policies, selects storage backends, 
+ * evaluates each policy, and returns the strictest request decision.
+ * @author Kunal Chandra Das <kunal@subatomjs.dev>
+ * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
+ * @license MIT
+ */
+
+
+import type { IRequest } from "../../../core/http/request/types/request.types.js";
 import { resolveKey } from "./resolveKey.js";
 import { MemoryStore } from "./stores/MemoryStore.js";
 import { RedisStore } from "./stores/RedisStore.js";

@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Normalizes CORS headers and resolves whether a request origin 
+ * is allowed via strings, regex, arrays, booleans, or callback functions.
+ * @author Kunal Chandra Das <kunal@subatomjs.dev>
+ * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
+ * @license MIT
+ */
+
+
 import type { CorsOrigin } from "./types/cors.types.js";
 
 type CorsOriginCallback = (err: Error | null, allow?: boolean) => void;

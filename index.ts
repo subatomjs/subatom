@@ -36,18 +36,18 @@ export * from "./packages/core/http/response/types/response.types.js";
 // 11. Export all types of streams.
 
 export type {
-	FileStreamOptions,
-	SendFileOptions,
-	TypeDataListener,
-	TypeEndListener,
-	IPipeOptions,
-	TypeResEndCallback,
-	TypeResWriteCallback,
-	ISendStreamOptions,
-	IStreamOptions,
-	IPipeStreamOptions,
-	TypeTransformFunction,
-	StreamResponseOptions,
+  FileStreamOptions,
+  SendFileOptions,
+  TypeDataListener,
+  TypeEndListener,
+  IPipeOptions,
+  TypeResEndCallback,
+  TypeResWriteCallback,
+  ISendStreamOptions,
+  IStreamOptions,
+  IPipeStreamOptions,
+  TypeTransformFunction,
+  StreamResponseOptions,
 } from "./packages/core/http/streams/types/stream.methods.types.js";
 export * from "./packages/core/http/streams/types/stream.types.js";
 
@@ -61,43 +61,43 @@ export { uuid } from "./packages/methods/uuid.js";
 
 // Export all types & interfaces.
 export type {
-	SlugOptions,
-	HashAlgorithm,
-	HashEncoding,
-	HashOptions,
-	HashPasswordOptions,
-	RandomFn,
+  SlugOptions,
+  HashAlgorithm,
+  HashEncoding,
+  HashOptions,
+  HashPasswordOptions,
+  RandomFn,
 } from "./packages/methods/types/methods.types.js";
 
 // 13. Export all from pipeline/files
 export * from "./packages/pipelines/files/FileUpload.js";
 import {
-	single,
-	array,
-	fields,
-	anyFiles,
-	none,
+  single,
+  array,
+  fields,
+  anyFiles,
+  none,
 } from "./packages/pipelines/files/fileUploadPipeline.js";
 export const file = { single, array, fields, anyFiles, none };
 export * from "./packages/pipelines/files/parseMultipart.js";
 
 export type {
-	FileUploadOptions,
-	IFileUpload,
-	FilesMap,
-	StorageStrategy,
-	FileParserConfig,
-	FileUploadPipelineOptions,
-	RequestFiles,
-	IFrameworkRequest,
-	Middleware,
-	ParseResult,
-	Destroyable,
-	FileConfigMeta,
-	DocumentedMiddleware,
-	ResponseTarget,
-	RequestTarget,
-	ErrorHandlerResponse,
+  FileUploadOptions,
+  IFileUpload,
+  FilesMap,
+  StorageStrategy,
+  FileParserConfig,
+  FileUploadPipelineOptions,
+  RequestFiles,
+  IFrameworkRequest,
+  Middleware,
+  ParseResult,
+  Destroyable,
+  FileConfigMeta,
+  DocumentedMiddleware,
+  ResponseTarget,
+  RequestTarget,
+  ErrorHandlerResponse,
 } from "./packages/pipelines/files/types/files.types.js";
 
 // 14. Export all from pipeline/middlewares
@@ -141,7 +141,7 @@ export * from "./packages/validations/SchemaValidator.js";
 export * from "./packages/validations/types/validator.types.js";
 
 // 21. Export important from security/cors.
-export * from "./packages/securities/cors/index.js";
+export * from "./packages/pipelines/securities/cors/index.js";
 
 // 22. Export all from rate limiting.
-export * from "./packages/securities/ratelimit/index.js";
+export * from "./packages/pipelines/securities/ratelimit/index.js";

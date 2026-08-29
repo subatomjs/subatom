@@ -1,12 +1,22 @@
+/**
+ * @fileoverview Implements configurable CORS middleware, handling origins, 
+ * credentials, headers, exposed headers, preflight requests, max-age, and OPTIONS responses.
+ * @author Kunal Chandra Das <kunal@subatomjs.dev>
+ * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
+ * @license MIT
+ */
+
+
+
 import type {
 	CorsMiddleware,
 	FallbackRequest,
 	ICorsOptions,
 } from "./types/cors.types.js";
 import { normalizeHeaderValue, resolveOrigin } from "./cors.utils.js";
-import type { IRequest } from "../../core/http/request/types/request.types.js";
-import type { IResponse } from "../../core/http/response/types/response.types.js";
-import type { NextFunction } from "../../pipelines/next/types/nextFunction.types.js";
+import type { IRequest } from "../../../core/http/request/types/request.types.js";
+import type { IResponse } from "../../../core/http/response/types/response.types.js";
+import type { NextFunction } from "../../../pipelines/next/types/nextFunction.types.js";
 
 const DEFAULT_OPTIONS: ICorsOptions = {
 	origin: "*",
