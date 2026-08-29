@@ -1,3 +1,11 @@
+/**
+ * @fileoverview Error handlers export hub.
+ * @author Kunal Chandra Das <kunal@subatomjs.dev>
+ * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
+ * @license MIT
+ */
+
+
 export * from "./ErrorFormatter.js";
 export * from "./Errors.js";
 export * from "./fileUploadErrHandler.js";

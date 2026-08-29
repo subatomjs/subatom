@@ -145,3 +145,6 @@ export * from "./packages/pipelines/securities/cors/index.js";
 
 // 22. Export all from rate limiting.
 export * from "./packages/pipelines/securities/ratelimit/index.js";
+
+// 23. Export all from security
+export * from "./packages/security/index.export.js";
