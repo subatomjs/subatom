@@ -9,11 +9,6 @@
 		"types": ["node"],
 
 		"rootDir": "./",
-		"outDir": "./dist",
-
-		"declaration": true,
-		"declarationMap": true,
-		"sourceMap": true,
 
 		"strict": true,
 		"noImplicitAny": true,
@@ -31,13 +26,22 @@
 
 		"skipLibCheck": true,
 
-		"removeComments": true,
-		"noEmitOnError": true,
-
-		"incremental": false
+		"noEmit": true
 	},
 
-	"include": ["index.ts", "package/**/*.ts"],
+	"include": ["index.ts", "**/*.ts"],
 
-	"exclude": ["dist", "node_modules", "playground", "tests"]
+	"exclude": [
+		"dist",
+		"build",
+		"node_modules",
+		"playground",
+		"playgrounds",
+		"tests",
+		"test",
+		"examples",
+		"example",
+		"samples",
+		"sample"
+	]
 }

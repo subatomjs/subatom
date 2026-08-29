@@ -8,7 +8,19 @@
 		"sourceMap": false
 	},
 
-	"include": ["index.ts", "package/**/*.ts"],
+	"include": ["index.ts", "./**/*.ts", "package/**/*.ts"],
 
-	"exclude": ["playground", "tests", "dist", "node_modules"]
+	"exclude": [
+		"playground",
+		"playgrounds",
+		"test",
+		"tests",
+		"dist",
+		"build",
+		"node_modules",
+		"sample",
+		"samples",
+		"example",
+		"examples"
+	]
 }

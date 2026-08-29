@@ -9,14 +9,14 @@ npm install subatom
 ## Example
 
 ```ts
-import { App } from "subatom";
+import { Subatom } from "subatom";
 
-const app = new App();
+const server = new Subatom();
 
 app.get("/", (req, res) => {
   res.send("Hello World");
 });
 
-app.listen(3000);
+app.listen(8080);
 
 ## NOTE: Currently in development phase.
