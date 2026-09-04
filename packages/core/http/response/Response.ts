@@ -199,8 +199,11 @@ export class Response implements IResponse {
 		resEnd(this.raw, chunk, encoding, callback);
 	}
 
-	public stream(readableStream: Readable, options?: IStreamOptions): void {
-		resStream(this.raw, readableStream, options);
+	public stream(
+		readableStream: Readable,
+		options?: IStreamOptions,
+	): Promise<void> {
+		return resStream(this.raw, readableStream, options);
 	}
 
 	public sendStream(

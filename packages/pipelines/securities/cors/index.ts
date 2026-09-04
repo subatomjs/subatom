@@ -5,7 +5,6 @@
  * @license MIT
  */
 
-
 export type {
 	AsyncOriginFunction,
 	CorsMiddleware,

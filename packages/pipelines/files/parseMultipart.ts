@@ -9,9 +9,8 @@
  * parseMultipart is an asynchronous multipart/form-data parsing engine built on Busboy
  * that extracts form fields and processes file uploads into memory buffers
  * or disk storage based on configuration. It enforces MIME type and size limits during streaming,
- * prevents connection hangs by properly unpiping and draining incoming streams on
- * validation or network errors, and tracks active file descriptors and temporary paths
- * to guarantee immediate cleanup and resource reclamation upon abort.
+ * resolves accurate MIME types for generic application/octet-stream uploads, coerces primitive
+ * multipart form fields, and prevents connection hangs by properly unpiping and draining incoming streams.
  */
 
 import crypto from "node:crypto";
@@ -32,6 +31,143 @@ import {
 	UnprocessableEntityError,
 } from "../../errors/Errors.js";
 import { FileUpload } from "./FileUpload.js";
+
+const EXTENSION_TO_MIME: Record<string, string> = {
+	svg: "image/svg+xml",
+	png: "image/png",
+	jpg: "image/jpeg",
+	jpeg: "image/jpeg",
+	webp: "image/webp",
+	gif: "image/gif",
+	bmp: "image/bmp",
+	ico: "image/x-icon",
+	tiff: "image/tiff",
+	tif: "image/tiff",
+	avif: "image/avif",
+	pdf: "application/pdf",
+	json: "application/json",
+	txt: "text/plain",
+	csv: "text/csv",
+	xml: "application/xml",
+	zip: "application/zip",
+	tar: "application/x-tar",
+	gz: "application/gzip",
+	mp3: "audio/mpeg",
+	wav: "audio/wav",
+	mp4: "video/mp4",
+	webm: "video/webm",
+};
+
+/**
+ * Resolves the true MIME type, falling back to extension-based lookup
+ * if the client sent generic "application/octet-stream" or an empty string.
+ */
+function resolveMimeType(rawMime: string, filename: string): string {
+	const normalized = (rawMime || "").trim().toLowerCase();
+	const ext = path.extname(filename).toLowerCase().replace(/^\./, "");
+	const mapped = EXTENSION_TO_MIME[ext];
+
+	if (
+		(!normalized ||
+			normalized === "application/octet-stream" ||
+			normalized === "binary/octet-stream") &&
+		mapped
+	) {
+		return mapped;
+	}
+
+	if (normalized === "image/svg") {
+		return "image/svg+xml";
+	}
+
+	return normalized || mapped || "application/octet-stream";
+}
+
+/**
+ * Matches a detected MIME type against allowed MIME rules, supporting wildcards (e.g. "image/*", "*\/*")
+ * and fallback resolution based on file extensions.
+ */
+function isMimeAllowed(
+	resolvedMime: string,
+	filename: string,
+	allowedTypes: string[],
+): boolean {
+	const targetMime = resolveMimeType(resolvedMime, filename);
+	const ext = path.extname(filename).toLowerCase().replace(/^\./, "");
+
+	for (const rule of allowedTypes) {
+		const target = rule.trim().toLowerCase();
+
+		if (target === "*/*" || target === "*") {
+			return true;
+		}
+
+		if (target.endsWith("/*")) {
+			const prefix = target.slice(0, -1);
+			if (targetMime.startsWith(prefix)) {
+				return true;
+			}
+			continue;
+		}
+
+		if (targetMime === target) {
+			return true;
+		}
+
+		// SVG aliasing support
+		if (
+			(target === "image/svg" || target === "image/svg+xml") &&
+			(targetMime === "image/svg" || targetMime === "image/svg+xml")
+		) {
+			return true;
+		}
+
+		// File extension match
+		if (target.replace(/^\./, "") === ext) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Coerces multipart string values into primitives (numbers, booleans, JSON objects/arrays).
+ */
+function coerceFieldValue(value: string): unknown {
+	const trimmed = value.trim();
+
+	if (trimmed === "true") return true;
+	if (trimmed === "false") return false;
+	if (trimmed === "null") return null;
+
+	if (
+		/^-?\d+(\.\d+)?$/.test(trimmed) &&
+		!(
+			trimmed.length > 1 &&
+			trimmed.startsWith("0") &&
+			!trimmed.startsWith("0.")
+		)
+	) {
+		const num = Number(trimmed);
+		if (Number.isFinite(num)) {
+			return num;
+		}
+	}
+
+	if (
+		(trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+		(trimmed.startsWith("[") && trimmed.endsWith("]"))
+	) {
+		try {
+			return JSON.parse(trimmed);
+		} catch {
+			return value;
+		}
+	}
+
+	return value;
+}
 
 export function parseMultipart(
 	stream: Readable,
@@ -71,14 +207,10 @@ export function parseMultipart(
 		const body: Record<string, unknown> = {};
 		const files: Record<string, FileUpload[]> = Object.create(null);
 		const pendingWrites: Promise<FileUpload | null>[] = [];
-		const tempFilePaths: string[] = []; // Track created temp files
-		// track every open write/read handle so we can force-close the
-		// the instant we abort, instead of leaving them dangling once the
-		// upstream request stream is unpiped.
+		const tempFilePaths: string[] = [];
 		const activeHandles: Set<Destroyable> = new Set();
 		let isFinishedOrAborted = false;
 
-		// Purge written temp files if an error occurs
 		const cleanupTempFiles = async () => {
 			await Promise.all(
 				tempFilePaths.map((filePath) =>
@@ -87,31 +219,22 @@ export function parseMultipart(
 			);
 		};
 
-		// Safe Abort Function: Unpipes and drains streams WITHOUT destroying busboy
 		const abortParsing = (err: Error) => {
 			if (isFinishedOrAborted) return;
 			isFinishedOrAborted = true;
 
 			try {
-				// Unpipe incoming HTTP request from busboy
 				stream.unpipe(bb);
-				// Resume incoming streams to consume remaining bytes without hanging TCP socket
 				stream.resume();
 			} catch {
 				// Ignore unpipe errors
 			}
 
-			// force-close every in-flight file stream / write stream.
-			// Without this, any file that was already being written when the
-			// bad part arrived never gets a 'finish'/'end' event (because we
-			// just cut off its data supply above), leaking open file
-			// descriptors on every rejected upload until the process runs out
-			// of them.
 			for (const handle of activeHandles) {
 				try {
 					handle.destroy(err);
 				} catch {
-					// ignore - best effort teardown
+					// Ignore teardown errors
 				}
 			}
 			activeHandles.clear();
@@ -123,36 +246,43 @@ export function parseMultipart(
 
 		// 3. Handle Text Fields
 		bb.on("field", (fieldname, val) => {
-			if (isFinishedOrAborted) return; // NEW: stop processing after abort
-			body[fieldname] = val;
+			if (isFinishedOrAborted) return;
+			const parsedVal = coerceFieldValue(val);
+
+			if (fieldname in body) {
+				const current = body[fieldname];
+				if (Array.isArray(current)) {
+					current.push(parsedVal);
+				} else {
+					body[fieldname] = [current, parsedVal];
+				}
+			} else {
+				body[fieldname] = parsedVal;
+			}
 		});
 
 		// 4. Handle Incoming Files
 		bb.on("file", (fieldname, fileStream, info) => {
-			// if we've already aborted (e.g. an earlier part in this same
-			// request failed validation), don't touch disk/memory for any
-			// further parts. Busboy can have already-buffered events queued
-			// up before unpipe() takes effect, so this guard has to be the
-			// very first thing in the handler.
 			if (isFinishedOrAborted) {
-				fileStream.resume(); // drain so busboy doesn't stall internally
+				fileStream.resume();
 				return;
 			}
 
 			const { filename, encoding, mimeType } = info;
 
-			// If user submitted an empty file input field
 			if (!filename) {
 				fileStream.resume();
 				return;
 			}
 
-			// MIME Type Validation
+			// Infer exact MIME type if client passed application/octet-stream
+			const effectiveMime = resolveMimeType(mimeType, filename);
+
+			// MIME Type Validation against configured middleware constraints
 			if (
 				config.allowedMimeTypes?.length &&
-				!config.allowedMimeTypes.includes(mimeType)
+				!isMimeAllowed(effectiveMime, filename, config.allowedMimeTypes)
 			) {
-				// Resume file stream so busboy keeps flowing, then safely abort
 				fileStream.resume();
 				return abortParsing(
 					new UnprocessableEntityError(
@@ -192,7 +322,7 @@ export function parseMultipart(
 							new FileUpload({
 								filename,
 								encoding,
-								mimetype: mimeType,
+								mimetype: effectiveMime,
 								storageType: "memory",
 								size: buffer.length,
 								buffer,
@@ -259,7 +389,7 @@ export function parseMultipart(
 							new FileUpload({
 								filename,
 								encoding,
-								mimetype: mimeType,
+								mimetype: effectiveMime,
 								storageType: "disk",
 								path: savePath,
 								size: outStream.bytesWritten,
@@ -321,7 +451,6 @@ export function parseMultipart(
 		);
 
 		bb.on("error", (err: Error) => {
-			// Ignore busboy internal teardown errors if we already triggered an abort
 			if (!isFinishedOrAborted) {
 				abortParsing(
 					new BadRequestError(`Multipart parsing error: ${err.message}`),
@@ -329,10 +458,6 @@ export function parseMultipart(
 			}
 		});
 
-		// if the underlying request itself dies mid-upload (client
-		// disconnect, proxy timeout, etc.) we must abort the same way, or
-		// pendingWrites will simply hang forever since bb's 'finish' event
-		// will never fire and nothing will ever settle the outer promise.
 		stream.on("aborted", () => {
 			abortParsing(new BadRequestError("Client aborted the upload"));
 		});
@@ -354,7 +479,6 @@ export function parseMultipart(
 			}
 		});
 
-		// Pipe HTTP stream into busboy
 		stream.pipe(bb);
 	});
 }

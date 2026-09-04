@@ -1,6 +1,7 @@
 /**
  * @fileoverview The file defines utilities for extracting validated file-upload metadata
- *  from handlers, primarily for generating accurate OpenAPI documentation.
+ * from handlers, primarily for generating accurate OpenAPI documentation adhering strictly
+ * to subatom-infer and FastAPI OpenAPI 3.1 specifications.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -20,46 +21,155 @@ import type {
 	SchemaRegistry,
 } from "./types/openapi.types.js";
 
+const VALID_OPENAPI_METHODS = new Set([
+	"get",
+	"post",
+	"put",
+	"patch",
+	"delete",
+	"options",
+	"head",
+	"trace",
+]);
+
+const ALL_METHOD_EXPANSIONS = ["get", "post", "put", "patch", "delete"];
+
+export function isMultipleFilesRule(rule: unknown): boolean {
+	if (!rule || typeof rule !== "object") return false;
+	const r = rule as Record<string, unknown>;
+	const def = r._def as Record<string, unknown> | undefined;
+
+	if (
+		r.multiple === true ||
+		def?.multiple === true ||
+		r._isFiles === true ||
+		def?._isFiles === true
+	) {
+		return true;
+	}
+
+	if (
+		r.multiple === false ||
+		def?.multiple === false ||
+		r._isFile === true ||
+		def?._isFile === true
+	) {
+		return false;
+	}
+
+	if (
+		typeof r.minEach === "function" ||
+		typeof r.maxEach === "function" ||
+		typeof def?.minEach === "function" ||
+		typeof def?.maxEach === "function"
+	) {
+		return true;
+	}
+
+	const typeStr = String(
+		r.type ?? r._type ?? def?.type ?? def?.typeName ?? r.typeName ?? "",
+	).toLowerCase();
+
+	if (typeStr === "files" || typeStr.endsWith(".files")) {
+		return true;
+	}
+
+	return false;
+}
+
+export function isSingleFileRule(rule: unknown): boolean {
+	if (!rule || typeof rule !== "object") return false;
+	if (isMultipleFilesRule(rule)) return false;
+
+	const r = rule as Record<string, unknown>;
+	const def = r._def as Record<string, unknown> | undefined;
+
+	if (r._isFile === true || def?._isFile === true) return true;
+
+	const typeStr = String(
+		r.type ?? r._type ?? def?.type ?? def?.typeName ?? r.typeName ?? "",
+	).toLowerCase();
+
+	if (typeStr === "file" || typeStr.endsWith(".file")) return true;
+
+	const inner = def?.innerType ?? def?.schema ?? r.innerType ?? r.schema;
+	if (inner && inner !== rule) {
+		return isSingleFileRule(inner);
+	}
+
+	return (
+		typeof r.mime === "function" &&
+		typeof r.extension === "function" &&
+		typeof r.minEach !== "function"
+	);
+}
+
 function unwrapSchema(schema: unknown): {
 	unwrapped: unknown;
 	isOptional: boolean;
+	isSingleFile: boolean;
+	isArrayFiles: boolean;
 } {
 	let current: unknown = schema;
 	let isOptional = false;
+	let isSingleFile = false;
+	let isArrayFiles = false;
 
 	while (current && typeof current === "object") {
-		const obj = current as SchemaLike;
+		const obj = current as SchemaLike & Record<string, unknown>;
+		const def = obj._def as Record<string, unknown> | undefined;
+
+		if (isMultipleFilesRule(current)) {
+			isArrayFiles = true;
+			isSingleFile = false;
+		} else if (isSingleFileRule(current)) {
+			isSingleFile = true;
+			isArrayFiles = false;
+		}
+
 		if (
 			obj.isOptional === true ||
-			obj._def?.typeName === "ZodOptional" ||
-			obj._def?.typeName === "ZodNullable" ||
-			obj._def?.typeName === "ZodDefault" ||
-			obj.isNullable === true
+			obj._optional === true ||
+			obj.optional === true ||
+			obj.isNullable === true ||
+			def?.isOptional === true ||
+			def?.optional === true ||
+			def?.typeName === "ZodOptional" ||
+			def?.typeName === "ZodNullable" ||
+			def?.typeName === "ZodDefault" ||
+			def?.type === "optional"
 		) {
 			isOptional = true;
 		}
 
 		const inner =
-			obj._def?.innerType ??
-			obj._def?.schema ??
-			obj.innerType ??
-			obj.schema ??
-			obj._def?.type;
+			def?.innerType ?? def?.schema ?? obj.innerType ?? obj.schema ?? def?.type;
 
-		if (inner && inner !== current) {
+		if (inner && inner !== current && typeof inner === "object") {
 			current = inner;
 		} else {
 			break;
 		}
 	}
 
-	return { unwrapped: current, isOptional };
+	return { unwrapped: current, isOptional, isSingleFile, isArrayFiles };
 }
 
 function isOptionalSchema(schema: unknown): boolean {
 	if (!schema || typeof schema !== "object") return false;
 	const { isOptional } = unwrapSchema(schema);
-	return isOptional || (schema as { isOptional?: unknown }).isOptional === true;
+	const raw = schema as Record<string, unknown>;
+	const def = raw._def as Record<string, unknown> | undefined;
+
+	return (
+		isOptional ||
+		raw.isOptional === true ||
+		raw._optional === true ||
+		raw.optional === true ||
+		def?.isOptional === true ||
+		def?.optional === true ||
+		def?.type === "optional"
+	);
 }
 
 function normalizeSchemaName(name: string): string {
@@ -98,15 +208,19 @@ function getSchemaName(schema: unknown): string | undefined {
 	if (!schema || typeof schema !== "object") return undefined;
 
 	const s = schema as SchemaLike;
+	const def = (s as Record<string, unknown>)._def as
+		| Record<string, unknown>
+		| undefined;
+
 	const candidates = [
 		s.title,
 		s.name,
 		s.schemaName,
 		s.typeName,
 		s._typeName,
-		s._def?.title,
-		s._def?.name,
-		s._def?.typeName,
+		def?.title as string | undefined,
+		def?.name as string | undefined,
+		def?.typeName as string | undefined,
 		s.constructor?.name,
 	];
 
@@ -148,7 +262,7 @@ export function convertInferSchema(
 	if (rawSchema === undefined || rawSchema === null) return undefined;
 	if (isOpenApiSchema(rawSchema)) return { ...rawSchema };
 
-	const { unwrapped } = unwrapSchema(rawSchema);
+	const { unwrapped, isSingleFile, isArrayFiles } = unwrapSchema(rawSchema);
 
 	if (typeof unwrapped !== "object" && typeof unwrapped !== "function") {
 		return undefined;
@@ -159,9 +273,27 @@ export function convertInferSchema(
 		seen.add(unwrapped);
 	}
 
+	if (isArrayFiles || isMultipleFilesRule(unwrapped)) {
+		return {
+			type: "array",
+			items: {
+				type: "string",
+				format: "binary",
+			},
+			description: "Files upload",
+		};
+	}
+
+	if (isSingleFile || isSingleFileRule(unwrapped)) {
+		return {
+			type: "string",
+			format: "binary",
+			description: "File upload",
+		};
+	}
+
 	const schema = unwrapped as SchemaLike;
 
-	// Handle plain key-value rule dictionaries
 	if (
 		typeof schema === "object" &&
 		!Array.isArray(schema) &&
@@ -190,21 +322,20 @@ export function convertInferSchema(
 		return result;
 	}
 
-	const jsonSchema: OpenApiSchema = { type: "string" };
+	const def = (schema as Record<string, unknown>)?._def as
+		| Record<string, unknown>
+		| undefined;
 
 	const typeIndicator = String(
 		schema?.type ??
 			schema?._type ??
 			schema?.typeName ??
-			schema?._def?.typeName ??
-			schema?.name ??
-			schema?.constructor?.name ??
+			def?.typeName ??
+			def?.type ??
 			"",
 	).toLowerCase();
 
-	if (typeIndicator.includes("file") || typeIndicator.includes("upload")) {
-		return { type: "string", format: "binary" };
-	}
+	const jsonSchema: OpenApiSchema = { type: "string" };
 
 	if (typeIndicator.includes("integer") || typeIndicator.includes("int")) {
 		jsonSchema.type = "integer";
@@ -232,7 +363,7 @@ export function convertInferSchema(
 		schema?.properties
 	) {
 		jsonSchema.type = "object";
-		const shape = schema?.shape ?? schema?.properties ?? schema?._def?.shape;
+		const shape = schema?.shape ?? schema?.properties ?? def?.shape;
 		if (shape) {
 			const resolvedShape =
 				typeof shape === "function"
@@ -266,10 +397,7 @@ export function convertInferSchema(
 	}
 
 	const enumValues =
-		schema?.enumValues ??
-		schema?.options ??
-		schema?._options ??
-		schema?._def?.values;
+		schema?.enumValues ?? schema?.options ?? schema?._options ?? def?.values;
 
 	if (Array.isArray(enumValues)) {
 		jsonSchema.enum = [...enumValues];
@@ -349,19 +477,33 @@ function createMultipartSchema(
 
 	if (schemaFiles && typeof schemaFiles === "object") {
 		for (const [key, rule] of Object.entries(schemaFiles)) {
-			properties[key] = {
-				type: "string",
-				format: "binary",
-				description: "File upload",
-			};
+			if (isMultipleFilesRule(rule)) {
+				properties[key] = {
+					type: "array",
+					items: { type: "string", format: "binary" },
+					description: "Files upload",
+				};
+			} else {
+				properties[key] = {
+					type: "string",
+					format: "binary",
+					description: "File upload",
+				};
+			}
+
 			if (!isOptionalSchema(rule)) {
 				required.push(key);
+			} else {
+				const idx = required.indexOf(key);
+				if (idx !== -1) required.splice(idx, 1);
 			}
 		}
 	}
 
 	if (fileUploadInfo) {
 		const fileType = fileUploadInfo.type ?? "single";
+		const fieldName = fileUploadInfo.fieldname ?? "file";
+
 		if (fileType === "fields" && Array.isArray(fileUploadInfo.fields)) {
 			for (const field of fileUploadInfo.fields) {
 				if (!field?.name) continue;
@@ -378,21 +520,22 @@ function createMultipartSchema(
 						description: "File upload",
 					};
 				}
+				required.push(field.name);
 			}
 		} else if (fileType === "array") {
-			const fieldName = fileUploadInfo.fieldname ?? "file";
 			properties[fieldName] = {
 				type: "array",
 				items: { type: "string", format: "binary" },
 				description: "Array of files",
 			};
-		} else {
-			const fieldName = fileUploadInfo.fieldname ?? "file";
+			required.push(fieldName);
+		} else if (fileType === "single") {
 			properties[fieldName] = {
 				type: "string",
 				format: "binary",
 				description: "File upload",
 			};
+			required.push(fieldName);
 		}
 	}
 
@@ -433,58 +576,73 @@ export function generateOpenApiSpec(
 		const docsPath = options?.path ?? "/docs";
 		if (route.path === "/openapi.json" || route.path === docsPath) continue;
 
-		const openApiPath = route.path.replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
+		const optionalParamNames = new Set<string>();
+		const matches = route.path.matchAll(/:([a-zA-Z0-9_]+)\?/g);
+		for (const match of matches) {
+			const param = match[1];
+			if (typeof param === "string" && param.length > 0) {
+				optionalParamNames.add(param);
+			}
+		}
+
+		const openApiPath = route.path
+			.replace(/:([a-zA-Z0-9_]+)\?/g, "{$1}")
+			.replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
+
 		if (!spec.paths[openApiPath]) {
 			spec.paths[openApiPath] = {};
 		}
 
-		const httpMethod = route.method.toLowerCase();
 		const routeSchema = (route.schema ?? {}) as RouteSchemaDescriptor;
 
 		const paramsSchema = convertInferSchema(routeSchema.params);
 		const querySchema = convertInferSchema(routeSchema.query);
+		const headersSchema = convertInferSchema(routeSchema.headers);
 		const bodySchema = convertInferSchema(routeSchema.body);
 
 		let fileUploadInfo: FileMetadata | null = null;
-		if (Array.isArray(route.handlers)) {
-			for (const handler of route.handlers) {
-				const metadata = extractFileMetadata(handler);
-				if (metadata) {
-					fileUploadInfo = metadata;
-					break;
-				}
+
+		const routeRecord = route as unknown as Record<string, unknown>;
+		const candidateHandlers: unknown[] = [
+			...(Array.isArray(routeRecord.middleware)
+				? (routeRecord.middleware as unknown[])
+				: []),
+			...(Array.isArray(route.handlers) ? route.handlers : []),
+			...(routeRecord.controller ? [routeRecord.controller] : []),
+		];
+
+		for (const handler of candidateHandlers) {
+			const metadata = extractFileMetadata(handler);
+			if (metadata) {
+				fileUploadInfo = metadata;
+				break;
+			}
+		}
+
+		for (const handler of candidateHandlers) {
+			const metadata = extractFileMetadata(handler);
+			if (metadata) {
+				fileUploadInfo = metadata;
+				break;
 			}
 		}
 
 		const parameters: OpenApiParameter[] = [];
 
-		const operation: OpenApiOperation = {
-			summary: route.name ?? `${route.method} ${route.path}`,
-			tags: route.tags && route.tags.length > 0 ? [...route.tags] : ["default"],
-			parameters,
-			responses: {
-				200: {
-					description: "Successful operation",
-					content: {
-						"application/json": {
-							schema: {},
-						},
-					},
-				},
-				400: {
-					description: "Validation / File error",
-				},
-			},
-		};
-
 		if (paramsSchema?.properties) {
 			for (const [name, propSchema] of Object.entries(
 				paramsSchema.properties,
 			)) {
+				const isOptional =
+					optionalParamNames.has(name) ||
+					isOptionalSchema(
+						(routeSchema.params as Record<string, unknown>)?.[name],
+					);
+
 				parameters.push({
 					name,
 					in: "path",
-					required: true,
+					required: !isOptional,
 					schema: propSchema,
 				});
 			}
@@ -492,65 +650,130 @@ export function generateOpenApiSpec(
 
 		if (querySchema?.properties) {
 			for (const [name, propSchema] of Object.entries(querySchema.properties)) {
+				const isRequired = Array.isArray(querySchema.required)
+					? querySchema.required.includes(name)
+					: !isOptionalSchema(
+							(routeSchema.query as Record<string, unknown>)?.[name],
+						);
+
 				parameters.push({
 					name,
 					in: "query",
-					required:
-						Array.isArray(querySchema.required) &&
-						querySchema.required.includes(name),
+					required: isRequired,
 					schema: propSchema,
 				});
 			}
 		}
 
-		const hasFiles = Boolean(
-			fileUploadInfo || routeSchema.file || routeSchema.files,
-		);
+		if (headersSchema?.properties) {
+			for (const [name, propSchema] of Object.entries(
+				headersSchema.properties,
+			)) {
+				const isRequired = Array.isArray(headersSchema.required)
+					? headersSchema.required.includes(name)
+					: !isOptionalSchema(
+							(routeSchema.headers as Record<string, unknown>)?.[name],
+						);
 
-		if (hasFiles) {
-			const multipartSchema = createMultipartSchema(
-				bodySchema,
-				fileUploadInfo,
-				routeSchema.files,
-			);
-			const bodySchemaName = createBodySchemaName(
-				route,
-				openApiPath,
-				httpMethod,
-			);
-			const bodyRef = registerSchema(registry, multipartSchema, bodySchemaName);
-
-			operation.requestBody = {
-				content: {
-					"multipart/form-data": {
-						schema: bodyRef,
-					},
-				},
-				required: true,
-			};
-		} else if (routeSchema.body) {
-			const bodySchemaName = createBodySchemaName(
-				route,
-				openApiPath,
-				httpMethod,
-			);
-			const bodyRef = registerSchema(
-				registry,
-				routeSchema.body,
-				bodySchemaName,
-			);
-
-			operation.requestBody = {
-				content: {
-					"application/json": {
-						schema: bodyRef,
-					},
-				},
-				required: true,
-			};
+				parameters.push({
+					name,
+					in: "header",
+					required: isRequired,
+					schema: propSchema,
+				});
+			}
 		}
 
-		spec.paths[openApiPath][httpMethod] = operation;
+		const rawMethod = route.method.toLowerCase();
+		const methodsToRegister: string[] =
+			rawMethod === "all"
+				? ALL_METHOD_EXPANSIONS
+				: VALID_OPENAPI_METHODS.has(rawMethod)
+					? [rawMethod]
+					: [];
+
+		for (const httpMethod of methodsToRegister) {
+			const operation: OpenApiOperation = {
+				summary: route.name ?? `${route.method} ${route.path}`,
+				tags:
+					route.tags && route.tags.length > 0 ? [...route.tags] : ["default"],
+				parameters: [...parameters],
+				responses: {
+					200: {
+						description: "Successful operation",
+						content: {
+							"application/json": {
+								schema: {},
+							},
+						},
+					},
+					400: {
+						description: "Validation / File error",
+					},
+				},
+			};
+
+			const hasFiles = Boolean(
+				fileUploadInfo || routeSchema.file || routeSchema.files,
+			);
+
+			if (hasFiles) {
+				const filesMap =
+					(routeSchema.files as Record<string, unknown> | undefined) ??
+					(routeSchema.file && fileUploadInfo?.fieldname
+						? { [fileUploadInfo.fieldname]: routeSchema.file }
+						: routeSchema.file
+							? { file: routeSchema.file }
+							: undefined);
+
+				const multipartSchema = createMultipartSchema(
+					bodySchema,
+					fileUploadInfo,
+					filesMap,
+				);
+				const bodySchemaName = createBodySchemaName(
+					route,
+					openApiPath,
+					httpMethod,
+				);
+				const bodyRef = registerSchema(
+					registry,
+					multipartSchema,
+					bodySchemaName,
+				);
+
+				operation.requestBody = {
+					content: {
+						"multipart/form-data": {
+							schema: bodyRef,
+						},
+					},
+					required: true,
+				};
+			} else if (routeSchema.body) {
+				const bodySchemaName = createBodySchemaName(
+					route,
+					openApiPath,
+					httpMethod,
+				);
+				const bodyRef = registerSchema(
+					registry,
+					routeSchema.body,
+					bodySchemaName,
+				);
+
+				operation.requestBody = {
+					content: {
+						"application/json": {
+							schema: bodyRef,
+						},
+					},
+					required: true,
+				};
+			}
+
+			spec.paths[openApiPath][httpMethod] = operation;
+		}
 	}
 
 	return spec;

@@ -223,14 +223,23 @@ export function buildResourceRoutes(
 		);
 		const handlers = [...sharedMiddleware, ...ownHandlers];
 
-		const pathSuffix =
-			!singular && MEMBER_ACTIONS.has(action) ? `:${param}` : "";
+		const isMember = !singular && MEMBER_ACTIONS.has(action);
+		const pathSuffix = isMember ? `:${param}` : "";
 		const path = joinPath(basePath, pathSuffix);
 		const name = options.names?.[action] ?? `${namePrefix}.${action}`;
 
 		const meta: IRouteMetaOptions = { name };
 		if (options.tags) meta.tags = options.tags;
 		if (options.rateLimit) meta.rateLimit = options.rateLimit;
+
+		// Map runtime schemas to the OpenAPI metadata generator
+		if (options.schemas?.[action]) {
+			meta.schema = options.schemas[action];
+		} else if (isMember) {
+			meta.schema = {
+				params: { [param]: { type: "string" } },
+			};
+		}
 
 		routes.push({ method: ACTION_METHOD[action], path, handlers, meta });
 
@@ -241,9 +250,19 @@ export function buildResourceRoutes(
 			!registeredUpdates.has(path)
 		) {
 			registeredUpdates.add(path);
-			const aliasMeta: IRouteMetaOptions = {};
+			const patchName = options.names?.patch ?? `${namePrefix}.patch`;
+			const aliasMeta: IRouteMetaOptions = { name: patchName };
 			if (options.tags) aliasMeta.tags = options.tags;
 			if (options.rateLimit) aliasMeta.rateLimit = options.rateLimit;
+
+			if (options.schemas?.update) {
+				aliasMeta.schema = options.schemas.update;
+			} else if (isMember) {
+				aliasMeta.schema = {
+					params: { [param]: { type: "string" } },
+				};
+			}
+
 			routes.push({
 				method: "PATCH",
 				path,

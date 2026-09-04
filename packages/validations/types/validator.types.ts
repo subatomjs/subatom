@@ -79,3 +79,23 @@ export interface SchemaValidatorObject {
 		name?: string;
 	};
 }
+
+export interface StandardSchemaIssue {
+	message?: string;
+	path?: ReadonlyArray<PropertyKey | { key: PropertyKey }>;
+}
+
+export interface StandardSchemaResult {
+	value?: unknown;
+	issues?: ReadonlyArray<StandardSchemaIssue>;
+}
+
+export interface StandardSchemaValidator {
+	"~standard": {
+		version: number;
+		vendor: string;
+		validate: (
+			value: unknown,
+		) => Promise<StandardSchemaResult> | StandardSchemaResult;
+	};
+}

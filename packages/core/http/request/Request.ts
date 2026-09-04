@@ -152,19 +152,34 @@ export class Request<
 	 * - If a single string is passed, returns a boolean (`true`/`false`).
 	 * - If multiple strings are passed, returns the best matching string, or `false` if none match.
 	 */
+	/**
+	 * Checks if the request's Accept header matches the given type(s).
+	 * - If a single string is passed, returns a boolean (`true`/`false`).
+	 * - If multiple strings or an array of strings are passed, returns the best matching string, or `false` if none match.
+	 */
 	public accepts(type: string): boolean;
 	public accepts(...types: string[]): string | false;
-	public accepts(...types: string[]): boolean | string | false {
-		if (types.length === 1 && typeof types[0] === "string") {
-			// Preserves your existing behavior: returns boolean
-			return acceptsHeader(this.headers, types[0]);
+	public accepts(types: string[]): string | false;
+	public accepts(...args: (string | string[])[]): boolean | string | false {
+		const flattened: string[] = [];
+
+		for (const arg of args) {
+			if (Array.isArray(arg)) {
+				flattened.push(...arg);
+			} else if (typeof arg === "string") {
+				flattened.push(arg);
+			}
 		}
 
-		// Advanced negotiation for multiple types
-		const flattened = types.flat();
-		for (const t of flattened) {
-			if (acceptsHeader(this.headers, t)) {
-				return t; // Returns the first/best matched format
+		// Single string check -> return boolean
+		if (args.length === 1 && typeof args[0] === "string") {
+			return acceptsHeader(this.headers, args[0]);
+		}
+
+		// Multiple types negotiation -> return matched string or false
+		for (const type of flattened) {
+			if (acceptsHeader(this.headers, type)) {
+				return type;
 			}
 		}
 

@@ -1,12 +1,10 @@
 /**
- * @fileoverview Resolves rate-limit keys by IP, user, API key, tenant, 
+ * @fileoverview Resolves rate-limit keys by IP, user, API key, tenant,
  * route, composite values, or custom functions, hashing sensitive API keys.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
  */
-
-
 
 import type { IRequest } from "../../../core/http/request/types/request.types.js";
 import type { KeyResolver } from "./types/rateLimit.types.js";

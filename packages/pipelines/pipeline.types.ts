@@ -15,16 +15,6 @@ export type TCorsOriginFunction = (
 	callback: (err: Error | null, allow?: boolean) => void,
 ) => void;
 
-// export interface ICorsOptions {
-// 	origin?: string | string[] | boolean | TCorsOriginFunction;
-// 	methods?: string | string[];
-// 	allowedHeaders?: string | string[];
-// 	exposedHeaders?: string | string[];
-// 	credentials?: boolean;
-// 	maxAge?: number;
-// 	optionsSuccessStatus?: number;
-// }
-
 export interface IPipelineContext<TState = Record<string, unknown>> {
 	readonly req: IRequest;
 	readonly res: IResponse;
@@ -34,58 +24,61 @@ export interface IPipelineContext<TState = Record<string, unknown>> {
 	state: TState;
 }
 
-export type BeforeRequestFn = (
-	req: IPipelineContext["req"],
-	ctx: IPipelineContext,
+export type BeforeRequestFn<TState = Record<string, unknown>> = (
+	ctx: IPipelineContext<TState>,
 ) => unknown | Promise<unknown>;
 
-export type AfterRequestFn = (
-	data: unknown,
-	ctx: IPipelineContext,
+export type AfterRequestFn<
+	TData = unknown,
+	TState = Record<string, unknown>,
+> = (data: TData, ctx: IPipelineContext<TState>) => unknown | Promise<unknown>;
+
+export type BeforeResponseFn<TState = Record<string, unknown>> = (
+	ctx: IPipelineContext<TState>,
 ) => unknown | Promise<unknown>;
 
-export type BeforeResponseFn = (
-	response: unknown,
-	ctx: IPipelineContext,
+export type AfterResponseFn<TState = Record<string, unknown>> = (
+	ctx: IPipelineContext<TState>,
 ) => unknown | Promise<unknown>;
 
-export type AfterResponseFn = (
-	response: unknown,
-	ctx: IPipelineContext,
-) => unknown | Promise<unknown>;
-
-export interface ITransformer {
+export interface ITransformer<
+	TData = unknown,
+	TState = Record<string, unknown>,
+> {
 	name?: string;
 	priority?: number;
-	beforeRequest?: BeforeRequestFn;
-	afterRequest?: AfterRequestFn;
-	beforeResponse?: BeforeResponseFn;
-	afterResponse?: AfterResponseFn;
+	beforeRequest?: BeforeRequestFn<TState>;
+	afterRequest?: AfterRequestFn<TData, TState>;
+	beforeResponse?: BeforeResponseFn<TState>;
+	afterResponse?: AfterResponseFn<TState>;
 }
 
 export type InterceptorNext = () => Promise<unknown>;
 
-export type InterceptorFn = (
-	ctx: IPipelineContext,
+export type InterceptorFn<TState = Record<string, unknown>> = (
+	ctx: IPipelineContext<TState>,
 	next: InterceptorNext,
 ) => unknown | Promise<unknown>;
 
-export interface IInterceptor {
+export interface IInterceptor<TState = Record<string, unknown>> {
 	name?: string;
 	priority?: number;
-	intercept: InterceptorFn;
+	intercept: InterceptorFn<TState>;
 }
 
-export type SerializeFn = (
-	data: unknown,
-	ctx: IPipelineContext,
+export type SerializeFn<TData = unknown, TState = Record<string, unknown>> = (
+	data: TData,
+	ctx: IPipelineContext<TState>,
 ) => unknown | Promise<unknown>;
 
-export interface ISerializer {
+export interface ISerializer<
+	TData = unknown,
+	TState = Record<string, unknown>,
+> {
 	name?: string;
 	priority?: number;
 	contentType?: string;
-	serialize: SerializeFn;
+	serialize: SerializeFn<TData, TState>;
 }
 
 export type PipelineScope = "global" | "group" | "route";

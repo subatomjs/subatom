@@ -1,5 +1,5 @@
 /**
- * @fileoverview Type provider for socket features of subatom.
+ * @fileoverview Type definitions for enterprise-grade WebSocket engine in Subatom.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -42,6 +42,10 @@ export interface ISocketConnection<
 	readonly readyState: SocketReadyState;
 	readonly bufferedAmount: number;
 	locals: TLocals;
+	userId?: string;
+
+	/** Binds an authenticated user ID to this connection instance */
+	setUserId(userId: string): void;
 
 	send(data: SocketSendPayload): boolean;
 	sendAsync(data: SocketSendPayload): Promise<void>;
@@ -51,6 +55,7 @@ export interface ISocketConnection<
 	leave(room: string): void;
 	leaveAll(): void;
 	broadcast(room: string, data: SocketSendPayload, excludeSelf?: boolean): void;
+	sendToUser(userId: string, data: SocketSendPayload): boolean;
 	ping(data?: unknown): void;
 	pong(data?: unknown): void;
 	close(code?: number, reason?: string): void;

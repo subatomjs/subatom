@@ -52,13 +52,13 @@
 	"files": [
 		"dist",
 		"README.md",
-		"LICENSE",
-		"tests"
+		"LICENSE"
 	],
 	"scripts": {
 		"clean": "rm -rf dist",
 		"typecheck": "tsc --noEmit",
-		"build": "npm run typecheck && tsdown",
+		"build": "npm run clean && npm run typecheck && tsdown",
+		"postbuild": "tsx ./start/postbuild.ts",
 		"build:watch": "tsdown --watch",
 		"dev": "tsx watch ./index.ts",
 		"cli:dev": "tsx watch ./start/cli.ts",

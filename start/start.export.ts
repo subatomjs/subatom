@@ -1,5 +1,4 @@
 export * from "./cli.js";
-export * from "./postbuild.js";
 export * from "./commands/build.js";
 export * from "./commands/dev.js";
 export * from "./commands/preview.js";

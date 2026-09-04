@@ -5,10 +5,15 @@
  * @license MIT
  */
 
+import type { ServerResponse } from "node:http";
 import type { ISession } from "../../pipelines/middlewares/types/session.types.js";
 import type {
+	DocumentedMiddleware,
+	FilesMap,
+	IFrameworkRequest,
 	IFileUpload,
-	RequestFiles,
+	Middleware,
+	// RequestFiles,
 } from "../../pipelines/files/types/files.types.js";
 import type {
 	CookieOptions,
@@ -53,6 +58,20 @@ export type InferType<T> = T extends {
 									? { [K in keyof T]: InferType<T[K]> }
 									: T;
 
+type OptionalKeys<T> = {
+	[K in keyof T]: undefined extends InferType<T[K]> ? K : never;
+}[keyof T];
+
+type RequiredKeys<T> = {
+	[K in keyof T]: undefined extends InferType<T[K]> ? never : K;
+}[keyof T];
+
+export type InferMappedObject<T> = {
+	[K in RequiredKeys<T>]: InferType<T[K]>;
+} & {
+	[K in OptionalKeys<T>]?: InferType<T[K]>;
+};
+
 export type InferObjectSchema<
 	T,
 	TFallback = Record<string, unknown>,
@@ -66,27 +85,19 @@ export type InferObjectSchema<
 				? U
 				: T extends { infer: infer U }
 					? U
-					: T extends { parse: (...args: never[]) => infer U }
-						? U
-						: T extends {
-									safeParse: (
-										...args: never[]
-									) =>
-										| { success: true; data: infer U }
-										| { success: false; [key: string]: unknown };
-								}
-							? U
-							: T extends Record<string, unknown>
-								? { [K in keyof T]: InferType<T[K]> }
-								: TFallback;
+					: T extends readonly (infer U)[]
+						? Array<InferType<U>>
+						: T extends Record<string, unknown>
+							? InferMappedObject<T>
+							: TFallback;
 
 export type InferParams<TSchema> = TSchema extends { params: infer P }
-	? InferObjectSchema<P, Record<string, string>>
-	: Record<string, string>;
+	? InferObjectSchema<P, Record<string, string | undefined>>
+	: Record<string, string | undefined>;
 
 export type InferQuery<TSchema> = TSchema extends { query: infer Q }
-	? InferObjectSchema<Q, Record<string, string>>
-	: Record<string, string>;
+	? InferObjectSchema<Q, Record<string, string | undefined>>
+	: Record<string, string | undefined>;
 
 export type InferBody<TSchema> = TSchema extends { body: infer B }
 	? InferObjectSchema<B, unknown>
@@ -98,11 +109,27 @@ export type InferHeaders<TSchema> = TSchema extends { headers: infer H }
 
 export type InferFile<TSchema> = TSchema extends { file: infer F }
 	? InferType<F>
-	: IFileUpload | undefined;
+	: TSchema extends { files: Record<string, infer Fs> }
+		? InferType<Fs> extends IFileUpload
+			? InferType<Fs>
+			: IFileUpload | undefined
+		: IFileUpload | undefined;
 
+/**
+ * Resolves schema-derived files with exact property names (e.g. avatar, documents)
+ * and falls back to string-indexable FilesMap.
+ */
 export type InferFiles<TSchema> = TSchema extends { files: infer Fs }
-	? InferObjectSchema<Fs, RequestFiles | undefined>
-	: RequestFiles | undefined;
+	? Fs extends Record<string, unknown>
+		? {
+				[K in keyof Fs]: InferType<Fs[K]> extends infer Resolved
+					? Resolved extends unknown[]
+						? IFileUpload[]
+						: IFileUpload
+					: IFileUpload;
+			} & FilesMap
+		: FilesMap
+	: FilesMap;
 
 /**
  * Developer-facing Context facade wrapping underlying IRequest and IResponse.
@@ -163,7 +190,15 @@ export interface IContext<
 
 	// Request Methods
 	get(headerName: string): string | undefined;
-	accepts(contentType: string): boolean;
+
+	/**
+	 * Checks if the request's Accept header matches the given type(s).
+	 * - Single string parameter returns boolean (true/false).
+	 * - Multiple string parameters or an array return the best matching string, or false.
+	 */
+	accepts(type: string): boolean;
+	accepts(...types: string[]): string | false;
+	accepts(types: string[]): string | false;
 
 	// Response Facade Methods
 	status(code: number): this;
@@ -186,7 +221,7 @@ export interface IContext<
 		filename?: string,
 		options?: DownloadOptions,
 	): void;
-	stream(readableStream: NodeJS.ReadableStream): void;
+	stream(readableStream: NodeJS.ReadableStream): Promise<void>;
 	end(chunk?: unknown): void;
 	format(
 		handlers: FormatHandlers,
@@ -219,11 +254,10 @@ export type IContextMiddleware<
 /**
  * Legacy/Upload request-response handler signature.
  */
-export type ILegacyHandler = (
-	req: IRequest,
-	res: IResponse,
-	next: NextFunction,
-) => unknown | Promise<unknown>;
+export type ILegacyHandler<
+	TReq = IRequest | IFrameworkRequest,
+	TRes = IResponse | ServerResponse,
+> = (req: TReq, res: TRes, next: NextFunction) => unknown | Promise<unknown>;
 
 /**
  * Union of Context-based and Request-based Middleware handlers.
@@ -232,4 +266,9 @@ export type IRouteMiddleware<
 	TSchema = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>,
 	TUser = unknown,
-> = IContextMiddleware<TSchema, TLocals, TUser> | ILegacyHandler;
+> =
+	| IContextMiddleware<TSchema, TLocals, TUser>
+	| ILegacyHandler<IRequest, IResponse>
+	| ILegacyHandler<IFrameworkRequest, ServerResponse>
+	| DocumentedMiddleware
+	| Middleware;

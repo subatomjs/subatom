@@ -9,29 +9,34 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { findAndLoadConfig } from "../../config/helpers/load.config.js";
 import { resolvePort, runProcess, logger } from "../utils/index.js";
+import { resolveEntry } from "../utils/resolveEntry.js";
 
 export async function runPreview(): Promise<void> {
 	const cwd = process.cwd();
 	const config = await findAndLoadConfig(cwd);
 
-	const outDir = path.resolve(cwd, config.outDir);
+	let entryFile: string;
+	try {
+		entryFile = resolveEntry(config.entry, cwd);
+	} catch (err: unknown) {
+		logger.error(err instanceof Error ? err.message : String(err));
+		process.exit(1);
+	}
 
-	const entryPath = path.resolve(cwd, config.entry);
-	const entryDir = path.dirname(entryPath);
-	const entryFile = path.basename(entryPath);
+	const outDir = path.resolve(cwd, config.outDir ?? "dist");
+	const relativeToCwd = path.relative(cwd, entryFile);
+	const firstSegment = relativeToCwd.split(path.sep)[0] ?? ".";
 
-	const sourceRoot = path.resolve(
-		cwd,
-		path.dirname(config.entry).split(path.sep)[0] || "src",
+	const sourceRoot =
+		path.dirname(relativeToCwd) === "" ? cwd : path.resolve(cwd, firstSegment);
+
+	const relativeEntry = path.relative(sourceRoot, entryFile);
+	const compiledRelativeEntry = relativeEntry.replace(
+		/\.(tsx?|mts|cts|jsx?|mjs|cjs)$/,
+		".js",
 	);
 
-	const relativeEntry = path.relative(sourceRoot, entryDir);
-
-	const compiledEntry = path.join(
-		outDir,
-		relativeEntry,
-		entryFile.replace(/\.(tsx?|mts|cts|jsx?|mjs|cjs)$/, ".js"),
-	);
+	const compiledEntry = path.resolve(outDir, compiledRelativeEntry);
 
 	if (!existsSync(compiledEntry)) {
 		logger.error(
@@ -41,11 +46,10 @@ export async function runPreview(): Promise<void> {
 		process.exit(1);
 	}
 
-	const port = await resolvePort(config.port, config.host);
+	const host = config.host ?? "localhost";
+	const port = await resolvePort(config.port ?? 8080, host);
 
-	const protocol = config.host !== "localhost" ? "https" : "http";
-	const host = config.host;
-
+	const protocol = host !== "localhost" ? "https" : "http";
 	const previewUrl = `${protocol}://${host}:${port}`;
 
 	logger.info("Starting production preview...");

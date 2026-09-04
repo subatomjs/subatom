@@ -9,7 +9,11 @@ import type {
 	IController,
 	IRouteMiddleware,
 } from "../../../context/types/context.types.js";
-import type { IHandler, IRouteMetaOptions } from "./router.types.js";
+import type {
+	IHandler,
+	IRouteMetaOptions,
+	IRouteSchema,
+} from "./router.types.js";
 
 export type ResourceAction =
 	| "index"
@@ -55,6 +59,7 @@ export interface IResourceOptions {
 	allowPatch?: boolean;
 	tags?: string[];
 	rateLimit?: IRouteMetaOptions["rateLimit"];
+	schemas?: Partial<Record<ResourceAction, IRouteSchema>>;
 }
 
 export interface IResourceRouteDefinition {

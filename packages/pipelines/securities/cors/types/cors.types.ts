@@ -5,8 +5,6 @@
  * @license MIT
  */
 
-
-
 import type { IRequest } from "../../../../core/http/request/types/request.types.js";
 import type { IResponse } from "../../../../core/http/response/types/response.types.js";
 import type { NextFunction } from "../../../../pipelines/next/types/nextFunction.types.js";

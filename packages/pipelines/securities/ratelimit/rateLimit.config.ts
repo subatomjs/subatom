@@ -1,12 +1,10 @@
 /**
- * @fileoverview Normalizes rate-limit configuration, parsing durations and 
+ * @fileoverview Normalizes rate-limit configuration, parsing durations and
  * policies while validating algorithms, limits, token buckets, storage, headers, and failure modes.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
  */
-
-
 
 import { RateLimitConfigError } from "../../../errors/RateLimitError.js";
 import type {

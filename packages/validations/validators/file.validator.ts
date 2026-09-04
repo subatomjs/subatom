@@ -1,6 +1,6 @@
 /**
  * @fileoverview Validates files using a schema’s safeParse, normalizing schema failures
- * into structured ValidationIssue errors.
+ * into structured ValidationIssue errors and supporting both single and multi-file array validation.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -49,16 +49,27 @@ export function compileFileValidator(schema: ISchemaBase): ValidateFn {
 			];
 		}
 
-		return schemaIssues.map((issue) => ({
-			path: issue.path
-				? `${path}.${
-						Array.isArray(issue.path) ? issue.path.join(".") : issue.path
-					}`
-				: path,
-			rule: issue.rule ?? "validation",
-			message: issue.message ?? "File validation failed",
-			received: issue.received,
-			expected: issue.expected,
-		}));
+		return schemaIssues.map((issue) => {
+			let cleanSub = "";
+			if (Array.isArray(issue.path)) {
+				cleanSub = issue.path.join(".");
+			} else if (
+				typeof issue.path === "string" ||
+				typeof issue.path === "number"
+			) {
+				cleanSub = String(issue.path);
+			}
+
+			const fullPath =
+				path && cleanSub ? `${path}.${cleanSub}` : path || cleanSub;
+
+			return {
+				path: fullPath,
+				rule: issue.rule ?? "validation",
+				message: issue.message ?? "File validation failed",
+				received: issue.received,
+				expected: issue.expected,
+			};
+		});
 	};
 }

@@ -17,7 +17,7 @@ import {
 import path from "node:path";
 import { build } from "esbuild";
 import { findAndLoadConfig } from "../../config/helpers/load.config.js";
-import { logger, readUserPackageJson } from "../utils/index.js";
+import { logger, readUserPackageJson, resolveEntry } from "../utils/index.js";
 
 const SOURCE_EXTENSIONS = new Set([
 	".ts",
@@ -86,12 +86,20 @@ export async function runBuild(): Promise<void> {
 	const config = await findAndLoadConfig(cwd);
 	const pkg = readUserPackageJson(cwd);
 
-	const srcDir = path.resolve(
-		cwd,
-		path.dirname(config.entry).split(path.sep)[0] || "src",
-	);
+	let entryFile: string;
+	try {
+		entryFile = resolveEntry(config.entry, cwd);
+	} catch (err: unknown) {
+		logger.error(err instanceof Error ? err.message : String(err));
+		process.exit(1);
+	}
 
-	const outDir = path.resolve(cwd, config.outDir);
+	const relativeEntry = path.relative(cwd, entryFile);
+	const firstSegment = relativeEntry.split(path.sep)[0] ?? ".";
+	const srcDir =
+		path.dirname(relativeEntry) === "" ? cwd : path.resolve(cwd, firstSegment);
+
+	const outDir = path.resolve(cwd, config.outDir ?? "dist");
 	const tmpDir = `${outDir}.tmp-${process.pid}-${Date.now()}`;
 
 	if (!existsSync(srcDir)) {
@@ -152,8 +160,8 @@ export async function runBuild(): Promise<void> {
 			platform: "node",
 			target: "node18",
 			format: pkg.type === "module" ? "esm" : "cjs",
-			sourcemap: config.sourcemap,
-			minify: config.minify,
+			sourcemap: config.sourcemap ?? true,
+			minify: config.minify ?? false,
 			logLevel: "silent",
 		});
 
@@ -174,9 +182,7 @@ export async function runBuild(): Promise<void> {
 		});
 
 		logger.error("Build failed:");
-
 		console.error(err instanceof Error ? err.message : err);
-
 		process.exit(1);
 	}
 

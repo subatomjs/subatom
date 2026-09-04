@@ -1,12 +1,10 @@
 /**
- * @fileoverview Implements configurable CORS middleware, handling origins, 
+ * @fileoverview Implements configurable CORS middleware, handling origins,
  * credentials, headers, exposed headers, preflight requests, max-age, and OPTIONS responses.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
  */
-
-
 
 import type {
 	CorsMiddleware,

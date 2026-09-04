@@ -11,7 +11,7 @@ export interface FileFieldConfig {
 }
 
 export interface FileMetadata {
-	type: "single" | "array" | "fields";
+	type: "single" | "array" | "fields" | "any" | "none";
 	fieldname?: string;
 	maxCount?: number;
 	fields?: FileFieldConfig[];
@@ -103,14 +103,18 @@ export interface SetupApiDocsOptions {
 }
 
 export interface SchemaLikeDef {
-	typeName?: string;
-	innerType?: unknown;
-	schema?: unknown;
-	type?: unknown;
 	title?: string;
 	name?: string;
-	shape?: Record<string, unknown> | (() => Record<string, unknown>);
+	typeName?: string;
+	type?: unknown;
+	innerType?: unknown;
+	schema?: unknown;
+	shape?: unknown;
 	values?: unknown[];
+	isOptional?: boolean;
+	optional?: boolean;
+	_isFiles?: boolean;
+	[key: string]: unknown;
 }
 
 export interface SchemaLike {
@@ -119,6 +123,7 @@ export interface SchemaLike {
 	schemaName?: string;
 	typeName?: string;
 	_typeName?: string;
+	_isFiles?: boolean;
 	isOptional?: boolean;
 	isNullable?: boolean;
 	coerce?: boolean;
@@ -146,6 +151,7 @@ export interface SchemaLike {
 export interface RouteSchemaDescriptor {
 	params?: unknown;
 	query?: unknown;
+	headers?: unknown;
 	body?: unknown;
 	file?: unknown;
 	files?: Record<string, unknown>;

@@ -1,6 +1,5 @@
 /**
- * @fileoverview Manages the WebSocket server lifecycle, routes connections, dispatches messages,
- * tracks connections and rooms, handles events, broadcasting, heartbeat, and graceful shutdown.
+ * @fileoverview Manages WebSocket lifecycle, user routing, broadcasting, and clean shutdown.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -88,6 +87,19 @@ export class SocketManager {
 		return this.registry.getRoomNames();
 	}
 
+	public sendToUser(userId: string, data: SocketSendPayload): boolean {
+		const sockets = this.registry.getSocketsByUser(userId);
+		if (sockets.length === 0) return false;
+		let sent = false;
+		for (const socket of sockets) {
+			if (socket.readyState === 1) {
+				socket.send(data);
+				sent = true;
+			}
+		}
+		return sent;
+	}
+
 	public activate(userOptions: ISocketOptions = {}): void {
 		if (this.active) return;
 		this.active = true;
@@ -116,6 +128,9 @@ export class SocketManager {
 		});
 
 		this.upgradeListener = (request, socket, head) => {
+			// Zero Delay flag on incoming socket
+			socket.setNoDelay(true);
+
 			const maxConnections =
 				this.options.maxConnections ?? DEFAULT_OPTIONS.maxConnections;
 			if (this.registry.size() >= maxConnections) {
@@ -183,6 +198,11 @@ export class SocketManager {
 		});
 
 		this.registry.add(connection);
+
+		// If userId was provided in query, bind it immediately
+		if (matchedContext.query.userId) {
+			connection.setUserId(matchedContext.query.userId);
+		}
 
 		rawSocket.on("pong", (data: Buffer) => {
 			connection._isAlive = true;
@@ -308,7 +328,7 @@ export class SocketManager {
 							err instanceof Error ? err : new Error(String(err)),
 						);
 					} catch {
-						// Suppress secondary handler errors
+						// Suppress secondary errors[cite: 2]
 					}
 				});
 			}
@@ -323,7 +343,7 @@ export class SocketManager {
 					err instanceof Error ? err : new Error(String(err)),
 				);
 			} catch {
-				// Suppress secondary handler errors
+				// Suppress secondary errors[cite: 2]
 			}
 		}
 	}

@@ -11,6 +11,7 @@ import { findAndLoadConfig } from "../../config/helpers/load.config.js";
 import { logger } from "../utils/logger.js";
 import { resolvePort } from "../utils/port.js";
 import { runProcess } from "../utils/spawnProcess.js";
+import { resolveEntry } from "../utils/resolveEntry.js";
 
 interface StartOptions {
 	readonly port?: string;
@@ -19,17 +20,16 @@ interface StartOptions {
 
 function resolveCompiledEntry(
 	cwd: string,
-	entry: string,
+	entryFile: string,
 	outDir: string,
 ): string {
-	const entryPath = path.resolve(cwd, entry);
+	const relativeToCwd = path.relative(cwd, entryFile);
+	const firstSegment = relativeToCwd.split(path.sep)[0] ?? ".";
 
-	const sourceRoot = path.resolve(
-		cwd,
-		path.dirname(entry).split(path.sep)[0] || "src",
-	);
+	const sourceRoot =
+		path.dirname(relativeToCwd) === "" ? cwd : path.resolve(cwd, firstSegment);
 
-	const relativeEntry = path.relative(sourceRoot, entryPath);
+	const relativeEntry = path.relative(sourceRoot, entryFile);
 
 	const compiledRelativeEntry = relativeEntry.replace(
 		/\.(tsx?|mts|cts|jsx?|mjs|cjs)$/,
@@ -55,7 +55,16 @@ export async function runStart(opts: StartOptions): Promise<void> {
 	const cwd = process.cwd();
 	const config = await findAndLoadConfig(cwd);
 
-	const compiledEntry = resolveCompiledEntry(cwd, config.entry, config.outDir);
+	let entryFile: string;
+	try {
+		entryFile = resolveEntry(config.entry, cwd);
+	} catch (err: unknown) {
+		logger.error(err instanceof Error ? err.message : String(err));
+		process.exit(1);
+	}
+
+	const outDir = config.outDir ?? "dist";
+	const compiledEntry = resolveCompiledEntry(cwd, entryFile, outDir);
 
 	if (!existsSync(compiledEntry)) {
 		logger.error(
@@ -65,9 +74,8 @@ export async function runStart(opts: StartOptions): Promise<void> {
 		process.exit(1);
 	}
 
-	const host = opts.host ?? config.host;
-
-	const preferredPort = opts.port ? Number(opts.port) : config.port;
+	const host = opts.host ?? config.host ?? "localhost";
+	const preferredPort = opts.port ? Number(opts.port) : (config.port ?? 8080);
 
 	if (
 		!Number.isInteger(preferredPort) ||

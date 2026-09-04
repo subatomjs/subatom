@@ -23,10 +23,16 @@ export async function runTransformerHook(
 		if (typeof fn !== "function") continue;
 
 		try {
-			const result = await (fn as (a: unknown, b: IPipelineContext) => unknown)(
-				current,
-				ctx,
-			);
+			let result: unknown;
+			if (hook === "beforeRequest") {
+				// beforeRequest signature is (ctx: IPipelineContext)
+				result = await (fn as (context: IPipelineContext) => unknown)(ctx);
+			} else {
+				// afterRequest, beforeResponse, afterResponse signature is (data: unknown, ctx: IPipelineContext)
+				result = await (
+					fn as (data: unknown, context: IPipelineContext) => unknown
+				)(current, ctx);
+			}
 			current = result === undefined ? current : result;
 		} catch (cause) {
 			throw new TransformerError(hook, transformer.name, cause);

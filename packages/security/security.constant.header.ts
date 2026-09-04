@@ -1,12 +1,10 @@
 /**
- * @fileoverview Defines standardized HTTP security header names used across 
+ * @fileoverview Defines standardized HTTP security header names used across
  * Subatom’s security middleware and configuration.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
  */
-
-
 
 export const SECURITY_HEADERS = {
 	CSP: "Content-Security-Policy",

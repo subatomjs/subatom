@@ -1,11 +1,10 @@
 /**
- * @fileoverview Creates rate-limit middleware that processes requests through the engine, 
+ * @fileoverview Creates rate-limit middleware that processes requests through the engine,
  * applies headers, handles exceeded limits, and supports configurable fail-open/fail-closed behavior.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
  */
-
 
 import type { IRequest } from "../../../core/http/request/types/request.types.js";
 import type { IResponse } from "../../../core/http/response/types/response.types.js";

@@ -1,6 +1,7 @@
 /**
- * @fileoverview Wraps raw WebSocket connections with safe sending, backpressure control,
- * rate limiting, room management, connection metadata, and lifecycle controls.
+ * @fileoverview High-performance, memory-safe wrapper around raw WebSocket instances.
+ * Enforces backpressure checks, safe serialization, room management,
+ * and strongly-typed params, query, and locals.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -17,11 +18,6 @@ import type {
 import type { ConnectionRegistry } from "./services/connectionRegistry.service.js";
 import { TokenBucket } from "./services/rateLimiter.service.js";
 
-/**
- * High-performance, memory-safe wrapper around raw WebSocket instances.
- * Enforces backpressure checks, safe serialization, room management,
- * and strongly-typed params, query, and locals.
- */
 export class SocketConnection<
 	TParams extends Record<string, string | undefined> = Record<
 		string,
@@ -36,10 +32,11 @@ export class SocketConnection<
 {
 	public readonly id: string;
 	public locals: TLocals = {} as TLocals;
+	public userId?: string;
 
-	/** @internal Heartbeat liveness flag, flipped on receiving pong responses */
+	/** @internal Heartbeat liveness flag, flipped on receiving pong responses[cite: 1] */
 	public _isAlive = true;
-	/** @internal Token-bucket inbound message rate limiter */
+	/** @internal Token-bucket inbound message rate limiter[cite: 1] */
 	public readonly _rateLimiter: TokenBucket;
 
 	public readonly params: TParams;
@@ -67,7 +64,7 @@ export class SocketConnection<
 		this.params = options.params ?? ({} as TParams);
 		this.query = options.query ?? ({} as TQuery);
 		this.path = options.path ?? request.url ?? "/";
-		this.backpressureLimit = options.backpressureLimitBytes ?? 1_048_576; // 1MB default
+		this.backpressureLimit = options.backpressureLimitBytes ?? 1_048_576; // 1MB default[cite: 1]
 
 		const forwardedFor = request.headers["x-forwarded-for"];
 		const clientIp = Array.isArray(forwardedFor)
@@ -81,6 +78,14 @@ export class SocketConnection<
 			options.maxMessagesPerSecond,
 			options.maxMessagesPerSecond,
 		);
+	}
+
+	public setUserId(userId: string): void {
+		if (this.userId) {
+			this.registry.unregisterUser(this.userId, this);
+		}
+		this.userId = userId;
+		this.registry.registerUser(userId, this);
 	}
 
 	public get rooms(): ReadonlySet<string> {
@@ -132,8 +137,11 @@ export class SocketConnection<
 			return false;
 		}
 
+		const isBinary = typeof payload !== "string";
+
 		try {
-			this.raw.send(payload, (err) => {
+			// Zero-compression immediate frame push
+			this.raw.send(payload, { binary: isBinary, compress: false }, (err) => {
 				if (err) {
 					console.error(
 						`[Subatom WS] Send failed for connection ${this.id}:`,
@@ -166,8 +174,10 @@ export class SocketConnection<
 				return reject(new Error("Failed to serialize payload"));
 			}
 
+			const isBinary = typeof payload !== "string";
+
 			try {
-				this.raw.send(payload, (err) => {
+				this.raw.send(payload, { binary: isBinary, compress: false }, (err) => {
 					if (err) return reject(err);
 					resolve();
 				});
@@ -217,6 +227,19 @@ export class SocketConnection<
 		}
 	}
 
+	public sendToUser(userId: string, data: SocketSendPayload): boolean {
+		const sockets = this.registry.getSocketsByUser(userId);
+		if (sockets.length === 0) return false;
+		let dispatched = false;
+		for (const socket of sockets) {
+			if (socket.readyState === 1 /* WebSocket.OPEN */) {
+				socket.send(data);
+				dispatched = true;
+			}
+		}
+		return dispatched;
+	}
+
 	public ping(data?: unknown): void {
 		if (this.raw.readyState === WebSocket.OPEN) {
 			try {
@@ -254,7 +277,7 @@ export class SocketConnection<
 		try {
 			this.raw.terminate();
 		} catch {
-			// Ignore termination errors if already destroyed
+			// Ignore termination errors if already destroyed[cite: 1]
 		}
 	}
 }

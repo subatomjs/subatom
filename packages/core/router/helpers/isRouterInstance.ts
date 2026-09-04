@@ -6,14 +6,14 @@
  * @license MIT
  */
 
-import type { Router } from "../Router.js";
 import type { IRouter } from "../types/router.types.js";
 
-function isRouterInstance(x: unknown): x is Router {
+function isRouterInstance(x: unknown): x is IRouter {
 	return (
 		!!x &&
 		typeof (x as IRouter).getRoutes === "function" &&
-		typeof (x as Router).dispatch === "function"
+		typeof (x as IRouter).dispatch === "function"
 	);
 }
+
 export default isRouterInstance;

@@ -1,7 +1,6 @@
 /**
- * @fileoverview Handles WebSocket upgrade requests by matching routes,
- * validating origins and clients, attaching request context,
- * and completing or rejecting the connection upgrade.
+ * @fileoverview Production upgrade handler with TCP zero-delay configuration
+ * and resilient context attachment.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -87,6 +86,10 @@ export async function handleUpgrade(
 	routes: Map<string, ISocketRoute>,
 	options: ISocketOptions,
 ): Promise<void> {
+	// 1. DISABLE NAGLE'S DELAY & ENABLE KEEP-ALIVE ON INCOMING TCP STREAM
+	socket.setNoDelay(true);
+	socket.setKeepAlive(true, 10_000);
+
 	const match = matchSocketRoute(routes, request.url ?? "/");
 
 	if (!match) {

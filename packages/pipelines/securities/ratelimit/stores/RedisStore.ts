@@ -1,12 +1,10 @@
 /**
- * @fileoverview Implements Redis-backed rate limiting with atomic Lua scripts 
+ * @fileoverview Implements Redis-backed rate limiting with atomic Lua scripts
  * for fixed-window, sliding-window, and token-bucket algorithms.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
  */
-
-
 
 import type {
 	RateLimitStore,

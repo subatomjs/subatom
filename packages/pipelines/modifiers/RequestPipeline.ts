@@ -1,19 +1,8 @@
 /**
- * @fileoverview Type declaration file of FileUpload.ts & helpers & operations files.
+ * @fileoverview RequestPipeline orchestrates the end-to-end lifecycle of an HTTP request.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
- */
-
-/**
- * @fileoverview
- * RequestPipeline orchestrates the end-to-end lifecycle of an HTTP request by creating a pipeline
- * context and executing configured modifiers in a strict sequence.
- * It coordinates inbound request mutation through beforeRequest hooks,
- * delegates handler processing via the controller chain, post-processes
- * returned controller payloads using afterRequest and beforeResponse transformers,
- * formats the payload to wire format with content-type serializers,
- * and executes final afterResponse hooks before returning the finalized response data.
  */
 
 import { TransformerError } from "../../errors/modifiers/TransformerError.js";
@@ -26,10 +15,6 @@ import type {
 	IRequestPipelineOptions,
 } from "./types/modifiers.types.js";
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 export class RequestPipeline {
 	constructor(private readonly config: Readonly<IRequestPipelineConfig>) {}
 
@@ -39,31 +24,24 @@ export class RequestPipeline {
 		const ctx: IPipelineContext = {
 			req,
 			res,
-			routePath: routePath ?? "",
-			method: method ?? "",
+			routePath: routePath ?? req.path ?? "",
+			method: method ?? req.method ?? "GET",
 			meta: Object.freeze({ ...(meta ?? {}) }),
 			state: {},
 		};
 
-		// 1. beforeRequest — safely mutate request object
-		const transformedReq = await runTransformerHook(
+		// 1. beforeRequest — receives ctx directly as defined in BeforeRequestFn
+		await runTransformerHook(
 			this.config.transformers,
 			"beforeRequest",
-			req,
+			ctx,
 			ctx,
 		);
-
-		if (
-			isPlainObject(transformedReq) &&
-			transformedReq !== (req as unknown as Record<string, unknown>)
-		) {
-			Object.assign(req, transformedReq);
-		}
 
 		// 2. Controller/Middleware Chain Phase
 		const controllerResult = await runControllerChain(ctx);
 
-		// 3. afterRequest — transform raw controller result
+		// 3. afterRequest — transform raw controller result: (data, ctx)
 		const dataAfterRequest = await runTransformerHook(
 			this.config.transformers,
 			"afterRequest",
@@ -71,7 +49,7 @@ export class RequestPipeline {
 			ctx,
 		);
 
-		// 4. beforeResponse — shape response envelope
+		// 4. beforeResponse — shape response envelope: (data, ctx)
 		const responseEnvelope = await runTransformerHook(
 			this.config.transformers,
 			"beforeResponse",
@@ -88,7 +66,7 @@ export class RequestPipeline {
 			contentType,
 		);
 
-		// 6. afterResponse — final observation/mutation
+		// 6. afterResponse — final observation/mutation: (data, ctx)
 		return await runTransformerHook(
 			this.config.transformers,
 			"afterResponse",
@@ -97,4 +75,5 @@ export class RequestPipeline {
 		);
 	}
 }
+
 export { runInterceptors, TransformerError };

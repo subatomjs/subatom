@@ -5,11 +5,7 @@
  * @license MIT
  */
 
-import type {
-	IncomingHttpHeaders,
-	IncomingMessage,
-	ServerResponse,
-} from "node:http";
+import type { IncomingHttpHeaders, ServerResponse } from "node:http";
 import type { Readable } from "node:stream";
 import type { NextFunction } from "../../next/types/nextFunction.types.js";
 import type { FileUpload } from "../FileUpload.js";
@@ -50,8 +46,6 @@ export interface IFileUpload {
 	destroy(): Promise<void>;
 }
 
-export type FilesMap = Record<string, IFileUpload | IFileUpload[]>;
-
 export type StorageStrategy = "memory" | "disk";
 
 export interface FileParserConfig {
@@ -70,26 +64,49 @@ export interface FileParserConfig {
 export interface FileUploadPipelineOptions extends FileParserConfig {
 	fieldname?: string;
 }
-export type RequestFiles = IFileUpload[] | FilesMap;
 
-export interface IFrameworkRequest extends IncomingMessage {
-	body?: Record<string, unknown>;
-	file?: IFileUpload | undefined;
-	files?: RequestFiles;
+/**
+ * Dictionary map of uploaded files supporting scalar files and file lists.
+ */
+export interface FilesMap {
+	[key: string]: IFileUpload | IFileUpload[] | undefined;
 }
 
-export type Middleware = (
-	req: IFrameworkRequest,
-	res: ServerResponse,
+/**
+ * Union type for request files: supporting numeric indexation as an array
+ * or string indexation as a FilesMap.
+ */
+export type RequestFiles =
+	| IFileUpload[]
+	| FilesMap
+	| (IFileUpload[] & FilesMap);
+
+export interface IFrameworkRequest {
+	body?: unknown;
+	file?: IFileUpload | undefined;
+	files?: RequestFiles;
+	headers: IncomingHttpHeaders;
+	url?: string;
+	method?: string;
+	raw?: Readable;
+	getStream?: () => Readable;
+	getHeaders?: () => IncomingHttpHeaders;
+}
+
+export type Middleware<
+	TReq extends RequestTarget = IFrameworkRequest,
+	TRes extends ResponseTarget = ServerResponse,
+> = (
+	req: TReq,
+	res: TRes,
 	next: NextFunction,
-) => Promise<void> | void;
+) => Promise<void> | void | unknown;
 
 export interface ParseResult {
 	body: Record<string, unknown>;
 	files: Record<string, FileUpload[]>;
 }
 
-// A minimal shape for anything we need to force-close on abort
 export interface Destroyable {
 	destroy: (err?: Error) => void;
 }
@@ -99,16 +116,14 @@ export interface FileConfigMeta {
 	fieldname?: string | undefined;
 	maxCount?: number | undefined;
 	fields?: Array<{ name: string; maxCount?: number }> | undefined;
-	options?: FileUploadPipelineOptions | undefined; // storage, allowedMimeTypes, limits...
+	options?: FileUploadPipelineOptions | undefined;
 }
 
-export interface DocumentedMiddleware extends Middleware {
+export interface DocumentedMiddleware
+	extends Middleware<IFrameworkRequest, ServerResponse> {
 	_fileConfig?: FileConfigMeta;
 }
 
-/**
- * Represents any response target (Subatom IResponse, Express-like res, or raw ServerResponse)
- */
 export type ResponseTarget =
 	| IResponse
 	| ServerResponse
@@ -124,9 +139,6 @@ export type ResponseTarget =
 			end?: (chunk?: unknown) => unknown;
 	  };
 
-/**
- * Represents any request target (Subatom IRequest, IFrameworkRequest, or raw IncomingMessage)
- */
 export type RequestTarget =
 	| IRequest
 	| IFrameworkRequest
@@ -137,10 +149,6 @@ export type RequestTarget =
 			getHeaders?: () => IncomingHttpHeaders;
 	  };
 
-/**
- * Polymorphic response type supporting Subatom IResponse, Express-like res,
- * or raw Node.js ServerResponse.
- */
 export type ErrorHandlerResponse =
 	| IResponse
 	| ServerResponse

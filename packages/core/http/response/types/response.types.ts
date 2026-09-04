@@ -3,6 +3,7 @@ import type {
 	TErrorHelperName,
 	TSuccessHelperName,
 } from "../services/helpers.service.js";
+import type { TypeResWriteCallback } from "../../streams/types/stream.methods.types.js";
 
 export interface CookieOptions {
 	/** Max age in milliseconds (converted to seconds per spec). */
@@ -105,6 +106,11 @@ export interface IResponse {
 	send(body?: string | Buffer | Uint8Array | object): void;
 	json(data: unknown): this;
 	html(htmlContent: string): this;
+	write(
+		chunk: string | Buffer | Uint8Array,
+		encoding?: BufferEncoding,
+		callback?: TypeResWriteCallback,
+	): boolean;
 	/** End the response stream manually, bypassing the higher-level helpers. */
 	end(chunk?: unknown): void;
 
@@ -117,7 +123,7 @@ export interface IResponse {
 	 * caught and converted into a 500 response (if headers haven't been
 	 * sent yet) instead of crashing the process.
 	 */
-	stream(readableStream: NodeJS.ReadableStream): void;
+	stream(readableStream: NodeJS.ReadableStream): Promise<void>;
 
 	/**
 	 * Send a file inline (browser decides how to render it, e.g. images/PDFs).

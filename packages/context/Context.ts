@@ -26,6 +26,7 @@ import type {
 	SendFileOptions,
 } from "../core/http/response/types/response.types.js";
 import type { IRequest } from "../core/http/request/types/request.types.js";
+import type { Readable } from "node:stream";
 
 const CONTEXT_SYMBOL = Symbol.for("subatom.context");
 
@@ -173,10 +174,16 @@ export class Context<
 		return this.req.get(headerName);
 	}
 
-	public accepts(contentType: string): boolean {
-		return this.req.accepts(contentType);
+	public accepts(type: string): boolean;
+	public accepts(...types: string[]): string | false;
+	public accepts(types: string[]): string | false;
+	public accepts(...args: (string | string[])[]): boolean | string | false {
+		return (
+			this.req.accepts as (
+				...a: (string | string[])[]
+			) => boolean | string | false
+		)(...args);
 	}
-
 	// Response Methods
 	public status(code: number): this {
 		this.res.status(code);
@@ -262,8 +269,8 @@ export class Context<
 		this.res.download(filePath, filename, options);
 	}
 
-	public stream(readableStream: NodeJS.ReadableStream): void {
-		this.res.stream(readableStream);
+	public stream(readableStream: NodeJS.ReadableStream): Promise<void> {
+		return this.res.stream(readableStream as Readable);
 	}
 
 	public end(chunk?: unknown): void {

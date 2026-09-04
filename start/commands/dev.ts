@@ -22,7 +22,14 @@ export async function runDev(opts: DevOptions): Promise<void> {
 	const cwd = process.cwd();
 	const config = await findAndLoadConfig(cwd);
 
-	const entry = resolveEntry(config.entry, cwd);
+	let entry: string;
+	try {
+		entry = resolveEntry(config.entry, cwd);
+	} catch (err: unknown) {
+		logger.error(err instanceof Error ? err.message : String(err));
+		process.exit(1);
+	}
+
 	const host = opts.host ?? config.host ?? "localhost";
 	const preferredPort = opts.port ? Number(opts.port) : (config.port ?? 8080);
 

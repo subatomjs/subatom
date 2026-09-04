@@ -1,35 +1,35 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["index.ts", "start/cli.ts"],
+	entry: ["index.ts", "start/cli.ts"],
 
-  outDir: "dist",
+	outDir: "dist",
 
-  format: ["esm"],
+	format: ["esm"],
 
-  target: "node24",
+	target: "node24",
 
-  dts: true,
+	dts: true,
 
-  // Disables bundling/chunking and preserves 1:1 source file structure
-  bundle: false,
+	// Disables bundling/chunking and preserves 1:1 source file structure
+	bundle: false,
 
-  outExtension({ format }) {
-    return {
-      js: ".js",
-      dts: ".d.ts",
-    };
-  },
+	outExtension() {
+		return {
+			js: ".js",
+			dts: ".d.ts",
+		};
+	},
 
-  sourcemap: true,
+	sourcemap: true,
 
-  clean: true,
+	clean: true,
 
-  treeshake: true,
+	treeshake: true,
 
-  minify: false,
+	minify: false,
 
-  deps: {
-    neverBundle: true,
-  },
+	deps: {
+		neverBundle: true,
+	},
 });

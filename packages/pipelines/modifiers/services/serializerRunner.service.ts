@@ -15,17 +15,28 @@ export async function runSerializers(
 	ctx: IPipelineContext,
 	contentType?: string,
 ): Promise<unknown> {
-	const normalizedContentType = contentType
+	// If no Content-Type was explicitly set prior to serialization,
+	// infer standard application/json if data is an object, or text/plain otherwise.
+	const effectiveContentType =
+		contentType ||
+		ctx.res.get?.("content-type")?.toString() ||
+		(typeof data === "object" && data !== null
+			? "application/json"
+			: undefined);
+
+	const normalizedContentType = effectiveContentType
 		?.split(";")[0]
 		?.trim()
 		.toLowerCase();
 
 	for (const serializer of serializers) {
+		// If serializer has a contentType constraint, match it against normalizedContentType
 		if (serializer.contentType) {
 			const expectedContentType = serializer.contentType
 				.split(";")[0]
 				?.trim()
 				.toLowerCase();
+
 			if (expectedContentType !== normalizedContentType) {
 				continue;
 			}

@@ -6,8 +6,10 @@
  * @license MIT
  */
 
-import { Router } from "../../router/Router.js";
+import isRouterInstance from "../../router/helpers/isRouterInstance.js";
+import type { Router } from "../../router/Router.js";
 import { mergeSubRouter } from "../../router/services/routerMerger.service.js";
+import type { IRouter } from "../../router/types/router.types.js";
 import type { Subatom } from "../Subatom.js";
 import { RouteGroupBuilder } from "../subordinate/RouteGroupBuilder.js";
 
@@ -15,10 +17,10 @@ export function dispatchGroup(
 	app: Subatom,
 	targetRouter: Router,
 	prefix?: string,
-	router?: Router,
+	router?: IRouter,
 ): Subatom | RouteGroupBuilder {
 	if (router !== undefined) {
-		if (!(router instanceof Router)) {
+		if (!isRouterInstance(router)) {
 			throw new TypeError(
 				"[Subatom] app.group(prefix, router) expects the second argument to be a Router instance.",
 			);

@@ -5,6 +5,8 @@
  * @license MIT
  */
 
+import { existsSync, statSync } from "node:fs";
+import path from "node:path";
 import { ConfigError } from "../ConfigError.js";
 import type { SubatomConfig } from "../types/index.types.js";
 
@@ -27,6 +29,20 @@ export function validateConfig(config: SubatomConfig): void {
 			config.entry,
 		);
 	}
+
+	// Strictly assert entry file existence
+	const resolvedEntry = path.resolve(process.cwd(), config.entry);
+	if (!existsSync(resolvedEntry)) {
+		throw new Error(
+			`[Subatom Config Error]: Entry file "${config.entry}" does not exist at "${resolvedEntry}".`,
+		);
+	}
+	if (statSync(resolvedEntry).isDirectory()) {
+		throw new Error(
+			`[Subatom Config Error]: Entry "${config.entry}" is a directory. It must point directly to a file.`,
+		);
+	}
+
 	if (typeof config.outDir !== "string" || config.outDir.trim() === "") {
 		throw new ConfigError(
 			"outDir",

@@ -11,3 +11,12 @@ export interface ISubatomError {
 	details?: unknown;
 	isOperational?: boolean;
 }
+
+export interface IParsedStackFrame {
+	callSite: string;
+	filePath: string;
+	lineNumber: string;
+	columnNumber: string;
+	isInternal: boolean;
+	raw: string;
+}

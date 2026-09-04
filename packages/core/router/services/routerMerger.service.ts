@@ -8,11 +8,12 @@
 
 import { combinePaths } from "../../subatom/helpers/combinePath.js";
 import type { Router } from "../Router.js";
+import type { IRouter } from "../types/router.types.js";
 
 function assertRouterInstance(
 	subRouter: unknown,
 	callSite: string,
-): asserts subRouter is Router {
+): asserts subRouter is IRouter {
 	if (
 		typeof subRouter !== "object" ||
 		subRouter === null ||
@@ -31,7 +32,7 @@ function assertRouterInstance(
 export function mergeSubRouter(
 	targetRouter: Router,
 	prefix: string,
-	subRouter: Router,
+	subRouter: IRouter,
 ): void {
 	assertRouterInstance(subRouter, "app.use(prefix, subRouter)");
 
@@ -63,7 +64,7 @@ export function mergeSubRouter(
 	}
 }
 
-export function mergeRouter(targetRouter: Router, subRouter: Router): void {
+export function mergeRouter(targetRouter: Router, subRouter: IRouter): void {
 	assertRouterInstance(subRouter, "app.use(subRouter)");
 
 	for (const route of subRouter.getRoutes()) {

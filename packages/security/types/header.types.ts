@@ -5,78 +5,77 @@
  * @license MIT
  */
 
-
 export interface ContentSecurityPolicyDirectives {
-  "default-src"?: string[];
-  "script-src"?: string[];
-  "style-src"?: string[];
-  "img-src"?: string[];
-  "connect-src"?: string[];
-  "font-src"?: string[];
-  "object-src"?: string[];
-  "media-src"?: string[];
-  "frame-src"?: string[];
-  sandbox?: string[];
-  "report-uri"?: string[];
-  "child-src"?: string[];
-  "form-action"?: string[];
-  "frame-ancestors"?: string[];
-  "plugin-types"?: string[];
-  "base-uri"?: string[];
-  "report-to"?: string[];
-  "worker-src"?: string[];
-  "manifest-src"?: string[];
-  "upgrade-insecure-requests"?: boolean;
-  "block-all-mixed-content"?: boolean;
-  [key: string]: string[] | boolean | undefined;
+	"default-src"?: string[];
+	"script-src"?: string[];
+	"style-src"?: string[];
+	"img-src"?: string[];
+	"connect-src"?: string[];
+	"font-src"?: string[];
+	"object-src"?: string[];
+	"media-src"?: string[];
+	"frame-src"?: string[];
+	sandbox?: string[];
+	"report-uri"?: string[];
+	"child-src"?: string[];
+	"form-action"?: string[];
+	"frame-ancestors"?: string[];
+	"plugin-types"?: string[];
+	"base-uri"?: string[];
+	"report-to"?: string[];
+	"worker-src"?: string[];
+	"manifest-src"?: string[];
+	"upgrade-insecure-requests"?: boolean;
+	"block-all-mixed-content"?: boolean;
+	[key: string]: string[] | boolean | undefined;
 }
 
 export interface ContentSecurityPolicyConfig {
-  directives?: ContentSecurityPolicyDirectives;
-  reportOnly?: boolean;
+	directives?: ContentSecurityPolicyDirectives;
+	reportOnly?: boolean;
 }
 
 export type CrossOriginEmbedderPolicyValue =
-  | "unsafe-none"
-  | "require-corp"
-  | "credentialless";
+	| "unsafe-none"
+	| "require-corp"
+	| "credentialless";
 
 export interface CrossOriginEmbedderPolicyConfig {
-  policy?: CrossOriginEmbedderPolicyValue;
+	policy?: CrossOriginEmbedderPolicyValue;
 }
 
 export const defaultCrossOriginEmbedderPolicyConfig: CrossOriginEmbedderPolicyConfig =
-  {
-    policy: "require-corp",
-  };
+	{
+		policy: "require-corp",
+	};
 
 export type CrossOriginOpererPolicyValue =
-  | "unsafe-none"
-  | "same-origin-allow-popups"
-  | "same-origin";
+	| "unsafe-none"
+	| "same-origin-allow-popups"
+	| "same-origin";
 
 export interface CrossOriginOpererPolicyConfig {
-  policy?: CrossOriginOpererPolicyValue;
+	policy?: CrossOriginOpererPolicyValue;
 }
 
 export const defaultCrossOriginOpererPolicyConfig: CrossOriginOpererPolicyConfig =
-  {
-    policy: "same-origin",
-  };
+	{
+		policy: "same-origin",
+	};
 
 export type CrossOriginResourcePolicyValue =
-  | "same-site"
-  | "same-origin"
-  | "cross-origin";
+	| "same-site"
+	| "same-origin"
+	| "cross-origin";
 
 export interface CrossOriginResourcePolicyConfig {
-  policy?: CrossOriginResourcePolicyValue;
+	policy?: CrossOriginResourcePolicyValue;
 }
 
-export const defaultCrossOriginResourcePolicy: CrossOriginResourcePolicyConfig = {
-  policy: "same-origin",
-};
-
+export const defaultCrossOriginResourcePolicy: CrossOriginResourcePolicyConfig =
+	{
+		policy: "same-origin",
+	};
 
 export type FrameguardAction = "DENY" | "SAMEORIGIN";
 
@@ -87,7 +86,6 @@ export interface FrameguardConfig {
 export const defaultFrameguardConfig: FrameguardConfig = {
 	action: "SAMEORIGIN",
 };
-
 
 export interface PermissionsPolicyDirectives {
 	accelerometer?: string[];
@@ -136,7 +134,6 @@ export interface ReferrerPolicyConfig {
 export const defaultReferrerPolicyConfig: ReferrerPolicyConfig = {
 	policy: "no-referrer",
 };
-
 
 export interface HSTSConfig {
 	maxAge?: number;

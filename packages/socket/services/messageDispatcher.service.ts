@@ -1,6 +1,6 @@
 /**
- * @fileoverview Handles incoming WebSocket messages with rate limiting, JSON parsing,
- * message dispatch, async error handling, and fallback to the general message handler.
+ * @fileoverview Bulletproof incoming WebSocket message router with automatic
+ * JSON decoding, fast-path binary handling, and safe fallback.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -23,6 +23,8 @@ export function dispatchMessage(
 		return;
 	}
 
+	let jsonDispatched = false;
+
 	if (handlers.onJson && !isBinary) {
 		let rawStr: string;
 		if (typeof data === "string") {
@@ -35,34 +37,37 @@ export function dispatchMessage(
 			rawStr = Buffer.from(data).toString("utf-8");
 		}
 
-		try {
-			const parsed = JSON.parse(rawStr);
-			const jsonResult = handlers.onJson(connection, parsed);
-			if (
-				jsonResult &&
-				typeof (jsonResult as Promise<void>).catch === "function"
-			) {
-				(jsonResult as Promise<void>).catch((err) => {
-					const error = err instanceof Error ? err : new Error(String(err));
-					console.error(
-						`[Subatom WS] onJson async handler rejected for connection ${connection.id}:`,
-						error.message,
-					);
-					try {
-						handlers.onError?.(connection, error);
-					} catch (errHandlerErr) {
+		// Fast test for JSON object / array
+		const trimmed = rawStr.trim();
+		if (
+			(trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+			(trimmed.startsWith("[") && trimmed.endsWith("]"))
+		) {
+			try {
+				const parsed = JSON.parse(trimmed);
+				jsonDispatched = true;
+				const jsonResult = handlers.onJson(connection, parsed);
+				if (
+					jsonResult &&
+					typeof (jsonResult as Promise<void>).catch === "function"
+				) {
+					(jsonResult as Promise<void>).catch((err) => {
+						const error = err instanceof Error ? err : new Error(String(err));
 						console.error(
-							`[Subatom WS] onError handler threw for connection ${connection.id}:`,
-							(errHandlerErr as Error).message,
+							`[Subatom WS] onJson async handler rejected for ${connection.id}:`,
+							error.message,
 						);
-					}
-				});
+						handlers.onError?.(connection, error);
+					});
+				}
+			} catch {
+				jsonDispatched = false;
 			}
-		} catch {
-			// Not JSON payload; continue to normal onMessage handler
 		}
 	}
 
+	// If already handled by onJson, do not fire onMessage duplicate
+	if (jsonDispatched) return;
 	if (!handlers.onMessage) return;
 
 	try {
@@ -71,32 +76,18 @@ export function dispatchMessage(
 			(result as Promise<void>).catch((err) => {
 				const error = err instanceof Error ? err : new Error(String(err));
 				console.error(
-					`[Subatom WS] onMessage async handler rejected for connection ${connection.id}:`,
+					`[Subatom WS] onMessage async handler rejected for ${connection.id}:`,
 					error.message,
 				);
-				try {
-					handlers.onError?.(connection, error);
-				} catch (errHandlerErr) {
-					console.error(
-						`[Subatom WS] onError handler threw for connection ${connection.id}:`,
-						(errHandlerErr as Error).message,
-					);
-				}
+				handlers.onError?.(connection, error);
 			});
 		}
 	} catch (err) {
 		const error = err instanceof Error ? err : new Error(String(err));
 		console.error(
-			`[Subatom WS] onMessage handler threw for connection ${connection.id}:`,
+			`[Subatom WS] onMessage handler threw for ${connection.id}:`,
 			error.message,
 		);
-		try {
-			handlers.onError?.(connection, error);
-		} catch (errHandlerErr) {
-			console.error(
-				`[Subatom WS] onError handler threw for connection ${connection.id}:`,
-				(errHandlerErr as Error).message,
-			);
-		}
+		handlers.onError?.(connection, error);
 	}
 }

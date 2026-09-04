@@ -6,6 +6,7 @@
  * @license MIT
  */
 
+import type { ISubatom } from "../packages/core/subatom/types/subatom.types.js";
 import type { Subatom } from "../packages/core/subatom/Subatom.js";
 import type { IRoute } from "../packages/core/router/types/router.types.js";
 import { generateOpenApiSpec } from "./openApiGenerator.js";
@@ -15,14 +16,15 @@ import type {
 	SetupApiDocsOptions,
 } from "./types/openapi.types.js";
 
-interface SubatomWithRouter {
+interface SubatomWithRoutes {
+	getRoutes?: () => IRoute[];
 	router?: {
 		getRoutes?: () => IRoute[];
 	};
 }
 
-export function setupApiDocs(
-	app: Subatom,
+export function SubAtomDocs(
+	app: Subatom | ISubatom,
 	options?: SetupApiDocsOptions,
 ): void {
 	const docsPath = options?.path || "/docs";
@@ -32,9 +34,19 @@ export function setupApiDocs(
 	let cachedSpec: OpenApiSpec | null = null;
 	let cachedRouteCount = -1;
 
+	function extractRoutes(): IRoute[] {
+		const target = app as unknown as SubatomWithRoutes;
+		if (typeof target.getRoutes === "function") {
+			return target.getRoutes();
+		}
+		if (target.router && typeof target.router.getRoutes === "function") {
+			return target.router.getRoutes();
+		}
+		return [];
+	}
+
 	function buildSpec(): OpenApiSpec {
-		const subatomRouter = (app as unknown as SubatomWithRouter).router;
-		const routes = subatomRouter?.getRoutes?.() ?? [];
+		const routes = extractRoutes();
 
 		if (shouldCache && cachedSpec && routes.length === cachedRouteCount) {
 			return cachedSpec;

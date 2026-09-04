@@ -5,9 +5,6 @@
  * @license MIT
  */
 
-
-
-
 // 1. Export all types
 export type {
 	AlgorithmType,

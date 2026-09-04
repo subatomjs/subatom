@@ -5,7 +5,6 @@
  * @license MIT
  */
 
-
 import type { SecurityOptions } from "../types/security.types.js";
 
 export const productionProfile: SecurityOptions = {

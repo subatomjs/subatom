@@ -35,7 +35,7 @@ import { parseMultipart } from "./parseMultipart.js";
 
 /**
  * Writes the error response directly to the client instead of relying on
- * `next(err)` to bubble through framework-level error middleware.
+ * `next(err)` to bubble through framework-level error middleware[cite: 2].
  */
 function sendUploadError(res: ResponseTarget, err: unknown): boolean {
 	const status =
@@ -84,13 +84,13 @@ function sendUploadError(res: ResponseTarget, err: unknown): boolean {
 			return true;
 		}
 	} catch {
-		// fall through - couldn't write directly, let caller decide fallback
+		// Couldn't write directly, let caller handle next[cite: 2]
 	}
 	return false;
 }
 
 /**
- * Safe stream and headers extractor supporting Subatom Request wrapper and raw Node streams
+ * Safe stream and headers extractor supporting Subatom Request wrapper and raw Node streams[cite: 2]
  */
 function getStreamAndHeaders(req: RequestTarget): {
 	stream: Readable;
@@ -112,7 +112,7 @@ function getStreamAndHeaders(req: RequestTarget): {
 }
 
 /**
- * Validates whether the incoming request is multipart/form-data
+ * Validates whether the incoming request is multipart/form-data[cite: 2]
  */
 function isMultipartRequest(headers: IncomingHttpHeaders): boolean {
 	const contentType = headers["content-type"] || "";
@@ -123,7 +123,7 @@ function isMultipartRequest(headers: IncomingHttpHeaders): boolean {
 }
 
 /**
- * Single File Upload Middleware
+ * Single File Upload Middleware[cite: 2]
  */
 export function single(
 	fieldname: string,
@@ -168,7 +168,7 @@ export function single(
 }
 
 /**
- * Array File Upload Middleware (Multiple files under same field)
+ * Array File Upload Middleware (Multiple files under same field)[cite: 2]
  */
 export function array(
 	fieldname: string,
@@ -225,7 +225,7 @@ export function array(
 }
 
 /**
- * Fields Upload Middleware (Multiple named file fields with individual limits)
+ * Fields Upload Middleware (Multiple named file fields with individual limits)[cite: 2]
  */
 export function fields(
 	fieldsConfig: Array<{ name: string; maxCount?: number }>,
@@ -284,7 +284,7 @@ export function fields(
 }
 
 /**
- * Accepts ANY uploaded files across any fields
+ * Accepts ANY uploaded files across any fields[cite: 2]
  */
 export function anyFiles(
 	options: FileUploadPipelineOptions = { storage: "memory" },
@@ -322,7 +322,7 @@ export function anyFiles(
 }
 
 /**
- * Rejects ALL file uploads (Allows text/form fields only)
+ * Rejects ALL file uploads (Allows text/form fields only)[cite: 2]
  */
 export function none(
 	options: FileUploadPipelineOptions = { storage: "memory" },
@@ -367,7 +367,7 @@ export function none(
 }
 
 /**
- * Purges disk/memory references for parsed file maps.
+ * Purges disk/memory references for parsed file maps[cite: 2].
  */
 async function cleanupFiles(
 	filesMap: Record<string, IFileUpload[]>,

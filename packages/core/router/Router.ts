@@ -6,7 +6,6 @@
  * @license MIT
  */
 
-import { getOrCreateContext } from "../../context/Context.js";
 import { ErrorFormatter } from "../../errors/ErrorFormatter.js";
 import {
 	MethodNotAllowedError,
@@ -23,7 +22,7 @@ import {
 } from "../../pipelines/modifiers/services/pipelineRegistrar.service.js";
 import type { IRequestPipelineConfig } from "../../pipelines/modifiers/types/modifiers.types.js";
 import { Next } from "../../pipelines/next/Next.js";
-import type { NextFunction } from "../../pipelines/next/types/nextFunction.types.js";
+
 import type {
 	IInterceptor,
 	ISerializer,
@@ -39,12 +38,8 @@ import type {
 	IResourceOptions,
 } from "./types/resource.router.types.js";
 import type {
-	IContext,
-	IContextMiddleware,
-	IController,
 	IGroupOptions,
 	IHandler,
-	ILegacyHandler,
 	IMatchResult,
 	IRoute,
 	IRouteMetaOptions,
@@ -54,84 +49,12 @@ import type {
 	IRouteSchema,
 	RouteArgument,
 } from "./types/router.types.js";
+import normalizeMiddlewareToHandler from "./helpers/normalizeMiddleware.js";
+import createControllerHandler from "./helpers/createControllerHandler.js";
 
 const MIDDLEWARE_METHOD = "USE";
 const WILDCARD_METHOD = "ALL";
 const QUERY_METHOD = "QUERY";
-
-/**
- * Checks if a value is the Context or HTTP request/response object to avoid auto-serializing it.
- */
-function isContextOrHttpInstance(
-	val: unknown,
-	ctx: IContext,
-	req: IRequest,
-	res: IResponse,
-): boolean {
-	return (
-		val === ctx ||
-		val === res ||
-		val === req ||
-		val === (ctx as IContext)?.req ||
-		val === (ctx as IContext)?.res ||
-		val === (req as IRequest)?.raw ||
-		val === (res as IResponse)?.raw
-	);
-}
-
-/**
- * Adapts context middlewares or legacy request/response handlers to an internal IHandler.
- */
-function normalizeMiddlewareToHandler(mw: IRouteMiddleware): IHandler {
-	return async (req: IRequest, res: IResponse, next: NextFunction) => {
-		if (mw.length >= 3) {
-			return (mw as ILegacyHandler)(req, res, next);
-		}
-		const ctx = getOrCreateContext(req, res);
-		return (mw as IContextMiddleware)(ctx, next);
-	};
-}
-
-/**
- * Wraps a context controller into an internal IHandler.
- */
-function createControllerHandler<
-	TSchema extends IRouteSchema = IRouteSchema,
-	TLocals extends Record<string, unknown> = Record<string, unknown>,
-	TUser = unknown,
-	TReturn = unknown,
->(controller: IController<TSchema, TLocals, TUser, TReturn>): IHandler {
-	return async (req: IRequest, res: IResponse, next: NextFunction) => {
-		if (res.writableEnded || res.headersSent) return;
-		const ctx = getOrCreateContext<TSchema, TLocals, TUser>(req, res);
-		try {
-			const result = await controller(ctx);
-			if (
-				result !== undefined &&
-				!res.writableEnded &&
-				!res.headersSent &&
-				!isContextOrHttpInstance(result, ctx, req, res)
-			) {
-				if (
-					typeof result === "object" &&
-					result !== null &&
-					!(result instanceof Buffer) &&
-					!(result instanceof Uint8Array)
-				) {
-					ctx.json(result);
-				} else if (
-					typeof result === "string" ||
-					typeof result === "number" ||
-					typeof result === "boolean"
-				) {
-					ctx.send(String(result));
-				}
-			}
-		} catch (err) {
-			return next(err);
-		}
-	};
-}
 
 export class Router implements IRouter {
 	protected routes: IRoute[] = [];
@@ -142,14 +65,30 @@ export class Router implements IRouter {
 
 	public transformer(transformer: ITransformer): void {
 		registerTransformer(this.transformers, transformer);
+		// Update existing routes to inherit the newly registered transformer
+		for (const route of this.routes) {
+			if (!route.routerPipeline) {
+				route.routerPipeline = this.getPipelineConfig();
+			}
+		}
 	}
 
 	public intercept(interceptor: IInterceptor): void {
 		registerInterceptor(this.interceptors, interceptor);
+		for (const route of this.routes) {
+			if (!route.routerPipeline) {
+				route.routerPipeline = this.getPipelineConfig();
+			}
+		}
 	}
 
 	public serializer(serializer: ISerializer): void {
 		registerSerializer(this.serializers, serializer);
+		for (const route of this.routes) {
+			if (!route.routerPipeline) {
+				route.routerPipeline = this.getPipelineConfig();
+			}
+		}
 	}
 
 	public getPipelineConfig(): IRequestPipelineConfig {
@@ -375,7 +314,7 @@ export class Router implements IRouter {
 	}
 
 	// ============================================================
-	// Groups (Style 1 and Style 2)
+	// Groups
 	// ============================================================
 
 	public group(prefix: string, options?: IGroupOptions): this;
@@ -428,6 +367,7 @@ export class Router implements IRouter {
 					...route,
 					path: combinedPath,
 					handlers: mergedMiddlewares,
+					routerPipeline: route.routerPipeline || this.getPipelineConfig(),
 				};
 
 				if (mergedTags.length > 0) {
@@ -500,13 +440,14 @@ export class Router implements IRouter {
 			this.registerWithMeta(def.method, def.path, def.handlers, def.meta);
 		}
 	}
+
 	// ============================================================
 	// Use / Sub-Router Mounting
 	// ============================================================
 
 	public use(
-		pathOrHandler: string | IHandler | IRouteMiddleware | Router,
-		...handlers: Array<IHandler | IRouteMiddleware | Router>
+		pathOrHandler: string | IHandler | IRouteMiddleware | IRouter,
+		...handlers: Array<IHandler | IRouteMiddleware | IRouter>
 	): void {
 		if (typeof pathOrHandler === "string") {
 			const path = pathOrHandler;
@@ -540,7 +481,7 @@ export class Router implements IRouter {
 		}
 	}
 
-	private mountSubRouter(mountPath: string, subRouter: Router): void {
+	private mountSubRouter(mountPath: string, subRouter: IRouter): void {
 		const cleanMount = `/${mountPath}`.replace(/\/+/g, "/").replace(/\/$/, "");
 
 		for (const route of subRouter.getRoutes()) {
@@ -550,6 +491,7 @@ export class Router implements IRouter {
 			this.routes.push({
 				...route,
 				path: combinedPath,
+				routerPipeline: route.routerPipeline || subRouter.getPipelineConfig?.(),
 			});
 		}
 	}
@@ -609,7 +551,6 @@ export class Router implements IRouter {
 		const cleanPath = `/${path || "/"}`.replace(/\/+/g, "/");
 		const finalHandlers = [...handlers];
 
-		// Validation Injection: schema validator runs right before controller
 		if (meta?.schema) {
 			const validatorMw = buildRequestValidator(meta.schema);
 			if (finalHandlers.length > 0) {
@@ -792,9 +733,16 @@ export class Router implements IRouter {
 		const routeSegments = routePath.split("/").filter(Boolean);
 		const incomingSegments = incomingPath.split("/").filter(Boolean);
 
+		const requiredSegmentsCount = routeSegments.filter(
+			(seg) => !(seg.startsWith(":") && seg.endsWith("?")),
+		).length;
+
 		if (options.prefix) {
-			if (routeSegments.length > incomingSegments.length) return null;
-		} else if (routeSegments.length !== incomingSegments.length) {
+			if (incomingSegments.length < requiredSegmentsCount) return null;
+		} else if (
+			incomingSegments.length < requiredSegmentsCount ||
+			incomingSegments.length > routeSegments.length
+		) {
 			return null;
 		}
 
@@ -804,10 +752,26 @@ export class Router implements IRouter {
 			const routeSeg = routeSegments[i];
 			const incomingSeg = incomingSegments[i];
 
-			if (!routeSeg || !incomingSeg) return null;
+			if (!routeSeg) return null;
 
-			if (routeSeg.startsWith(":")) {
-				const paramName = routeSeg.slice(1);
+			const isOptionalParam =
+				routeSeg.startsWith(":") && routeSeg.endsWith("?");
+			const isRequiredParam =
+				routeSeg.startsWith(":") && !routeSeg.endsWith("?");
+
+			if (isOptionalParam && !incomingSeg) {
+				continue;
+			}
+
+			if (!incomingSeg) {
+				return null;
+			}
+
+			if (isOptionalParam || isRequiredParam) {
+				const paramName = isOptionalParam
+					? routeSeg.slice(1, -1)
+					: routeSeg.slice(1);
+
 				if (!paramName) return null;
 
 				try {
