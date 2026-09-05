@@ -14,9 +14,17 @@ interface Entry {
 }
 
 export class MemoryStore implements ISessionStore {
-	private entries = new Map<string, Entry>();
+	private readonly entries = new Map<string, Entry>();
+	private readonly cleanupTimer: NodeJS.Timeout;
+	private closed = false;
+
+	constructor(cleanupMs = 60_000) {
+		this.cleanupTimer = setInterval(() => this.cleanup(), cleanupMs);
+		this.cleanupTimer.unref();
+	}
 
 	async get(sid: string): Promise<ISessionData | null> {
+		if (this.closed) return null;
 		const entry = this.entries.get(sid);
 		if (!entry) return null;
 
@@ -25,24 +33,47 @@ export class MemoryStore implements ISessionStore {
 			return null;
 		}
 
-		return entry.data;
+		return cloneData(entry.data);
 	}
 
 	async set(sid: string, data: ISessionData, maxAgeMs?: number): Promise<void> {
+		if (this.closed) throw new Error("MemoryStore is closed.");
 		this.entries.set(sid, {
-			data,
+			data: cloneData(data),
 			expiresAt: typeof maxAgeMs === "number" ? Date.now() + maxAgeMs : null,
 		});
 	}
 
 	async destroy(sid: string): Promise<void> {
+		if (this.closed) return;
 		this.entries.delete(sid);
 	}
 
 	async touch(sid: string, maxAgeMs?: number): Promise<void> {
+		if (this.closed) return;
 		const entry = this.entries.get(sid);
 		if (!entry) return;
 		entry.expiresAt =
 			typeof maxAgeMs === "number" ? Date.now() + maxAgeMs : null;
 	}
+
+	async close(): Promise<void> {
+		if (this.closed) return;
+		this.closed = true;
+		clearInterval(this.cleanupTimer);
+		this.entries.clear();
+	}
+
+	private cleanup(): void {
+		const now = Date.now();
+		for (const [sid, entry] of this.entries) {
+			if (entry.expiresAt !== null && entry.expiresAt <= now) {
+				this.entries.delete(sid);
+			}
+		}
+	}
+}
+
+function cloneData(data: ISessionData): ISessionData {
+	return structuredClone(data);
 }

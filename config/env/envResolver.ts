@@ -44,8 +44,5 @@ export function getEnvConfigOverride(): ISubatomConfig {
 		override.sourcemap = env.getBoolean("SUBATOM_SOURCEMAP");
 	if (env.has("SUBATOM_MINIFY"))
 		override.minify = env.getBoolean("SUBATOM_MINIFY");
-	if (env.has("SUBATOM_WEBSOCKET"))
-		override.websocket = env.getBoolean("SUBATOM_WEBSOCKET");
-
 	return override;
 }

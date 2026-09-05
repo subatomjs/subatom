@@ -7,7 +7,7 @@
  * @license MIT
  */
 
-import { type ChildProcess, execSync, spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import type {
 	ProcessManagerOptions,
 	ProcessStateStatus,
@@ -131,28 +131,30 @@ export class ProcessManager {
 			const pid = child.pid;
 
 			if (process.platform === "win32") {
-				try {
-					execSync(`taskkill /pid ${pid} /T /F`, { stdio: "ignore" });
-				} catch {
-					// Process may have already exited
-				}
-				setTimeout(resolve, 5);
+				const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+					stdio: "ignore",
+				});
+				killer.once("close", () => resolve());
+				killer.once("error", () => resolve());
 				return;
 			}
 
-			try {
-				execSync(`pkill -9 -P ${pid}`, { stdio: "ignore" });
-			} catch {
-				// Ignore failure if child has no subprocesses
-			}
-
-			try {
-				process.kill(pid, "SIGKILL");
-			} catch {
-				// Ignore failure if process already dead
-			}
-
-			setTimeout(resolve, 5);
+			const killer = spawn("pkill", ["-9", "-P", String(pid)], {
+				stdio: "ignore",
+			});
+			let finished = false;
+			const finish = () => {
+				if (finished) return;
+				finished = true;
+				try {
+					process.kill(pid, "SIGKILL");
+				} catch {
+					// Ignore failure if process already exited.
+				}
+				resolve();
+			};
+			killer.once("close", finish);
+			killer.once("error", finish);
 		});
 	}
 }

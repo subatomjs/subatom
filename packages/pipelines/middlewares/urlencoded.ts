@@ -13,6 +13,7 @@ import type { NextFunction } from "../next/types/nextFunction.types.js";
 import type { IRequest } from "../../core/http/request/types/request.types.js";
 import type { IResponse } from "../../core/http/response/types/response.types.js";
 import { parseLimit } from "./utils/limit/parseLimit.js";
+import { isPayloadTooLarge, readLimitedBody } from "./utils/readLimitedBody.js";
 
 export function urlencoded(options: ILimit = {}) {
 	const maxBytes = parseLimit(options.limit ?? "100kb"); // Default 100kb limit
@@ -30,40 +31,10 @@ export function urlencoded(options: ILimit = {}) {
 			return next();
 		}
 
-		// 2. Content-Length header guard check
-		const contentLength = parseInt(
-			req.raw.headers["content-length"] || "0",
-			10,
-		);
-		if (contentLength > maxBytes) {
-			res.status(413).json({
-				success: false,
-				message: "Payload Too Large",
-			});
-			return;
-		}
-
-		// 3. Aggregate request stream chunks and enforce size limits dynamically
 		try {
-			const chunks: Buffer[] = [];
-			let totalBytes = 0;
-
-			for await (const chunk of req.raw) {
-				totalBytes += chunk.length;
-
-				if (totalBytes > maxBytes) {
-					res.status(413).json({
-						success: false,
-						message: "Payload Too Large",
-					});
-					return;
-				}
-
-				chunks.push(chunk);
-			}
-
-			// 4. Decode form string payload into a JavaScript Object
-			const rawBody = Buffer.concat(chunks).toString("utf-8");
+			const rawBody = (await readLimitedBody(req.raw, maxBytes)).toString(
+				"utf-8",
+			);
 
 			if (rawBody.trim().length > 0) {
 				// Parse "name=Kunal&roles=admin&roles=dev" into { name: 'Kunal', roles: ['admin', 'dev'] }
@@ -80,10 +51,12 @@ export function urlencoded(options: ILimit = {}) {
 			}
 
 			await next();
-		} catch (_error: unknown) {
-			res.status(400).json({
+		} catch (error: unknown) {
+			res.status(isPayloadTooLarge(error) ? 413 : 400).json({
 				success: false,
-				message: "Bad Request: Malformed URL-encoded payload",
+				message: isPayloadTooLarge(error)
+					? "Payload Too Large"
+					: "Bad Request: Malformed URL-encoded payload",
 			});
 		}
 	};

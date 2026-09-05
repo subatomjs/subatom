@@ -5,7 +5,6 @@
  * @license MIT
  */
 
-/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
 import type { IncomingMessage } from "node:http";
 import type { Readable, Writable } from "node:stream";
 import type { ISession } from "../../../pipelines/middlewares/types/session.types.js";
@@ -40,12 +39,12 @@ import { resolveOrigin } from "./services/resolveOrigin.service.js";
 // Import exact service per function
 
 export class Request<
-	Body = any,
-	Query = Record<string, string>,
+	Body = unknown,
+	Query = Record<string, string | string[]>,
 	Params = Record<string, string>,
 	Cookies = Record<string, string>,
-	User = any,
-	Locals = Record<string, any>,
+	User = unknown,
+	Locals = Record<string, unknown>,
 	Ip = string,
 	Protocol = "http" | "https",
 	Secure = boolean,
@@ -89,20 +88,24 @@ export class Request<
 	public file?: IFileUpload | undefined;
 	public files?: RequestFiles | undefined;
 
-	[key: string]: any;
-
 	constructor(native_request: IncomingMessage, options: RequestOptions = {}) {
 		this.raw = native_request;
 		this.method = (native_request.method || "GET").toUpperCase();
 		this.url = native_request.url || "/";
 		this.headers = native_request.headers;
 
-		this.raw.on("error", (streamErr) => {
+		const onStreamError = (streamErr: Error) => {
 			console.error(
 				"[Subatom Stream Error]: Request socket issue:",
 				streamErr.message,
 			);
-		});
+		};
+		const cleanupStreamListeners = () => {
+			this.raw.off("error", onStreamError);
+			this.raw.off("close", cleanupStreamListeners);
+		};
+		this.raw.on("error", onStreamError);
+		this.raw.once("close", cleanupStreamListeners);
 
 		const trustProxy =
 			options.trustProxy ?? process.env.SUBATOM_TRUST_PROXY === "true";

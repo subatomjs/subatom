@@ -1,6 +1,6 @@
 /**
  * @fileoverview Core Subatom application entry point for routes, middleware,
- * WebSockets, pipelines, server lifecycle, and graceful shutdown.
+ * pipelines, server lifecycle, and graceful shutdown.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -39,10 +39,6 @@ import type {
 	IRouteSchema,
 	RouteArgument,
 } from "../router/types/router.types.js";
-import type {
-	ISocketHandlers,
-	ISocketRoute,
-} from "../../socket/types/socket.types.js";
 import type { SubatomServer } from "../server/SubatomServer.js";
 import type {
 	IGroupContext,
@@ -67,7 +63,6 @@ export class Subatom implements ISubatom {
 	private readonly router = new Router();
 	private readonly middlewares: MiddlewareHandler[] = [];
 	private readonly errorMiddlewares: ErrorMiddlewareHandler[] = [];
-	private readonly wsRoutes: ISocketRoute[] = [];
 	private serverInstance?: SubatomServer;
 	private customConfig: ISubatomServerConfig = {};
 
@@ -89,30 +84,7 @@ export class Subatom implements ISubatom {
 		}
 	}
 
-	// 1. Web socket connection handle method.
-	public ws<
-		TParams extends Record<string, string | undefined> = Record<
-			string,
-			string | undefined
-		>,
-		TQuery extends Record<string, string | undefined> = Record<
-			string,
-			string | undefined
-		>,
-		TLocals extends Record<string, unknown> = Record<string, unknown>,
-	>(path: string, handlers: ISocketHandlers<TParams, TQuery, TLocals>): this {
-		const route: ISocketRoute = {
-			path,
-			handlers: handlers as unknown as ISocketHandlers,
-		};
-		this.wsRoutes.push(route);
-		if (this.serverInstance) {
-			this.serverInstance.webSocket.register(path, handlers);
-		}
-		return this;
-	}
-
-	// 2. Set config to set configuration from root file.
+	// 1. Set config to set configuration from root file.
 	public setConfig(config: ISubatomServerConfig): this {
 		this.customConfig = { ...this.customConfig, ...config };
 		if (this.serverInstance) {
@@ -345,7 +317,6 @@ export class Subatom implements ISubatom {
 			this.middlewares,
 			this.errorMiddlewares,
 			this.customConfig,
-			this.wsRoutes,
 		);
 		(
 			this.serverInstance as SubatomServer & {
@@ -363,7 +334,6 @@ export class Subatom implements ISubatom {
 			this.middlewares,
 			this.errorMiddlewares,
 			this.customConfig,
-			this.wsRoutes,
 		);
 		(
 			this.serverInstance as SubatomServer & {

@@ -56,8 +56,41 @@ const MIDDLEWARE_METHOD = "USE";
 const WILDCARD_METHOD = "ALL";
 const QUERY_METHOD = "QUERY";
 
+interface RouteTrieNode {
+	readonly staticChildren: Map<string, RouteTrieNode>;
+	paramChild?: RouteTrieNode;
+	paramName?: string;
+	readonly terminals: Map<string, IRoute[]>;
+}
+
+function createTrieNode(): RouteTrieNode {
+	return {
+		staticChildren: new Map(),
+		terminals: new Map(),
+	};
+}
+
+function cloneAndFreeze<T>(value: T): T {
+	if (value === null || typeof value !== "object") return value;
+
+	if (Array.isArray(value)) {
+		return Object.freeze(value.map((item) => cloneAndFreeze(item))) as T;
+	}
+
+	const clone = Object.create(Object.getPrototypeOf(value)) as Record<
+		string,
+		unknown
+	>;
+	for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+		clone[key] = cloneAndFreeze(child);
+	}
+	return Object.freeze(clone) as T;
+}
+
 export class Router implements IRouter {
 	protected routes: IRoute[] = [];
+	private readonly routeIndexes = new Map<string, RouteTrieNode>();
+	private readonly middlewareRoutes: IRoute[] = [];
 
 	private readonly transformers: ITransformer[] = [];
 	private readonly interceptors: IInterceptor[] = [];
@@ -380,7 +413,7 @@ export class Router implements IRouter {
 					newRoute.name = effectiveName;
 				}
 
-				this.routes.push(newRoute);
+				this.addRoute(newRoute);
 			}
 			childRouter.clearRoutes();
 		};
@@ -488,7 +521,7 @@ export class Router implements IRouter {
 			const suffix = route.path === "/" ? "" : route.path;
 			const combinedPath = (cleanMount + suffix).replace(/\/+/g, "/") || "/";
 
-			this.routes.push({
+			this.addRoute({
 				...route,
 				path: combinedPath,
 				routerPipeline: route.routerPipeline || subRouter.getPipelineConfig?.(),
@@ -501,11 +534,13 @@ export class Router implements IRouter {
 	// ============================================================
 
 	public getRoutes(): IRoute[] {
-		return this.routes;
+		return cloneAndFreeze(this.routes);
 	}
 
 	public clearRoutes(): void {
 		this.routes = [];
+		this.routeIndexes.clear();
+		this.middlewareRoutes.length = 0;
 	}
 
 	public registerWithMeta(
@@ -586,7 +621,7 @@ export class Router implements IRouter {
 			route.schema = meta.schema;
 		}
 
-		this.routes.push(route);
+		this.addRoute(route);
 	}
 
 	public findRouteByName(name: string): IRoute | undefined {
@@ -595,6 +630,17 @@ export class Router implements IRouter {
 
 	public hasRoute(name: string): boolean {
 		return this.findRouteByName(name) !== undefined;
+	}
+
+	/**
+	 * Registers a route that has already been normalized by another Router.
+	 * This is used when mounting sub-routers so route indexes stay in sync.
+	 */
+	public registerMountedRoute(route: IRoute): void {
+		this.addRoute({
+			...route,
+			handlers: [...route.handlers],
+		});
 	}
 
 	// ============================================================
@@ -609,15 +655,20 @@ export class Router implements IRouter {
 		const query = this.extractQuery(rawUrl);
 		const targetMethod = (method || "GET").toUpperCase();
 
-		for (const route of this.routes) {
-			if (route.method === MIDDLEWARE_METHOD) continue;
-			if (route.method !== targetMethod && route.method !== WILDCARD_METHOD)
-				continue;
+		const candidates = [
+			this.routeIndexes.get(targetMethod),
+			this.routeIndexes.get(WILDCARD_METHOD),
+		];
 
-			const params = this.matchPath(route.path, pathName);
-			if (params !== null) {
-				return { route, params, query };
-			}
+		for (const index of candidates) {
+			if (!index) continue;
+			const matched = this.matchTrie(
+				index,
+				pathName,
+				index === candidates[0] ? targetMethod : WILDCARD_METHOD,
+			);
+			if (matched)
+				return { route: matched.route, params: matched.params, query };
 		}
 
 		return undefined;
@@ -637,11 +688,7 @@ export class Router implements IRouter {
 		const matchResult = this.match(method, req.url || "/");
 
 		if (!matchResult) {
-			const pathExists = this.routes.some(
-				(r) =>
-					r.method !== MIDDLEWARE_METHOD &&
-					this.matchPath(r.path, pathName) !== null,
-			);
+			const pathExists = this.hasIndexedPath(pathName);
 
 			if (pathExists) {
 				throw new MethodNotAllowedError(
@@ -662,6 +709,105 @@ export class Router implements IRouter {
 		];
 
 		await this.runPipeline(pipeline, req, res);
+	}
+
+	private addRoute(route: IRoute): void {
+		this.routes.push(route);
+		if (route.method === MIDDLEWARE_METHOD) {
+			this.middlewareRoutes.push(route);
+			return;
+		}
+
+		let node = this.routeIndexes.get(route.method);
+		if (!node) {
+			node = createTrieNode();
+			this.routeIndexes.set(route.method, node);
+		}
+
+		for (const segment of route.path.split("/").filter(Boolean)) {
+			if (segment.startsWith(":") && segment.endsWith("?")) {
+				if (!node.paramChild) {
+					node.paramChild = createTrieNode();
+					node.paramName = segment.slice(1, -1);
+				}
+				node = node.paramChild;
+			} else if (segment.startsWith(":")) {
+				if (!node.paramChild) {
+					node.paramChild = createTrieNode();
+					node.paramName = segment.slice(1);
+				}
+				node = node.paramChild;
+			} else {
+				let child = node.staticChildren.get(segment);
+				if (!child) {
+					child = createTrieNode();
+					node.staticChildren.set(segment, child);
+				}
+				node = child;
+			}
+		}
+
+		const terminalRoutes = node.terminals.get(route.method) ?? [];
+		terminalRoutes.push(route);
+		node.terminals.set(route.method, terminalRoutes);
+	}
+
+	private hasIndexedPath(pathName: string): boolean {
+		for (const [method, index] of this.routeIndexes) {
+			if (this.matchTrie(index, pathName, method)) return true;
+		}
+		return false;
+	}
+
+	private matchTrie(
+		root: RouteTrieNode,
+		pathName: string,
+		method: string,
+	): { route: IRoute; params: Record<string, string> } | undefined {
+		const visit = (
+			node: RouteTrieNode,
+			offset: number,
+			params: Record<string, string>,
+		): { route: IRoute; params: Record<string, string> } | undefined => {
+			let start = offset;
+			while (start < pathName.length && pathName[start] === "/") start += 1;
+
+			if (start >= pathName.length) {
+				const terminal = node.terminals.get(method);
+				const route = terminal?.[0];
+				if (route) return { route, params };
+				if (node.paramChild) {
+					const optional = visit(node.paramChild, offset, { ...params });
+					if (optional) return optional;
+				}
+				return undefined;
+			}
+
+			const slashIndex = pathName.indexOf("/", start);
+			const end = slashIndex === -1 ? pathName.length : slashIndex;
+			const segment = pathName.slice(start, end);
+			const nextOffset = end === pathName.length ? end : end + 1;
+			const staticChild = node.staticChildren.get(segment);
+			if (staticChild) {
+				const staticMatch = visit(staticChild, nextOffset, { ...params });
+				if (staticMatch) return staticMatch;
+			}
+
+			if (node.paramChild && node.paramName) {
+				try {
+					const paramMatch = visit(node.paramChild, nextOffset, {
+						...params,
+						[node.paramName]: decodeURIComponent(segment),
+					});
+					if (paramMatch) return paramMatch;
+				} catch {
+					return undefined;
+				}
+			}
+			return undefined;
+		};
+
+		return visit(root, 0, Object.create(null));
 	}
 
 	public async handleRequest(
@@ -699,7 +845,7 @@ export class Router implements IRouter {
 		const handlers: IHandler[] = [];
 		const params: Record<string, string> = Object.create(null);
 
-		for (const route of this.routes) {
+		for (const route of this.middlewareRoutes) {
 			if (route.method !== MIDDLEWARE_METHOD) continue;
 
 			const matched = this.matchPath(route.path, pathName, { prefix: true });

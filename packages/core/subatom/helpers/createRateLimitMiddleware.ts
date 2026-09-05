@@ -19,30 +19,21 @@ type RateLimitableResponse = IResponse & {
 export function createRateLimitMiddleware(spec: string): MiddlewareHandler {
 	const { limit, windowMs } = parseRateLimitSpec(spec);
 	const buckets = new Map<string, { count: number; resetAt: number }>();
-
-	const sweepIntervalMs = Math.max(windowMs, 1_000);
-	const sweepTimer = setInterval(() => {
-		const now = Date.now();
-		for (const [key, bucket] of buckets) {
-			if (bucket.resetAt <= now) {
-				buckets.delete(key);
-			}
-		}
-	}, sweepIntervalMs);
-
-	// Never let this background timer keep the Node process alive.
-	if (typeof sweepTimer.unref === "function") {
-		sweepTimer.unref();
-	}
+	let requestCount = 0;
 
 	return (req, res, next) => {
 		try {
+			if ((requestCount++ & 0xff) === 0) {
+				const now = Date.now();
+				for (const [key, bucket] of buckets) {
+					if (bucket.resetAt <= now) buckets.delete(key);
+				}
+			}
+
 			const clientKey: string =
 				(req as IRequest)?.ip ||
-				(req as IRequest)?.rawRequest?.socket?.remoteAddress ||
-				(req as IRequest)?.rawRequest?.headers?.[
-					"x-forwarded-for"
-				]?.toString() ||
+				(req as IRequest)?.raw?.socket?.remoteAddress ||
+				(req as IRequest)?.raw?.headers?.["x-forwarded-for"]?.toString() ||
 				"unknown";
 
 			const now = Date.now();

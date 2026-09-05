@@ -6,21 +6,38 @@
  * @license MIT
  */
 
+import { randomUUID } from "node:crypto";
 import type {
 	RateLimitStore,
 	RedisClientLike,
+	RedisStoreOptions,
 	StoreEvalParams,
 	StoreEvalResult,
 } from "../types/rateLimit.types.js";
 
 export class RedisStore implements RateLimitStore {
-	private client: RedisClientLike;
+	private readonly client: RedisClientLike;
+	private readonly timeoutMs: number;
+	private readonly retries: number;
+	private readonly retryDelayMs: number;
+	private readonly failureThreshold: number;
+	private readonly cooldownMs: number;
+	private consecutiveFailures = 0;
+	private openedAt = 0;
+	private halfOpenInFlight = false;
+	private closed = false;
 
-	constructor(client: RedisClientLike) {
+	constructor(client: RedisClientLike, options: RedisStoreOptions = {}) {
 		this.client = client;
+		this.timeoutMs = positiveInteger(options.timeoutMs, 250);
+		this.retries = nonNegativeInteger(options.retries, 1);
+		this.retryDelayMs = nonNegativeInteger(options.retryDelayMs, 25);
+		this.failureThreshold = positiveInteger(options.failureThreshold, 5);
+		this.cooldownMs = positiveInteger(options.cooldownMs, 10_000);
 	}
 
 	async evaluate(p: StoreEvalParams): Promise<StoreEvalResult> {
+		if (this.closed) throw new Error("RedisStore is closed.");
 		const key = `rl:${p.key}`;
 
 		if (p.algorithm === "fixed-window") {
@@ -32,13 +49,13 @@ export class RedisStore implements RateLimitStore {
         local ttl = redis.call("PTTL", KEYS[1])
         return { current, ttl }
       `;
-			const res = (await this.client.eval(
+			const res = await this.call<[number | string, number | string]>(
 				lua,
 				1,
 				key,
 				p.limit,
 				p.windowMs,
-			)) as [number | string, number | string];
+			);
 
 			const count = Number(res[0]);
 			const ttl = Number(res[1]);
@@ -61,7 +78,7 @@ export class RedisStore implements RateLimitStore {
 
         local allowed = 0
         if count < limit then
-          redis.call("ZADD", KEYS[1], now, now)
+					redis.call("ZADD", KEYS[1], now, ARGV[4])
           allowed = 1
           count = count + 1
         end
@@ -75,14 +92,16 @@ export class RedisStore implements RateLimitStore {
 
         return { allowed, limit - count, resetMs }
       `;
-			const res = (await this.client.eval(
+			const member = `${p.now}-${randomUUID()}`;
+			const res = await this.call<[number, number | string, number | string]>(
 				lua,
 				1,
 				key,
 				p.now,
 				p.windowMs,
 				p.limit,
-			)) as [number, number | string, number | string];
+				member,
+			);
 
 			return {
 				allowed: res[0] === 1,
@@ -125,7 +144,7 @@ export class RedisStore implements RateLimitStore {
 
       return { allowed, tokens, refillInterval }
     `;
-		const res = (await this.client.eval(
+		const res = await this.call<[number, number | string, number | string]>(
 			lua,
 			1,
 			key,
@@ -133,7 +152,7 @@ export class RedisStore implements RateLimitStore {
 			p.refillRate,
 			p.refillIntervalMs,
 			p.now,
-		)) as [number, number | string, number | string];
+		);
 
 		return {
 			allowed: res[0] === 1,
@@ -141,4 +160,99 @@ export class RedisStore implements RateLimitStore {
 			resetMs: Number(res[2]),
 		};
 	}
+
+	async close(): Promise<void> {
+		this.closed = true;
+	}
+
+	async destroy(): Promise<void> {
+		await this.close();
+	}
+
+	private async call<T>(
+		script: string,
+		numKeys: number,
+		...args: (string | number)[]
+	): Promise<T> {
+		const now = Date.now();
+		if (this.openedAt > 0) {
+			if (now - this.openedAt < this.cooldownMs || this.halfOpenInFlight) {
+				throw new Error("Redis rate-limit circuit is open.");
+			}
+			this.halfOpenInFlight = true;
+		}
+
+		let lastError: Error | undefined;
+		try {
+			for (let attempt = 0; attempt <= this.retries; attempt += 1) {
+				try {
+					const result = await this.callOnce<T>(script, numKeys, ...args);
+					this.consecutiveFailures = 0;
+					this.openedAt = 0;
+					return result;
+				} catch (error) {
+					lastError = error instanceof Error ? error : new Error(String(error));
+					if (attempt < this.retries && this.retryDelayMs > 0) {
+						await this.delay(this.retryDelayMs);
+					}
+				}
+			}
+
+			throw lastError ?? new Error("Redis rate-limit call failed.");
+		} catch (error) {
+			this.consecutiveFailures += 1;
+			if (this.consecutiveFailures >= this.failureThreshold) {
+				this.openedAt = Date.now();
+				console.warn(
+					"[Subatom RateLimit] Redis circuit opened after repeated failures.",
+				);
+			}
+			throw error instanceof Error ? error : new Error(String(error));
+		} finally {
+			this.halfOpenInFlight = false;
+		}
+	}
+
+	private async callOnce<T>(
+		script: string,
+		numKeys: number,
+		...args: (string | number)[]
+	): Promise<T> {
+		let timer: NodeJS.Timeout | undefined;
+		try {
+			return await Promise.race([
+				this.client.eval(script, numKeys, ...args) as Promise<T>,
+				new Promise<T>((_, reject) => {
+					timer = setTimeout(
+						() => reject(new Error("Redis rate-limit call timed out.")),
+						this.timeoutMs,
+					);
+				}),
+			]);
+		} finally {
+			if (timer) clearTimeout(timer);
+		}
+	}
+
+	private delay(delayMs: number): Promise<void> {
+		return new Promise((resolve) => {
+			const timer = setTimeout(resolve, delayMs);
+			timer.unref();
+		});
+	}
+}
+
+function positiveInteger(value: number | undefined, fallback: number): number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+		? value
+		: fallback;
+}
+
+function nonNegativeInteger(
+	value: number | undefined,
+	fallback: number,
+): number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+		? value
+		: fallback;
 }

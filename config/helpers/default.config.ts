@@ -14,14 +14,6 @@ export const DEFAULT_CONFIG: SubatomConfig = {
 	host: "localhost",
 	sourcemap: true,
 	minify: false,
-	websocket: true,
-	websocketOptions: {
-		heartbeatIntervalMs: 30_000,
-		maxMessagesPerSecond: 20,
-		maxPayloadBytes: 1024 * 1024,
-		shutdownTimeoutMs: 5_000,
-		perMessageDeflate: true,
-	},
 	watch: {
 		extensions: ["ts", "js", "mjs", "cjs", "json"],
 		debounceMs: 300,

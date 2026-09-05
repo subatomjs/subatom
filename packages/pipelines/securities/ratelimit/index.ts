@@ -13,6 +13,7 @@ export type {
 	StoreType,
 	FailureMode,
 	RedisClientLike,
+	RedisStoreOptions,
 	StoreEvalParams,
 	StoreEvalResult,
 	RateLimitStore,

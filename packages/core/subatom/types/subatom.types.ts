@@ -12,7 +12,6 @@ import type {
 	ITransformer,
 	MiddlewareHandler,
 } from "../../../pipelines/pipeline.types.js";
-import type { ISocketHandlers } from "../../../socket/types/socket.types.js";
 import type {
 	IResourceController,
 	IResourceOptions,
@@ -30,19 +29,6 @@ import type { ISubatomServerConfig } from "../../server/types/subatom.server.typ
 import type { RouteGroupBuilder } from "../subordinate/RouteGroupBuilder.js";
 
 export interface ISubatom {
-	// WebSockets
-	ws<
-		TParams extends Record<string, string | undefined> = Record<
-			string,
-			string | undefined
-		>,
-		TQuery extends Record<string, string | undefined> = Record<
-			string,
-			string | undefined
-		>,
-		TLocals extends Record<string, unknown> = Record<string, unknown>,
-	>(path: string, handlers: ISocketHandlers<TParams, TQuery, TLocals>): this;
-
 	// Server Configuration & Lifecycle
 	setConfig(config: ISubatomServerConfig): this;
 	start(

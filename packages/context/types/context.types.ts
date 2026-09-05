@@ -135,38 +135,58 @@ export type InferFiles<TSchema> = TSchema extends { files: infer Fs }
  * Developer-facing Context facade wrapping underlying IRequest and IResponse.
  */
 export interface IContext<
-	TSchema = unknown,
-	TLocals extends Record<string, unknown> = Record<string, unknown>,
+	TBody = unknown,
+	TParams = Record<string, string>,
+	TQuery = Record<string, string | string[]>,
+	TFiles = Record<string, unknown>,
 	TUser = unknown,
+	TLocals extends Record<string, unknown> = Record<string, unknown>,
+	THeaders extends Record<string, string | string[] | undefined> = Record<
+		string,
+		string | string[] | undefined
+	>,
+	TFile = IFileUpload | undefined,
 > {
 	// Underlying HTTP abstractions
 	readonly req: IRequest<
-		InferBody<TSchema>,
-		InferQuery<TSchema>,
-		InferParams<TSchema>,
+		TBody,
+		TQuery,
+		TParams,
 		Record<string, string>,
 		TUser,
-		TLocals
+		TLocals,
+		string,
+		"http" | "https",
+		boolean,
+		string,
+		string,
+		TFiles
 	>;
 	readonly res: IResponse;
 	readonly request: IRequest<
-		InferBody<TSchema>,
-		InferQuery<TSchema>,
-		InferParams<TSchema>,
+		TBody,
+		TQuery,
+		TParams,
 		Record<string, string>,
 		TUser,
-		TLocals
+		TLocals,
+		string,
+		"http" | "https",
+		boolean,
+		string,
+		string,
+		TFiles
 	>;
 	readonly response: IResponse;
 
 	// Inferred Request Data Facade
-	readonly params: InferParams<TSchema>;
-	readonly query: InferQuery<TSchema>;
-	readonly body: InferBody<TSchema>;
-	readonly headers: InferHeaders<TSchema>;
+	readonly params: TParams;
+	readonly query: TQuery;
+	readonly body: TBody;
+	readonly headers: THeaders;
 	readonly cookies: Record<string, string>;
-	readonly files: InferFiles<TSchema>;
-	readonly file: InferFile<TSchema>;
+	readonly files: TFiles;
+	readonly file: TFile;
 	user: TUser;
 	locals: TLocals;
 
@@ -229,6 +249,21 @@ export interface IContext<
 	): this;
 }
 
+export type ContextForSchema<
+	TSchema = unknown,
+	TLocals extends Record<string, unknown> = Record<string, unknown>,
+	TUser = unknown,
+> = IContext<
+	InferBody<TSchema>,
+	InferParams<TSchema>,
+	InferQuery<TSchema>,
+	InferFiles<TSchema>,
+	TUser,
+	TLocals,
+	InferHeaders<TSchema>,
+	InferFile<TSchema>
+>;
+
 /**
  * Controller handler taking a typed Context.
  */
@@ -237,7 +272,9 @@ export type IController<
 	TLocals extends Record<string, unknown> = Record<string, unknown>,
 	TUser = unknown,
 	TReturn = unknown,
-> = (ctx: IContext<TSchema, TLocals, TUser>) => TReturn | Promise<TReturn>;
+> = (
+	ctx: ContextForSchema<TSchema, TLocals, TUser>,
+) => TReturn | Promise<TReturn>;
 
 /**
  * Middleware taking a Context and next function.
@@ -247,7 +284,7 @@ export type IContextMiddleware<
 	TLocals extends Record<string, unknown> = Record<string, unknown>,
 	TUser = unknown,
 > = (
-	ctx: IContext<TSchema, TLocals, TUser>,
+	ctx: ContextForSchema<TSchema, TLocals, TUser>,
 	next: NextFunction,
 ) => unknown | Promise<unknown>;
 

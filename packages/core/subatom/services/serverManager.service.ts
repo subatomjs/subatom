@@ -11,7 +11,6 @@ import type {
 	MiddlewareHandler,
 } from "../../../pipelines/pipeline.types.js";
 import type { Router } from "../../router/Router.js";
-import type { ISocketRoute } from "../../../socket/types/socket.types.js";
 import { SubatomServer } from "../../server/SubatomServer.js";
 import type { ISubatomServerConfig } from "../../server/types/subatom.server.types.js";
 
@@ -21,15 +20,9 @@ export function ensureServerInstance(
 	middlewares: MiddlewareHandler[],
 	errorMiddlewares: ErrorMiddlewareHandler[],
 	customConfig: ISubatomServerConfig,
-	wsRoutes: ISocketRoute[],
 ): SubatomServer {
 	if (!currentServer) {
-		const server = new SubatomServer(
-			router,
-			middlewares,
-			errorMiddlewares,
-			wsRoutes,
-		);
+		const server = new SubatomServer(router, middlewares, errorMiddlewares);
 		server.setConfig(customConfig);
 		return server;
 	}

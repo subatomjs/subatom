@@ -5,11 +5,9 @@
  * @license MIT
  */
 
-/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
-
 import type { ISession } from "../pipelines/middlewares/types/session.types.js";
 import type {
-	IContext,
+	ContextForSchema,
 	InferBody,
 	InferFile,
 	InferFiles,
@@ -32,22 +30,15 @@ const CONTEXT_SYMBOL = Symbol.for("subatom.context");
 
 type ContextRequest<
 	TSchema,
-	TLocals extends Record<string, any>,
+	TLocals extends Record<string, unknown>,
 	TUser,
-> = IRequest<
-	InferBody<TSchema>,
-	InferQuery<TSchema>,
-	InferParams<TSchema>,
-	Record<string, string>,
-	TUser,
-	TLocals
->;
+> = ContextForSchema<TSchema, TLocals, TUser>["req"];
 
 export class Context<
-	TSchema = any,
-	TLocals extends Record<string, any> = Record<string, any>,
-	TUser = any,
-> implements IContext<TSchema, TLocals, TUser>
+	TSchema = unknown,
+	TLocals extends Record<string, unknown> = Record<string, unknown>,
+	TUser = unknown,
+> implements ContextForSchema<TSchema, TLocals, TUser>
 {
 	public readonly req: ContextRequest<TSchema, TLocals, TUser>;
 	public readonly res: IResponse;
@@ -290,13 +281,15 @@ export class Context<
  * Retrieves an existing Context for the request or instantiates a new one.
  */
 export function getOrCreateContext<
-	TSchema = any,
-	TLocals extends Record<string, any> = Record<string, any>,
-	TUser = any,
->(req: IRequest, res: IResponse): IContext<TSchema, TLocals, TUser> {
-	const existing = (req as any)[CONTEXT_SYMBOL];
+	TSchema = unknown,
+	TLocals extends Record<string, unknown> = Record<string, unknown>,
+	TUser = unknown,
+>(req: IRequest, res: IResponse): ContextForSchema<TSchema, TLocals, TUser> {
+	const existing = (req as unknown as Record<PropertyKey, unknown>)[
+		CONTEXT_SYMBOL
+	];
 	if (existing) {
-		return existing as IContext<TSchema, TLocals, TUser>;
+		return existing as ContextForSchema<TSchema, TLocals, TUser>;
 	}
 
 	const ctx = new Context<TSchema, TLocals, TUser>(req, res);

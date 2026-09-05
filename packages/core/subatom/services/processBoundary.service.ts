@@ -16,6 +16,10 @@ interface ProcessBoundaryEntry {
 
 const registeredBoundaries = new Set<ProcessBoundaryEntry>();
 let isProcessBoundaryRegistered = false;
+let unhandledRejectionListener: ((reason: unknown) => void) | null = null;
+let uncaughtExceptionListener: ((error: Error) => void) | null = null;
+let sigintListener: (() => void) | null = null;
+let sigtermListener: (() => void) | null = null;
 
 function ensureGlobalProcessListeners(): void {
 	if (isProcessBoundaryRegistered) {
@@ -23,7 +27,7 @@ function ensureGlobalProcessListeners(): void {
 	}
 	isProcessBoundaryRegistered = true;
 
-	process.on("unhandledRejection", (reason: unknown) => {
+	unhandledRejectionListener = (reason: unknown) => {
 		let recovered = false;
 
 		for (const entry of registeredBoundaries) {
@@ -46,9 +50,10 @@ function ensureGlobalProcessListeners(): void {
 		} else {
 			console.error(reason);
 		}
-	});
+	};
+	process.on("unhandledRejection", unhandledRejectionListener);
 
-	process.on("uncaughtException", (error: Error) => {
+	uncaughtExceptionListener = (error: Error) => {
 		console.error("\n💥 [Subatom Fatal Error] Uncaught Synchronous Exception:");
 		console.error(error.stack ?? error.message);
 
@@ -66,7 +71,8 @@ function ensureGlobalProcessListeners(): void {
 				}
 			}
 		}
-	});
+	};
+	process.on("uncaughtException", uncaughtExceptionListener);
 
 	const handleSignal = (exitCode: number) => {
 		const entries = Array.from(registeredBoundaries);
@@ -82,8 +88,31 @@ function ensureGlobalProcessListeners(): void {
 		}
 	};
 
-	process.once("SIGINT", () => handleSignal(0));
-	process.once("SIGTERM", () => handleSignal(0));
+	sigintListener = () => handleSignal(0);
+	sigtermListener = () => handleSignal(0);
+	process.once("SIGINT", sigintListener);
+	process.once("SIGTERM", sigtermListener);
+}
+
+function removeGlobalProcessListeners(): void {
+	if (!isProcessBoundaryRegistered) return;
+	if (unhandledRejectionListener) {
+		process.off("unhandledRejection", unhandledRejectionListener);
+		unhandledRejectionListener = null;
+	}
+	if (uncaughtExceptionListener) {
+		process.off("uncaughtException", uncaughtExceptionListener);
+		uncaughtExceptionListener = null;
+	}
+	if (sigintListener) {
+		process.off("SIGINT", sigintListener);
+		sigintListener = null;
+	}
+	if (sigtermListener) {
+		process.off("SIGTERM", sigtermListener);
+		sigtermListener = null;
+	}
+	isProcessBoundaryRegistered = false;
 }
 
 export function registerProcessBoundary(
@@ -101,5 +130,8 @@ export function registerProcessBoundary(
 
 	return () => {
 		registeredBoundaries.delete(entry);
+		if (registeredBoundaries.size === 0) {
+			removeGlobalProcessListeners();
+		}
 	};
 }

@@ -56,16 +56,6 @@ export function validateConfig(config: SubatomConfig): void {
 	if (typeof config.minify !== "boolean") {
 		throw new ConfigError("minify", "a boolean", config.minify);
 	}
-	if (typeof config.websocket !== "boolean") {
-		throw new ConfigError("websocket", "a boolean", config.websocket);
-	}
-	if (config.websocketOptions && typeof config.websocketOptions !== "object") {
-		throw new ConfigError(
-			"websocketOptions",
-			"an object",
-			typeof config.websocketOptions,
-		);
-	}
 	if (
 		config.watch &&
 		(!Array.isArray(config.watch.extensions) ||

@@ -106,6 +106,7 @@ export * from "./packages/pipelines/middlewares/json.js";
 export * from "./packages/pipelines/middlewares/raw.js";
 export * from "./packages/pipelines/middlewares/serveStatic.js";
 export * from "./packages/pipelines/middlewares/session.js";
+export * from "./packages/pipelines/middlewares/streaming.js";
 export * from "./packages/pipelines/middlewares/text.js";
 export * from "./packages/pipelines/middlewares/urlencoded.js";
 export * from "./packages/pipelines/middlewares/xml.js";
@@ -129,13 +130,7 @@ export * from "./packages/core/router/Router.js";
 export * from "./packages/core/router/types/router.types.js";
 export * from "./packages/core/router/types/resource.router.types.js";
 
-// 19. Export important files of socket.
-export * from "./packages/socket/SocketConnection.js";
-export * from "./packages/socket/SocketManager.js";
-export * from "./packages/socket/types/socket.types.js";
-export * from "./packages/socket/types/sse.types.js";
-
-// 20.Export important files of validator.
+// 19. Export important files of validator.
 export * from "./packages/validations/ErrorValidator.js";
 export * from "./packages/validations/RequestValidator.js";
 export * from "./packages/validations/SchemaValidator.js";

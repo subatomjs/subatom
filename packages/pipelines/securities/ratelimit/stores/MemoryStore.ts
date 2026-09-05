@@ -16,6 +16,7 @@ import type {
 export class MemoryStore implements RateLimitStore {
 	private cache = new Map<string, MemoryStoreEntry>();
 	private gcInterval: NodeJS.Timeout;
+	private closed = false;
 
 	constructor(cleanupMs = 60000) {
 		this.gcInterval = setInterval(() => this.cleanup(), cleanupMs);
@@ -23,6 +24,7 @@ export class MemoryStore implements RateLimitStore {
 	}
 
 	async evaluate(p: StoreEvalParams): Promise<StoreEvalResult> {
+		if (this.closed) throw new Error("MemoryStore is closed.");
 		const entry: MemoryStoreEntry = this.cache.get(p.key) || {
 			count: 0,
 			resetAt: p.now + p.windowMs,
@@ -48,6 +50,7 @@ export class MemoryStore implements RateLimitStore {
 			);
 			history.push(p.now);
 			entry.history = history;
+			entry.resetAt = p.now + p.windowMs;
 			const allowed = history.length <= p.limit;
 			const remaining = Math.max(0, p.limit - history.length);
 			const oldest = history[0] || p.now;
@@ -63,6 +66,7 @@ export class MemoryStore implements RateLimitStore {
 			entry.tokens = Math.min(p.capacity, entry.tokens + refilled);
 			entry.lastRefill = p.now;
 		}
+		entry.resetAt = p.now + p.refillIntervalMs * 2;
 		const allowed = entry.tokens >= 1;
 		if (allowed) entry.tokens -= 1;
 		const remaining = entry.tokens;
@@ -81,6 +85,13 @@ export class MemoryStore implements RateLimitStore {
 	}
 
 	async close(): Promise<void> {
+		if (this.closed) return;
+		this.closed = true;
 		clearInterval(this.gcInterval);
+		this.cache.clear();
+	}
+
+	async destroy(): Promise<void> {
+		await this.close();
 	}
 }

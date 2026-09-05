@@ -16,7 +16,16 @@ import type {
 } from "./types/modifiers.types.js";
 
 export class RequestPipeline {
-	constructor(private readonly config: Readonly<IRequestPipelineConfig>) {}
+	private readonly config: Readonly<IRequestPipelineConfig>;
+
+	constructor(config: Readonly<IRequestPipelineConfig>) {
+		this.config = {
+			...config,
+			transformers: Array.from(new Set(config.transformers)),
+			interceptors: Array.from(new Set(config.interceptors)),
+			serializers: Array.from(new Set(config.serializers)),
+		};
+	}
 
 	public async execute(options: IRequestPipelineOptions): Promise<unknown> {
 		const { req, res, routePath, method, meta, runControllerChain } = options;

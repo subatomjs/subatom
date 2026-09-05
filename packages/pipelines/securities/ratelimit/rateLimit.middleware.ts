@@ -18,7 +18,7 @@ export function createRateLimitMiddleware(options: RateLimitOptions) {
 	const normalized = normalizeConfig(options);
 	const engine = new RateLimitEngine(normalized);
 
-	return async function rateLimitMiddleware(
+	const middleware = async function rateLimitMiddleware(
 		req: IRequest,
 		res: IResponse,
 		next: NextFunction,
@@ -41,7 +41,16 @@ export function createRateLimitMiddleware(options: RateLimitOptions) {
 
 			return next();
 		} catch (err: unknown) {
-			if (normalized.onStoreError) normalized.onStoreError(err as Error, req);
+			try {
+				normalized.onStoreError?.(err as Error, req);
+			} catch {
+				// Observability callbacks must not break the configured failure mode.
+			}
+			if (!normalized.onStoreError) {
+				console.warn(
+					"[Subatom RateLimit] Store failure; applying configured failure mode.",
+				);
+			}
 
 			if (normalized.failureMode === "fail-open") {
 				return next();
@@ -52,4 +61,9 @@ export function createRateLimitMiddleware(options: RateLimitOptions) {
 			}
 		}
 	};
+
+	return Object.assign(middleware, {
+		close: () => engine.close(),
+		destroy: () => engine.destroy(),
+	});
 }

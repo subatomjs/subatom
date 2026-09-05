@@ -169,29 +169,25 @@ function coerceFieldValue(value: string): unknown {
 	return value;
 }
 
-export function parseMultipart(
+export async function parseMultipart(
 	stream: Readable,
 	headers: IncomingHttpHeaders,
 	config: FileParserConfig,
 ): Promise<ParseResult> {
-	return new Promise((resolve, reject) => {
-		// 1. Ensure upload destination directory exists for disk strategy
-		let targetDir = os.tmpdir();
-		if (config.storage === "disk" && config.dest) {
-			targetDir = config.dest || os.tmpdir();
-			try {
-				if (!fs.existsSync(targetDir)) {
-					fs.mkdirSync(targetDir, { recursive: true });
-				}
-			} catch (mkdirErr: unknown) {
-				return reject(
-					new BadRequestError(
-						`Failed to create upload directory '${targetDir}': ${(mkdirErr as Error).message}`,
-					),
-				);
-			}
+	// 1. Ensure upload destination directory exists for disk strategy.
+	let targetDir = os.tmpdir();
+	if (config.storage === "disk" && config.dest) {
+		targetDir = config.dest;
+		try {
+			await fs.promises.mkdir(targetDir, { recursive: true });
+		} catch (mkdirErr: unknown) {
+			throw new BadRequestError(
+				`Failed to create upload directory '${targetDir}': ${(mkdirErr as Error).message}`,
+			);
 		}
+	}
 
+	return new Promise((resolve, reject) => {
 		// 2. Safely initialize Busboy
 		let bb: busboy.Busboy;
 		try {

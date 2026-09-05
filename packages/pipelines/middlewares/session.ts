@@ -23,6 +23,7 @@ import {
 	sign,
 	unsign,
 } from "./utils/index.utils.js";
+import { RedisSessionStore } from "./utils/redis/RedisSessionStore.js";
 
 const defaultOptions: Partial<ISessionOptions> = {
 	name: "sid",
@@ -45,13 +46,46 @@ export function session(options: ISessionOptions) {
 		throw new Error("session middleware requires a `secret`");
 	}
 
+	let store = options.store;
+	let ownsStore = !options.store;
+
+	if (!store && process.env.NODE_ENV === "production") {
+		if (options.allowInMemoryInProduction !== true) {
+			const redisUrl = process.env.REDIS_URL;
+			if (redisUrl) {
+				try {
+					const redisClient = createRedisClientFromUrl(redisUrl);
+					store = new RedisSessionStore(redisClient);
+					ownsStore = true;
+				} catch (error) {
+					throw new Error(
+						`Redis session store initialization failed: ${
+							error instanceof Error ? error.message : String(error)
+						}. Set REDIS_URL or configure store explicitly.`,
+					);
+				}
+			} else {
+				throw new Error(
+					"A distributed session store is required in production. Configure REDIS_URL environment variable or pass a custom store.",
+				);
+			}
+		}
+	}
+
+	if (!store) {
+		store = new MemoryStore();
+	}
+
 	const opts = { ...defaultOptions, ...options };
 	const cookieOpts = { ...defaultOptions.cookie, ...options.cookie };
-	const store = opts.store ?? new MemoryStore();
 	const genid = opts.genid ?? defaultGenId;
 	const cookieName = opts.name ?? "sid";
 
-	return async (req: IRequest, res: IResponse, next: NextFunction) => {
+	const middleware = async (
+		req: IRequest,
+		res: IResponse,
+		next: NextFunction,
+	) => {
 		// 1. Read + verify the session id from the cookie
 		const rawCookies = parseCookieHeader(
 			req.raw.headers.cookie as string | undefined,
@@ -126,9 +160,6 @@ export function session(options: ISessionOptions) {
 		req.session = buildSession(sid, data, isNew);
 		req.sessionID = sid;
 
-		// 3. Run downstream handlers
-		await next();
-
 		const finalize = async () => {
 			const {
 				id: _id,
@@ -168,10 +199,13 @@ export function session(options: ISessionOptions) {
 		let finalized = false;
 
 		if (rawRes && typeof rawRes.end === "function") {
+			const originalEndMethod = rawRes.end;
 			const originalEnd = rawRes.end.bind(rawRes);
+			const invokeOriginalEnd = (args: never[]) =>
+				Reflect.apply(originalEnd, rawRes, args) as ServerResponse;
 
 			rawRes.end = (...args: never[]) => {
-				if (finalized) return originalEnd(...args);
+				if (finalized) return invokeOriginalEnd(args);
 				finalized = true;
 
 				finalize()
@@ -180,22 +214,66 @@ export function session(options: ISessionOptions) {
 						console.error("[session] failed to persist session:", err);
 					})
 					.finally(() => {
-						originalEnd(...args);
+						invokeOriginalEnd(args);
 					});
 
 				return rawRes;
 			};
 
-			await next();
+			try {
+				await next();
 
-			// Handler forgot to send a response at all — still try to persist.
-			if (!finalized) {
-				finalized = true;
-				await finalize();
+				// Handler forgot to send a response at all — still try to persist.
+				if (!finalized) {
+					finalized = true;
+					await finalize();
+				}
+			} finally {
+				rawRes.end = originalEndMethod;
 			}
 		} else {
 			await next();
 			await finalize();
 		}
 	};
+
+	return Object.assign(middleware, {
+		close: async () => {
+			if (ownsStore) await store.close?.();
+		},
+	});
+}
+
+function createRedisClientFromUrl(url: string): {
+	eval: (
+		script: string,
+		_keys: number,
+		...args: (string | number)[]
+	) => Promise<unknown>;
+} {
+	try {
+		// eslint-disable-next-line global-require
+		const redisModule = require("redis") as {
+			createClient: (options: { url: string }) => {
+				connect: () => Promise<void>;
+				eval: (
+					script: string,
+					options: { keys: string[]; arguments: (string | number)[] },
+				) => Promise<unknown>;
+			};
+		};
+		const client = redisModule.createClient({ url });
+		void client.connect();
+		return {
+			eval: (script: string, _keys: number, ...args: (string | number)[]) =>
+				client.eval(script, {
+					keys: [String(args[0])],
+					arguments: args.slice(1),
+				}),
+		};
+	} catch {
+		throw new Error(
+			"Failed to import Redis client. Install with: npm install redis",
+		);
+	}
 }

@@ -33,6 +33,14 @@ export interface RedisClientLike {
 	): Promise<unknown>;
 }
 
+export interface RedisStoreOptions {
+	timeoutMs?: number;
+	retries?: number;
+	retryDelayMs?: number;
+	failureThreshold?: number;
+	cooldownMs?: number;
+}
+
 export interface StoreEvalParams {
 	key: string;
 	algorithm: AlgorithmType;
@@ -53,6 +61,7 @@ export interface StoreEvalResult {
 export interface RateLimitStore {
 	evaluate(params: StoreEvalParams): Promise<StoreEvalResult>;
 	close?(): Promise<void>;
+	destroy?(): Promise<void>;
 }
 
 export interface PolicyConfig {
@@ -76,6 +85,11 @@ export interface RateLimitOptions extends PolicyConfig {
 	policies?: PolicyConfig[];
 	store?: StoreType | RateLimitStore;
 	redisClient?: RedisClientLike;
+	redisTimeoutMs?: number;
+	redisRetries?: number;
+	redisRetryDelayMs?: number;
+	redisFailureThreshold?: number;
+	redisCooldownMs?: number;
 	headers?: HeaderConfig;
 	failureMode?: FailureMode;
 	onLimitExceeded?: (
@@ -109,6 +123,11 @@ export interface NormalizedConfig {
 	policies: NormalizedPolicy[];
 	store: StoreType | RateLimitStore;
 	redisClient?: RedisClientLike | undefined;
+	redisTimeoutMs: number;
+	redisRetries: number;
+	redisRetryDelayMs: number;
+	redisFailureThreshold: number;
+	redisCooldownMs: number;
 	headers: Required<HeaderConfig>;
 	failureMode: FailureMode;
 	onLimitExceeded?:

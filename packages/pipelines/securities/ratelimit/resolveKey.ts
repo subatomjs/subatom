@@ -9,10 +9,16 @@
 import type { IRequest } from "../../../core/http/request/types/request.types.js";
 import type { KeyResolver } from "./types/rateLimit.types.js";
 
+interface RequestExtensions {
+	baseUrl?: string;
+	tenant?: { id?: string | number };
+}
+
 export async function resolveKey(
 	req: IRequest,
 	resolver: KeyResolver,
 ): Promise<string> {
+	const extensions = req as IRequest & RequestExtensions;
 	if (typeof resolver === "function") {
 		return String(await resolver(req));
 	}
@@ -20,9 +26,15 @@ export async function resolveKey(
 	switch (resolver) {
 		case "ip":
 			// Respect Subatom trusted proxy / ip resolution
-			return req.ip || req.socket?.remoteAddress || "0.0.0.0";
-		case "user":
-			return req.user?.id ? `user:${req.user.id}` : resolveKey(req, "ip");
+			return req.ip || req.raw.socket?.remoteAddress || "0.0.0.0";
+		case "user": {
+			const user = req.user;
+			const userId =
+				typeof user === "object" && user !== null && "id" in user
+					? (user as { id?: string | number }).id
+					: undefined;
+			return userId ? `user:${userId}` : resolveKey(req, "ip");
+		}
 		case "api-key": {
 			const apiKey = req.headers["x-api-key"] || req.headers.authorization;
 			return apiKey
@@ -30,11 +42,13 @@ export async function resolveKey(
 				: resolveKey(req, "ip");
 		}
 		case "tenant":
-			return req.tenant?.id ? `tenant:${req.tenant.id}` : resolveKey(req, "ip");
+			return extensions.tenant?.id
+				? `tenant:${extensions.tenant.id}`
+				: resolveKey(req, "ip");
 		case "route":
-			return `route:${req.baseUrl || ""}${req.path || req.url}`;
+			return `route:${extensions.baseUrl || ""}${req.path || req.url}`;
 		case "composite": {
-			const ip = req.ip || req.socket?.remoteAddress || "0.0.0.0";
+			const ip = req.ip || req.raw.socket?.remoteAddress || "0.0.0.0";
 			const path = req.path || req.url;
 			return `${ip}:${path}`;
 		}

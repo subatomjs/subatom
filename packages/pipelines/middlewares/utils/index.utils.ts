@@ -11,6 +11,7 @@ export * from "./cookies/serializeCookie.js";
 
 // Memory Store utils
 export * from "./memory/MemoryStore.js";
+export * from "./redis/RedisSessionStore.js";
 
 // Signature utils
 export * from "./signatures/signatures.js";

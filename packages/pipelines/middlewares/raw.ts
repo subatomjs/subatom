@@ -10,6 +10,7 @@ import type { NextFunction } from "../next/types/nextFunction.types.js";
 import type { IRequest } from "../../core/http/request/types/request.types.js";
 import type { IResponse } from "../../core/http/response/types/response.types.js";
 import { parseLimit } from "./utils/limit/parseLimit.js";
+import { isPayloadTooLarge, readLimitedBody } from "./utils/readLimitedBody.js";
 import type { IRawOptions } from "./types/middleware.types.js";
 
 export function raw(options: IRawOptions = {}) {
@@ -31,48 +32,16 @@ export function raw(options: IRawOptions = {}) {
 			return next();
 		}
 
-		// 2. Early Content-Length check if the header is provided
-		const contentLength = parseInt(
-			req.raw.headers["content-length"] || "0",
-			10,
-		);
-		if (contentLength > maxBytes) {
-			res.status(413).json({
-				success: false,
-				message: "Payload Too Large",
-			});
-			return;
-		}
-
-		// 3. Stream data buffer aggregation with real-time size tracking
 		try {
-			const chunks: Buffer[] = [];
-			let totalBytes = 0;
-
-			for await (const chunk of req.raw) {
-				totalBytes += chunk.length;
-
-				// Enforce byte limit during chunk streaming
-				if (totalBytes > maxBytes) {
-					res.status(413).json({
-						success: false,
-						message: "Payload Too Large",
-					});
-					return;
-				}
-
-				chunks.push(chunk);
-			}
-
-			// 4. Attach aggregated raw Buffer to req.body
-			req.body = Buffer.concat(chunks);
+			req.body = await readLimitedBody(req.raw, maxBytes);
 
 			await next();
-		} catch (_error: unknown) {
-			// 5. Catch stream read or memory errors
-			res.status(400).json({
+		} catch (error: unknown) {
+			res.status(isPayloadTooLarge(error) ? 413 : 400).json({
 				success: false,
-				message: "Bad Request: Error reading raw payload",
+				message: isPayloadTooLarge(error)
+					? "Payload Too Large"
+					: "Bad Request: Error reading raw payload",
 			});
 		}
 	};

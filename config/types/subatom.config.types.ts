@@ -5,8 +5,6 @@
  * @license MIT
  */
 
-import type { ISocketOptions } from "../../packages/socket/types/socket.types.js";
-
 export interface SubatomConfig {
 	entry: string;
 	outDir: string;
@@ -14,8 +12,6 @@ export interface SubatomConfig {
 	host: string;
 	sourcemap: boolean;
 	minify: boolean;
-	websocket: boolean;
-	websocketOptions?: ISocketOptions;
 	watch: {
 		extensions: string[];
 		debounceMs: number;

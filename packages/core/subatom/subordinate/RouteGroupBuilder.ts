@@ -1,6 +1,6 @@
 /**
  * @fileoverview Builds Express-like route groups with prefixes, middleware, tags,
- * rate limits, WebSockets, HTTP routes, and nested synchronous groups.
+ * rate limits, HTTP routes, and nested synchronous groups.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -13,7 +13,6 @@ import type {
 	IRouteSchema,
 	RouteArgument,
 } from "../../router/types/router.types.js";
-import type { ISocketHandlers } from "../../../socket/types/socket.types.js";
 import type { IGroupContext } from "../../server/types/subatom.server.types.js";
 import type { Subatom } from "../Subatom.js";
 import { buildGroupContext } from "./services/contextBuilder.service.js";
@@ -66,22 +65,6 @@ export class RouteGroupBuilder {
 		const { spec: validatedSpec, middleware } = configureRateLimit(spec);
 		this.ownRateLimitSpec = validatedSpec;
 		this.ownRateLimitMiddleware = middleware;
-		return this;
-	}
-
-	public ws<
-		TParams extends Record<string, string | undefined> = Record<
-			string,
-			string | undefined
-		>,
-		TQuery extends Record<string, string | undefined> = Record<
-			string,
-			string | undefined
-		>,
-		TLocals extends Record<string, unknown> = Record<string, unknown>,
-	>(path: string, handlers: ISocketHandlers<TParams, TQuery, TLocals>): this {
-		const fullPath = appendPrefix(this.ownPrefix, path);
-		this.app.ws(fullPath, handlers);
 		return this;
 	}
 

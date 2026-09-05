@@ -1,5 +1,5 @@
 /**
- * @fileoverview Manages the Subatom HTTP server lifecycle, configuration, middleware, WebSocket integration,
+ * @fileoverview Manages the Subatom HTTP server lifecycle, configuration, middleware,
  * request handling, port selection, socket tracking, and graceful shutdown.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
@@ -17,35 +17,34 @@ import type net from "node:net";
 import type { Socket } from "node:net";
 import type { Router } from "../router/Router.js";
 import { tryRecoverFromOrphanedRejection } from "./services/orphanRecovery.service.js";
-import { getAvailablePort } from "./services/portProber.service.js";
+import { listenOnPort } from "./services/portProber.service.js";
 import { processHttpRequest } from "./services/requestHandler.service.js";
 import { closeServer } from "./services/serverShutdown.service.js";
 import { trackSocket } from "./services/socketTracker.service.js";
 import type {
 	IRequestContext,
+	ISubatomServerMetrics,
 	ISubatomServerConfig,
 } from "./types/subatom.server.types.js";
-import { SocketManager } from "../../socket/SocketManager.js";
 import type { IRequestPipelineConfig } from "../../pipelines/modifiers/types/modifiers.types.js";
 import type { IRouter } from "../router/types/router.types.js";
 import type {
 	ErrorMiddlewareHandler,
 	MiddlewareHandler,
 } from "../../pipelines/pipeline.types.js";
-import type { ISocketRoute } from "../../socket/types/socket.types.js";
 import { ConfigManager } from "../../../config/ConfigManager.js";
-import type {
-	SubatomConfig,
-	ISubatomConfig,
-} from "../../../config/types/subatom.config.types.js";
+import type { ISubatomConfig } from "../../../config/types/subatom.config.types.js";
 
 export class SubatomServer {
 	private readonly server: Server;
 	private config: ISubatomServerConfig = {};
-	private resolvedConfig: Partial<SubatomConfig> = {};
 
 	private readonly openSockets = new Set<Socket>();
-	private readonly webSocketManager: SocketManager;
+	private activeRequests = 0;
+	private totalRequests = 0;
+	private failedRequests = 0;
+	private acceptingRequests = false;
+	private maxConcurrentRequests = 0;
 
 	private pipelineConfig: IRequestPipelineConfig = {
 		transformers: [],
@@ -59,14 +58,34 @@ export class SubatomServer {
 		private readonly router: Router | IRouter,
 		private readonly middlewares: MiddlewareHandler[] = [],
 		private readonly errorMiddlewares: ErrorMiddlewareHandler[] = [],
-		private readonly wsRoutes: ISocketRoute[] = [],
 	) {
-		this.server = createServer((req, res) => this.handleRequest(req, res));
-		this.webSocketManager = new SocketManager(this.server);
+		this.server = createServer((req, res) => {
+			if (
+				!this.acceptingRequests ||
+				(this.maxConcurrentRequests > 0 &&
+					this.activeRequests >= this.maxConcurrentRequests)
+			) {
+				res.statusCode = 503;
+				res.setHeader("Retry-After", "1");
+				res.end("Service Unavailable");
+				return;
+			}
 
-		for (const route of this.wsRoutes) {
-			this.webSocketManager.register(route.path, route.handlers);
-		}
+			this.activeRequests += 1;
+			this.totalRequests += 1;
+			void this.handleRequest(req, res)
+				.catch((error: unknown) => {
+					this.failedRequests += 1;
+					console.error("[SubatomServer] Unhandled request failure:", error);
+					if (res.writableEnded || res.destroyed) return;
+					res.statusCode = 500;
+					res.setHeader("Content-Type", "application/json; charset=utf-8");
+					res.end(JSON.stringify({ error: "Internal Server Error" }));
+				})
+				.finally(() => {
+					this.activeRequests -= 1;
+				});
+		});
 
 		this.server.on("connection", (socket: Socket) => {
 			trackSocket(this.openSockets, socket);
@@ -135,32 +154,75 @@ export class SubatomServer {
 		}
 
 		const finalConfig = await ConfigManager.resolve(
-			safeOverrides as SubatomConfig,
+			safeOverrides as ISubatomConfig,
 		);
-		this.resolvedConfig = finalConfig;
-
-		if (finalConfig.websocket && finalConfig.websocketOptions) {
-			this.webSocketManager.activate(finalConfig.websocketOptions);
-		}
 
 		const requestedPort = Number(finalConfig.port);
 		const host = finalConfig.host;
+		this.server.headersTimeout = this.positiveTimeout(
+			combinedOverrides.headersTimeout,
+			60_000,
+		);
+		this.server.requestTimeout = this.positiveTimeout(
+			combinedOverrides.requestTimeout,
+			30_000,
+		);
+		this.server.keepAliveTimeout = this.positiveTimeout(
+			combinedOverrides.keepAliveTimeout,
+			5_000,
+		);
+		this.server.maxConnections = this.positiveInteger(
+			combinedOverrides.maxConnections,
+			10_000,
+		);
+		this.maxConcurrentRequests = this.nonNegativeInteger(
+			combinedOverrides.maxConcurrentRequests,
+			0,
+		);
 		const appName =
 			(finalConfig as unknown as ISubatomServerConfig).appName ||
 			combinedOverrides.appName ||
 			"subatom";
 
-		const availablePort = await getAvailablePort(requestedPort, host);
+		const server = await listenOnPort(this.server, requestedPort, host);
+		this.acceptingRequests = true;
+		console.log(`${appName} is running on http://${host}:${requestedPort}`);
+		return server;
+	}
 
-		if (availablePort !== requestedPort) {
-			console.warn(
-				`[${appName}] Port ${requestedPort} is in use. Automatically switched to ${availablePort}.`,
-			);
-		}
+	private positiveTimeout(value: unknown, fallback: number): number {
+		const timeout = Number(value ?? fallback);
+		return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
+	}
 
-		return this.server.listen(availablePort, host, () => {
-			console.log(`${appName} is running on http://${host}:${availablePort}`);
-		});
+	private positiveInteger(value: unknown, fallback: number): number {
+		const limit = Number(value ?? fallback);
+		return Number.isSafeInteger(limit) && limit > 0 ? limit : fallback;
+	}
+
+	private nonNegativeInteger(value: unknown, fallback: number): number {
+		const limit = Number(value ?? fallback);
+		return Number.isSafeInteger(limit) && limit >= 0 ? limit : fallback;
+	}
+
+	public getMetrics(): ISubatomServerMetrics {
+		return {
+			activeRequests: this.activeRequests,
+			totalRequests: this.totalRequests,
+			failedRequests: this.failedRequests,
+			accepted: this.acceptingRequests,
+		};
+	}
+
+	public getHealth(): ISubatomServerMetrics & { healthy: boolean } {
+		const metrics = this.getMetrics();
+		return { ...metrics, healthy: metrics.accepted };
+	}
+
+	public close(callback?: (err?: Error) => void): Server {
+		this.acceptingRequests = false;
+		const timeoutMs = Number(this.config.shutdownTimeoutMs ?? 10_000);
+		return closeServer(this.server, this.openSockets, timeoutMs, callback);
 	}
 
 	public async listen(
@@ -186,19 +248,5 @@ export class SubatomServer {
 		}
 
 		return srv;
-	}
-
-	public close(callback?: (err?: Error) => void): Server {
-		const timeoutMs = Number(
-			this.resolvedConfig.websocketOptions?.shutdownTimeoutMs ??
-				this.config.shutdownTimeoutMs ??
-				10_000,
-		);
-		void this.webSocketManager.shutdown(timeoutMs);
-		return closeServer(this.server, this.openSockets, timeoutMs, callback);
-	}
-
-	public get webSocket(): SocketManager {
-		return this.webSocketManager;
 	}
 }

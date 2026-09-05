@@ -19,7 +19,19 @@ export interface ISubatomServerConfig {
 	host?: string;
 	appName?: string;
 	shutdownTimeoutMs?: number;
+	headersTimeout?: number;
+	requestTimeout?: number;
+	keepAliveTimeout?: number;
+	maxConnections?: number;
+	maxConcurrentRequests?: number;
 	[key: string]: unknown;
+}
+
+export interface ISubatomServerMetrics {
+	activeRequests: number;
+	totalRequests: number;
+	failedRequests: number;
+	accepted: boolean;
 }
 
 export interface IGroupContext {

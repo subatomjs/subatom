@@ -92,13 +92,42 @@ export function normalizeConfig(options: RateLimitOptions): NormalizedConfig {
 		policies,
 		store: options.store || "memory",
 		redisClient: options.redisClient,
+		redisTimeoutMs: normalizePositiveInteger(options.redisTimeoutMs, 250),
+		redisRetries: normalizeNonNegativeInteger(options.redisRetries, 1),
+		redisRetryDelayMs: normalizeNonNegativeInteger(
+			options.redisRetryDelayMs,
+			25,
+		),
+		redisFailureThreshold: normalizePositiveInteger(
+			options.redisFailureThreshold,
+			5,
+		),
+		redisCooldownMs: normalizePositiveInteger(options.redisCooldownMs, 10_000),
 		headers: {
 			standard: options.headers?.standard ?? true,
 			legacy: options.headers?.legacy ?? false,
 			retryAfter: options.headers?.retryAfter ?? true,
 		},
-		failureMode: options.failureMode || "fail-open",
+		failureMode: options.failureMode || "fail-closed",
 		onLimitExceeded: options.onLimitExceeded,
 		onStoreError: options.onStoreError,
 	};
+}
+
+function normalizePositiveInteger(
+	value: number | undefined,
+	fallback: number,
+): number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+		? value
+		: fallback;
+}
+
+function normalizeNonNegativeInteger(
+	value: number | undefined,
+	fallback: number,
+): number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+		? value
+		: fallback;
 }

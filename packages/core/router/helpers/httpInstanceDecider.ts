@@ -8,14 +8,18 @@
 
 import type { IRequest } from "../../http/request/types/request.types.js";
 import type { IResponse } from "../../http/response/types/response.types.js";
-import type { IContext } from "../types/router.types.js";
+
+interface ContextLike {
+	readonly req: unknown;
+	readonly res: unknown;
+}
 
 /**
  * Checks if a value is the Context or HTTP request/response object to avoid auto-serializing it.
  */
 function isContextOrHttpInstance(
 	val: unknown,
-	ctx: IContext,
+	ctx: ContextLike,
 	req: IRequest,
 	res: IResponse,
 ): boolean {
@@ -23,10 +27,10 @@ function isContextOrHttpInstance(
 		val === ctx ||
 		val === res ||
 		val === req ||
-		val === (ctx as IContext)?.req ||
-		val === (ctx as IContext)?.res ||
-		val === (req as IRequest)?.raw ||
-		val === (res as IResponse)?.raw
+		val === ctx.req ||
+		val === ctx.res ||
+		val === req.raw ||
+		val === res.raw
 	);
 }
 

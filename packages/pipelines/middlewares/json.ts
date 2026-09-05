@@ -10,6 +10,7 @@ import type { NextFunction } from "../next/types/nextFunction.types.js";
 import type { IRequest } from "../../core/http/request/types/request.types.js";
 import type { IResponse } from "../../core/http/response/types/response.types.js";
 import { parseLimit } from "./utils/limit/parseLimit.js";
+import { isPayloadTooLarge, readLimitedBody } from "./utils/readLimitedBody.js";
 import type { ILimit } from "./types/middleware.types.js";
 
 export function json(options: ILimit = {}) {
@@ -26,41 +27,10 @@ export function json(options: ILimit = {}) {
 			return next();
 		}
 
-		// 2. Early Content-Length check if the header is provided
-		const contentLength = parseInt(
-			req.raw.headers["content-length"] || "0",
-			10,
-		);
-		if (contentLength > maxBytes) {
-			res.status(413).json({
-				success: false,
-				message: "Payload Too Large",
-			});
-			return;
-		}
-
-		// 3. Stream data buffer aggregation with real-time size tracking
 		try {
-			const chunks: Buffer[] = [];
-			let totalBytes = 0;
-
-			for await (const chunk of req.raw) {
-				totalBytes += chunk.length;
-
-				// Enforce byte limit during chunk streaming
-				if (totalBytes > maxBytes) {
-					res.status(413).json({
-						success: false,
-						message: "Payload Too Large",
-					});
-					return;
-				}
-
-				chunks.push(chunk);
-			}
-
-			// 4. Parse aggregated buffer into JSON
-			const rawBody = Buffer.concat(chunks).toString("utf-8");
+			const rawBody = (await readLimitedBody(req.raw, maxBytes)).toString(
+				"utf-8",
+			);
 
 			if (rawBody.trim().length > 0) {
 				req.body = JSON.parse(rawBody);
@@ -69,11 +39,12 @@ export function json(options: ILimit = {}) {
 			}
 
 			await next();
-		} catch (_error: unknown) {
-			// 5. Catch invalid JSON syntax errors
-			res.status(400).json({
+		} catch (error: unknown) {
+			res.status(isPayloadTooLarge(error) ? 413 : 400).json({
 				success: false,
-				message: "Bad Request: Invalid JSON Payload",
+				message: isPayloadTooLarge(error)
+					? "Payload Too Large"
+					: "Bad Request: Invalid JSON Payload",
 			});
 		}
 	};

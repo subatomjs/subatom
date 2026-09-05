@@ -76,8 +76,62 @@ export class StaticPreCompress {
 		return { targetPath: requestPath, encoding: null };
 	}
 
+	private async resolvePrecompressedFileAsync(
+		req: IncomingMessage,
+		requestPath: string,
+	): Promise<{ targetPath: string; encoding: CompressionAlgorithm | null }> {
+		const rawAcceptEncoding = req.headers["accept-encoding"] as
+			| string
+			| undefined;
+		const { algorithm } = this.compressionEngine.negotiate(rawAcceptEncoding);
+
+		if (algorithm === "identity") {
+			return { targetPath: requestPath, encoding: null };
+		}
+
+		const candidates: Array<{
+			path: string;
+			encoding: CompressionAlgorithm;
+		}> = [];
+		const preferredExtension = this.extMap[algorithm];
+		if (preferredExtension) {
+			candidates.push({
+				path: `${requestPath}${preferredExtension}`,
+				encoding: algorithm,
+			});
+		}
+
+		for (const fallbackAlgo of ["br", "gzip", "deflate"] as const) {
+			if (fallbackAlgo === algorithm) continue;
+			const extension = this.extMap[fallbackAlgo];
+			if (extension) {
+				candidates.push({
+					path: `${requestPath}${extension}`,
+					encoding: fallbackAlgo,
+				});
+			}
+		}
+
+		for (const candidate of candidates) {
+			try {
+				const stat = await fs.promises.stat(candidate.path);
+				if (stat.isFile()) {
+					return { targetPath: candidate.path, encoding: candidate.encoding };
+				}
+			} catch {
+				// Try the next available encoding.
+			}
+		}
+
+		return { targetPath: requestPath, encoding: null };
+	}
+
 	public middleware() {
-		return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+		return async (
+			req: IncomingMessage,
+			res: ServerResponse,
+			next: () => void,
+		) => {
 			if (req.method !== "GET" && req.method !== "HEAD") {
 				return next();
 			}
@@ -87,12 +141,13 @@ export class StaticPreCompress {
 				.replace(/^(\.\.[/\\])+/, "");
 			const absoluteFilePath = path.join(this.publicDir, safeRelativePath);
 
-			if (
-				!fs.existsSync(absoluteFilePath) ||
-				fs.statSync(absoluteFilePath).isDirectory()
-			) {
+			let sourceStat: fs.Stats;
+			try {
+				sourceStat = await fs.promises.stat(absoluteFilePath);
+			} catch {
 				return next();
 			}
+			if (!sourceStat.isFile()) return next();
 
 			const existingVary = res.getHeader("Vary");
 			if (!existingVary) {
@@ -104,7 +159,7 @@ export class StaticPreCompress {
 				res.setHeader("Vary", `${existingVary}, Accept-Encoding`);
 			}
 
-			const { targetPath, encoding } = this.resolvePrecompressedFile(
+			const { targetPath, encoding } = await this.resolvePrecompressedFileAsync(
 				req,
 				absoluteFilePath,
 			);
@@ -115,7 +170,7 @@ export class StaticPreCompress {
 				const mimeType = getStaticMimeType(absoluteFilePath);
 				if (mimeType) res.setHeader("Content-Type", mimeType);
 
-				const stat = fs.statSync(targetPath);
+				const stat = await fs.promises.stat(targetPath);
 				res.setHeader("Content-Length", stat.size);
 
 				if (req.method === "HEAD") {

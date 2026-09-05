@@ -25,7 +25,13 @@ export class RateLimitEngine {
 				if (!config.redisClient) {
 					throw new Error("RedisStore requires a valid redisClient instance.");
 				}
-				this.store = new RedisStore(config.redisClient);
+				this.store = new RedisStore(config.redisClient, {
+					timeoutMs: config.redisTimeoutMs,
+					retries: config.redisRetries,
+					retryDelayMs: config.redisRetryDelayMs,
+					failureThreshold: config.redisFailureThreshold,
+					cooldownMs: config.redisCooldownMs,
+				});
 			} else {
 				this.store = new MemoryStore();
 			}
@@ -75,5 +81,14 @@ export class RateLimitEngine {
 				policyName: "default",
 			}
 		);
+	}
+
+	public async close(): Promise<void> {
+		await this.store.close?.();
+	}
+
+	public async destroy(): Promise<void> {
+		await this.store.destroy?.();
+		if (!this.store.destroy) await this.store.close?.();
 	}
 }

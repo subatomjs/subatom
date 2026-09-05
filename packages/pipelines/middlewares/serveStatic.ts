@@ -96,24 +96,33 @@ export function serveStatic(rootPath: string, options: IStaticOptions = {}) {
 			res.status(200);
 
 			// Await stream completion so pipeline runner halts and waits for response to finish
-			await new Promise<void>((resolve, _reject) => {
+			await new Promise<void>((resolve) => {
 				const stream = fs.createReadStream(targetPath);
-
-				stream.on("error", (err) => {
-					if (!res.headersSent) {
-						next(err);
-					}
+				let settled = false;
+				const cleanup = () => {
+					res.raw.off("finish", onFinish);
+					res.raw.off("close", onClose);
+					stream.off("error", onError);
+				};
+				const settle = () => {
+					if (settled) return;
+					settled = true;
+					cleanup();
 					resolve();
-				});
-
-				res.raw.on("finish", () => {
-					resolve();
-				});
-
-				res.raw.on("close", () => {
+				};
+				const onError = (err: Error) => {
+					if (!res.headersSent) void next(err);
+					settle();
+				};
+				const onFinish = () => settle();
+				const onClose = () => {
 					stream.destroy();
-					resolve();
-				});
+					settle();
+				};
+
+				stream.once("error", onError);
+				res.raw.once("finish", onFinish);
+				res.raw.once("close", onClose);
 
 				stream.pipe(res.raw);
 			});

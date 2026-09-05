@@ -7,6 +7,7 @@ export interface ISessionStore {
 	set(sid: string, data: ISessionData, maxAgeMs?: number): Promise<void>;
 	destroy(sid: string): Promise<void>;
 	touch?(sid: string, maxAgeMs?: number): Promise<void>;
+	close?(): Promise<void>;
 }
 
 export interface ISessionCookieOptions {
@@ -22,6 +23,7 @@ export interface ISessionOptions {
 	secret: string;
 	name?: string; // cookie name, default "sid"
 	store?: ISessionStore;
+	allowInMemoryInProduction?: boolean;
 	resave?: boolean;
 	saveUninitialized?: boolean;
 	rolling?: boolean;

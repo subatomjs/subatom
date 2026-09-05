@@ -5,7 +5,6 @@
  * @license MIT
  */
 
-/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
 import type { Readable, Writable } from "node:stream";
 import type { IncomingMessage } from "node:http";
 import type { ISession } from "../../../../pipelines/middlewares/types/session.types.js";
@@ -34,12 +33,12 @@ export interface IParsedAccept {
 }
 
 export interface IRequest<
-	Body = any,
-	Query = Record<string, string>,
+	Body = unknown,
+	Query = Record<string, string | string[]>,
 	Params = Record<string, string>,
 	Cookies = Record<string, string>,
-	User = any,
-	Locals = Record<string, any>,
+	User = unknown,
+	Locals = Record<string, unknown>,
 	Ip = string,
 	Protocol = "http" | "https",
 	Secure = boolean,
@@ -88,6 +87,4 @@ export interface IRequest<
 	onEnd(listener: TypeEndListener): () => void;
 	pipe<T extends Writable>(destination: T, options?: ReqPipeOptions): T;
 	stream(): Readable;
-
-	[key: string]: any;
 }

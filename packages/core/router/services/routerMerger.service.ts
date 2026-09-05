@@ -49,10 +49,10 @@ export function mergeSubRouter(
 		}
 
 		const fullPath = combinePaths(prefix, route.path);
-		targetRouter.getRoutes().push({
+		targetRouter.registerMountedRoute({
 			method: route.method,
 			path: fullPath,
-			handlers: route.handlers,
+			handlers: [...route.handlers],
 			...(route.tags !== undefined ? { tags: route.tags } : {}),
 			...(route.rateLimit !== undefined ? { rateLimit: route.rateLimit } : {}),
 			...(route.name !== undefined ? { name: route.name } : {}),
@@ -68,6 +68,6 @@ export function mergeRouter(targetRouter: Router, subRouter: IRouter): void {
 	assertRouterInstance(subRouter, "app.use(subRouter)");
 
 	for (const route of subRouter.getRoutes()) {
-		targetRouter.getRoutes().push(route);
+		targetRouter.registerMountedRoute(route);
 	}
 }

@@ -16,6 +16,7 @@ import type { NextFunction } from "../next/types/nextFunction.types.js";
 import type { IRequest } from "../../core/http/request/types/request.types.js";
 import type { IResponse } from "../../core/http/response/types/response.types.js";
 import { parseLimit } from "./utils/limit/parseLimit.js";
+import { isPayloadTooLarge, readLimitedBody } from "./utils/readLimitedBody.js";
 
 /**
  * Lightweight, native XML to JS Object parser (Zero Dependencies)
@@ -193,38 +194,10 @@ export function xml(options: ILimit = {}) {
 			return next();
 		}
 
-		const contentLength = parseInt(
-			req.raw.headers["content-length"] || "0",
-			10,
-		);
-		if (contentLength > maxBytes) {
-			res.status(413).json({
-				success: false,
-				message: "Payload Too Large",
-			});
-			return;
-		}
-
 		try {
-			const chunks: Buffer[] = [];
-			let totalBytes = 0;
-
-			for await (const chunk of req.raw) {
-				const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-				totalBytes += bufferChunk.length;
-
-				if (totalBytes > maxBytes) {
-					res.status(413).json({
-						success: false,
-						message: "Payload Too Large",
-					});
-					return;
-				}
-
-				chunks.push(bufferChunk);
-			}
-
-			const rawBody = Buffer.concat(chunks).toString("utf-8");
+			const rawBody = (await readLimitedBody(req.raw, maxBytes)).toString(
+				"utf-8",
+			);
 
 			if (rawBody.trim().length > 0) {
 				req.body = parseNativeXml(rawBody);
@@ -233,10 +206,12 @@ export function xml(options: ILimit = {}) {
 			}
 
 			await next();
-		} catch (_error: unknown) {
-			res.status(400).json({
+		} catch (error: unknown) {
+			res.status(isPayloadTooLarge(error) ? 413 : 400).json({
 				success: false,
-				message: "Bad Request: Invalid XML Payload",
+				message: isPayloadTooLarge(error)
+					? "Payload Too Large"
+					: "Bad Request: Invalid XML Payload",
 			});
 		}
 	};
