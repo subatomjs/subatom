@@ -20,7 +20,7 @@
 // - unquoted values
 // - trailing `#` comments on unquoted values
 const LINE =
-	/(?:^|\n)\s*(?:export\s+)?([\w.-]+)\s*=\s*(?:'((?:\\'|[^'])*)'|"((?:\\"|[^"])*)"|`((?:\\`|[^`])*)`|([^\r\n#]*))/g;
+	/(?:^|\n)[\t ]*(?:export[\t ]+)?([\w.-]+)[\t ]*=[\t ]*(?:'((?:\\'|[^'])*)'|"((?:\\"|[^"])*)"|`((?:\\`|[^`])*)`|([^\r\n#]*))/g;
 
 export function parseEnv(src: string): Record<string, string> {
 	const obj: Record<string, string> = {};
@@ -50,7 +50,7 @@ export function parseEnv(src: string): Record<string, string> {
 			value = match[4].replace(/\\`/g, "`");
 		} else {
 			// Unquoted value
-			value = (match[5] ?? "").trim();
+			value = match[5]!.trim();
 		}
 
 		obj[key] = value;
