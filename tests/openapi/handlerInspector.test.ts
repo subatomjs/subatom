@@ -3,80 +3,95 @@ import { extractFileMetadata } from "../../openapi/handlerInspector.js";
 import type { FileMetadata } from "../../openapi/types/openapi.types.js";
 
 describe("handlerInspector", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-	describe("extractFileMetadata", () => {
-		it("should return null if the handler is not a function", () => {
-			expect(extractFileMetadata(null)).toBeNull();
-			expect(extractFileMetadata(undefined)).toBeNull();
-			expect(extractFileMetadata("not-a-function")).toBeNull();
-			expect(extractFileMetadata(12345)).toBeNull();
-			expect(extractFileMetadata({})).toBeNull();
-		});
+  describe("extractFileMetadata", () => {
+    it("should return null if handler is not a function", () => {
+      expect(extractFileMetadata(null)).toBeNull();
+      expect(extractFileMetadata(undefined)).toBeNull();
+      expect(extractFileMetadata("string")).toBeNull();
+      expect(extractFileMetadata(42)).toBeNull();
+      expect(extractFileMetadata({})).toBeNull();
+      expect(extractFileMetadata([])).toBeNull();
+    });
 
-		it("should return null if handler function has no _fileConfig", () => {
-			const handler = () => {};
-			expect(extractFileMetadata(handler)).toBeNull();
-		});
+    it("should return null if handler has falsy _fileConfig", () => {
+      const fnWithoutConfig = () => {};
+      expect(extractFileMetadata(fnWithoutConfig)).toBeNull();
 
-		it("should return config when valid single file config is present", () => {
-			const handler = () => {};
-			const config: FileMetadata = { type: "single", fieldname: "avatar" };
-			Object.assign(handler, { _fileConfig: config });
+      const fnWithUndefined = () => {};
+      (fnWithUndefined as any)._fileConfig = undefined;
+      expect(extractFileMetadata(fnWithUndefined)).toBeNull();
 
-			expect(extractFileMetadata(handler)).toEqual(config);
-		});
+      const fnWithNull = () => {};
+      (fnWithNull as any)._fileConfig = null;
+      expect(extractFileMetadata(fnWithNull)).toBeNull();
 
-		it("should return config when valid array file config is present", () => {
-			const handler = () => {};
-			const config: FileMetadata = { type: "array", fieldname: "photos", maxCount: 5 };
-			Object.assign(handler, { _fileConfig: config });
+      const fnWithFalse = () => {};
+      (fnWithFalse as any)._fileConfig = false;
+      expect(extractFileMetadata(fnWithFalse)).toBeNull();
+    });
 
-			expect(extractFileMetadata(handler)).toEqual(config);
-		});
+    it("should return valid FileMetadata for single, array, and fields types", () => {
+      const singleFn = () => {};
+      const singleConfig: FileMetadata = { type: "single", fieldname: "avatar" };
+      (singleFn as any)._fileConfig = singleConfig;
+      expect(extractFileMetadata(singleFn)).toEqual(singleConfig);
 
-		it("should return config when valid fields file config is present", () => {
-			const handler = () => {};
-			const config: FileMetadata = {
-				type: "fields",
-				fields: [{ name: "doc", maxCount: 1 }],
-			};
-			Object.assign(handler, { _fileConfig: config });
+      const arrayFn = () => {};
+      const arrayConfig: FileMetadata = { type: "array", fieldname: "photos", maxCount: 10 };
+      (arrayFn as any)._fileConfig = arrayConfig;
+      expect(extractFileMetadata(arrayFn)).toEqual(arrayConfig);
 
-			expect(extractFileMetadata(handler)).toEqual(config);
-		});
+      const fieldsFn = () => {};
+      const fieldsConfig: FileMetadata = {
+        type: "fields",
+        fields: [{ name: "doc", maxCount: 1 }],
+      };
+      (fieldsFn as any)._fileConfig = fieldsConfig;
+      expect(extractFileMetadata(fieldsFn)).toEqual(fieldsConfig);
+    });
 
-		it("should warn and return null for invalid config type with named handler", () => {
-			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-			function uploadHandler() {}
-			Object.assign(uploadHandler, { _fileConfig: { type: "invalid-type" } });
+    it("should log warning with handler name and return null for invalid config shape", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-			const result = extractFileMetadata(uploadHandler);
+      function myNamedHandler() {}
+      (myNamedHandler as any)._fileConfig = { type: "unknown-type" };
 
-			expect(result).toBeNull();
-			expect(warnSpy).toHaveBeenCalledTimes(1);
-			expect(warnSpy).toHaveBeenCalledWith(
-				expect.stringContaining("Handler has a _fileConfig property"),
-				"uploadHandler",
-			);
-		});
+      expect(extractFileMetadata(myNamedHandler)).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Handler has a _fileConfig property"),
+        "myNamedHandler",
+      );
+    });
 
-		it("should fallback to 'anonymous' in warning when handler has no name", () => {
-			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-			const anonymousHandler = (() => () => {})() as { (): void; _fileConfig?: unknown };
-			Object.defineProperty(anonymousHandler, "name", { value: "" });
-			anonymousHandler._fileConfig = { type: "corrupt" };
+    it("should log warning with 'anonymous' when handler has empty name", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-			const result = extractFileMetadata(anonymousHandler);
+      const anonFn = () => {};
+      Object.defineProperty(anonFn, "name", { value: "" });
+      (anonFn as any)._fileConfig = { type: "invalid" };
 
-			expect(result).toBeNull();
-			expect(warnSpy).toHaveBeenCalledTimes(1);
-			expect(warnSpy).toHaveBeenCalledWith(
-				expect.stringContaining("Handler has a _fileConfig property"),
-				"anonymous",
-			);
-		});
-	});
+      expect(extractFileMetadata(anonFn)).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Handler has a _fileConfig property"),
+        "anonymous",
+      );
+    });
+
+    it("should log warning and return null when _fileConfig is a non-object truthy value", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      function primitiveConfigHandler() {}
+      (primitiveConfigHandler as any)._fileConfig = "not-an-object";
+
+      expect(extractFileMetadata(primitiveConfigHandler)).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Handler has a _fileConfig property"),
+        "primitiveConfigHandler",
+      );
+    });
+  });
 });

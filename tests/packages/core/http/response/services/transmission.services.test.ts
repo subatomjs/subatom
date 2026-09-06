@@ -47,6 +47,13 @@ describe("Response Transmission Services", () => {
   });
 
   describe("sendBody", () => {
+    it("should not send when the raw response has already ended", () => {
+      rawState.writableEnded = true;
+
+      sendBody(raw, headersMap, false, "ignored");
+
+      expect(raw.end).not.toHaveBeenCalled();
+    });
     it("should end response immediately when body is null or undefined", () => {
       sendBody(raw, headersMap, false, undefined);
       expect(raw.end).toHaveBeenCalledWith();
@@ -64,6 +71,12 @@ describe("Response Transmission Services", () => {
       expect(raw.end).not.toHaveBeenCalled();
     });
 
+    it("should ignore an object when no JSON delegate is provided", () => {
+      sendBody(raw, headersMap, false, { ignored: true });
+
+      expect(raw.end).not.toHaveBeenCalled();
+    });
+
     it("should set default HTML content-type and Content-Length for string bodies", () => {
       sendBody(raw, headersMap, false, "<h1>Hello</h1>");
       expect(headersMap.get("content-type")).toBe("text/html; charset=utf-8");
@@ -77,15 +90,36 @@ describe("Response Transmission Services", () => {
       expect(headersMap.get("content-length")).toBe(buf.length.toString());
       expect(headersMap.get("content-type")).toBeUndefined();
       expect(raw.end).toHaveBeenCalledWith(buf);
+
+      const bytes = new Uint8Array([1, 2, 3]);
+      rawState.writableEnded = false;
+      sendBody(raw, headersMap, false, bytes);
+      expect(headersMap.get("content-length")).toBe("3");
+      expect(raw.end).toHaveBeenCalledWith(bytes);
     });
   });
 
   describe("sendJson", () => {
+    it("should not serialize when the raw response has already ended", () => {
+      rawState.writableEnded = true;
+
+      sendJson(raw, headersMap, false, { ignored: true });
+
+      expect(raw.end).not.toHaveBeenCalled();
+    });
     it("should serialize objects to JSON and set application/json content-type", () => {
       sendJson(raw, headersMap, false, { status: "ready" });
       expect(headersMap.get("content-type")).toBe("application/json; charset=utf-8");
       expect(raw.end).toHaveBeenCalledWith(JSON.stringify({ status: "ready" }));
     });
+
+    it("should preserve an existing content type during JSON serialization", () => {
+      headersMap.set("content-type", "application/custom");
+
+      sendJson(raw, headersMap, false, { ready: true });
+
+      expect(headersMap.get("content-type")).toBe("application/custom");
+  });
 
     it("should throw SubatomError when serialization fails on circular references", () => {
       const circular: Record<string, unknown> = {};
@@ -106,6 +140,14 @@ describe("Response Transmission Services", () => {
       const disposition = headersMap.get("content-disposition") as string;
       expect(disposition).toContain('filename="report \'2026\' _.pdf"');
       expect(disposition).toContain("filename*=UTF-8''report%20%222026%22%20%E2%9C%93.pdf");
+    });
+
+    it("should encode RFC 5987 characters in attachment filenames", () => {
+      setAttachment(raw, headersMap, false, "file*(test).txt");
+
+      expect(headersMap.get("content-disposition")).toContain(
+        "filename*=UTF-8''file%2A%28test%29.txt",
+      );
     });
   });
 

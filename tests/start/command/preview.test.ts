@@ -16,6 +16,7 @@ describe("runPreview", () => {
   let loggerInfoSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called");
     }) as any);
@@ -39,6 +40,21 @@ describe("runPreview", () => {
     vi.restoreAllMocks();
   });
 
+  it("should exit 1 if resolveEntry throws Error or non-Error", async () => {
+    vi.spyOn(resolveEntryModule, "resolveEntry").mockImplementation(() => {
+      throw new Error("Missing entry point");
+    });
+
+    await expect(runPreview()).rejects.toThrow("process.exit called");
+    expect(loggerErrorSpy).toHaveBeenCalledWith("Missing entry point");
+
+    vi.spyOn(resolveEntryModule, "resolveEntry").mockImplementation(() => {
+      throw "Primitive error";
+    });
+    await expect(runPreview()).rejects.toThrow("process.exit called");
+    expect(loggerErrorSpy).toHaveBeenCalledWith("Primitive error");
+  });
+
   it("should exit 1 if compiled production file is missing", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(false);
 
@@ -49,8 +65,12 @@ describe("runPreview", () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it("should resolve port and start server process", async () => {
+  it("should resolve port and start server with default config and localhost protocol", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
+      entry: "src/server.ts",
+    } as any);
+    vi.spyOn(resolveEntryModule, "resolveEntry").mockReturnValue("/workspace/src/server.ts");
 
     await runPreview();
 
@@ -59,6 +79,53 @@ describe("runPreview", () => {
       process.execPath,
       [expect.stringContaining("server.js")],
       expect.objectContaining({ label: "preview server" })
+    );
+  });
+
+  it("should use https protocol when host is not localhost", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
+      entry: "src/server.ts",
+      host: "custom.domain",
+      port: 3000,
+    } as any);
+    vi.spyOn(utils, "resolvePort").mockResolvedValue(3000);
+
+    await runPreview();
+
+    expect(loggerSuccessSpy).toHaveBeenCalledWith("https://custom.domain:3000");
+  });
+
+  it("should resolve compiled path when entry is configured with outDir", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(resolveEntryModule, "resolveEntry").mockReturnValue("/workspace/src/index.ts");
+    vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
+      entry: "src/index.ts",
+      outDir: "dist",
+    } as any);
+
+    await runPreview();
+
+    expect(utils.runProcess).toHaveBeenCalledWith(
+      process.execPath,
+      ["/workspace/dist/index.js"],
+      expect.anything()
+    );
+  });
+
+  it("should resolve a compiled root-level entry relative to cwd", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(resolveEntryModule, "resolveEntry").mockReturnValue("/workspace/index.ts");
+    vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
+      entry: "index.ts",
+    } as any);
+
+    await runPreview();
+
+    expect(utils.runProcess).toHaveBeenCalledWith(
+      process.execPath,
+      ["/workspace/dist"],
+      expect.objectContaining({ label: "preview server" }),
     );
   });
 });

@@ -19,7 +19,7 @@ vi.mock("node:fs", async () => {
   return {
     ...actual,
     createReadStream: (...args: unknown[]) => mockCreateReadStream(...args),
-stat: (...args: unknown[]) => mockStat(...args),
+    stat: (...args: unknown[]) => mockStat(...args),
     default: {
       ...actual,
       createReadStream: (...args: unknown[]) => mockCreateReadStream(...args),
@@ -42,10 +42,12 @@ describe("File & Response Streaming Services", () => {
       expect(parseRange("items=0-10", fileSize)).toBeNull();
     });
 
-    it("should throw RangeNotSatisfiableError on multi-range requests", () => {
-      expect(() => parseRange("bytes=0-50,100-150", fileSize)).toThrow(
-        RangeNotSatisfiableError,
-      );
+it("should throw RangeNotSatisfiableError on invalid syntax or out-of-bounds offsets", () => {
+      expect(() => parseRange("bytes=500-100", fileSize)).toThrow(RangeNotSatisfiableError);
+      expect(() => parseRange("bytes=1500-2000", fileSize)).toThrow(RangeNotSatisfiableError);
+      expect(() => parseRange("bytes=abc-200", fileSize)).toThrow(RangeNotSatisfiableError);
+      expect(() => parseRange("bytes=100-abc", fileSize)).toThrow(RangeNotSatisfiableError);
+      expect(() => parseRange("bytes=invalid-end", fileSize)).toThrow(RangeNotSatisfiableError);
     });
 
     it("should parse standard start-end ranges", () => {
@@ -56,17 +58,24 @@ describe("File & Response Streaming Services", () => {
       expect(parseRange("bytes=500-", fileSize)).toEqual({ start: 500, end: 999 });
     });
 
-    it("should parse suffix -N ranges", () => {
+    it("should parse suffix -N ranges and cap start at 0 when suffix exceeds size", () => {
       expect(parseRange("bytes=-200", fileSize)).toEqual({ start: 800, end: 999 });
+      expect(parseRange("bytes=-2000", fileSize)).toEqual({ start: 0, end: 999 });
     });
 
-    it("should throw RangeNotSatisfiableError on invalid syntax or out-of-bounds offsets", () => {
+    it("should throw RangeNotSatisfiableError on invalid suffix syntax", () => {
+      expect(() => parseRange("bytes=-abc", fileSize)).toThrow(RangeNotSatisfiableError);
       expect(() => parseRange("bytes=-0", fileSize)).toThrow(RangeNotSatisfiableError);
+      expect(() => parseRange("bytes=--5", fileSize)).toThrow(RangeNotSatisfiableError);
+    });
+
+it("should throw RangeNotSatisfiableError on invalid syntax or out-of-bounds offsets", () => {
       expect(() => parseRange("bytes=500-100", fileSize)).toThrow(RangeNotSatisfiableError);
       expect(() => parseRange("bytes=1500-2000", fileSize)).toThrow(RangeNotSatisfiableError);
       expect(() => parseRange("bytes=invalid-end", fileSize)).toThrow(RangeNotSatisfiableError);
     });
   });
+
 
   describe("streamFileToResponse", () => {
     let req: IncomingMessage;
@@ -90,12 +99,15 @@ describe("File & Response Streaming Services", () => {
       vi.mocked(fsp.stat).mockResolvedValue({ size: 1000 } as fs.Stats);
     });
 
-    it("should stream entire file when no Range header is provided", async () => {
+    it("should stream entire file when no Range header is provided and set custom headers", async () => {
+      raw.statusCode = 203;
       await streamFileToResponse(req, raw, "/static/file.txt", {
         contentType: "text/plain",
+        headers: { "X-Custom": "header-val" },
       });
 
-      expect(raw.statusCode).toBe(200);
+      expect(raw.statusCode).toBe(203);
+      expect(headers.get("x-custom")).toBe("header-val");
       expect(headers.get("content-type")).toBe("text/plain");
       expect(headers.get("content-length")).toBe(1000);
       expect(headers.get("accept-ranges")).toBe("bytes");
@@ -127,6 +139,18 @@ describe("File & Response Streaming Services", () => {
       expect(raw.end).toHaveBeenCalledTimes(1);
       expect(pipeSpy).not.toHaveBeenCalled();
     });
+
+    it("should rethrow unexpected errors occurring during range parsing", async () => {
+      req.headers.range = "bytes=0-499";
+      const customError = new TypeError("Unexpected range failure");
+      vi.spyOn(String.prototype, "split").mockImplementationOnce(() => {
+        throw customError;
+      });
+
+      await expect(
+        streamFileToResponse(req, raw, "/static/file.txt"),
+      ).rejects.toThrow("Unexpected range failure");
+    });
   });
 
   describe("streamResponse", () => {
@@ -155,6 +179,43 @@ describe("File & Response Streaming Services", () => {
       expect(headers.get("Content-Length")).toBe(11);
       expect(headers.get("X-Stream-Id")).toBe("123");
       expect(pipeSpy).toHaveBeenCalledWith(raw, source, expect.any(Object));
+    });
+
+    it("should fallback to raw.statusCode when options.status is omitted", async () => {
+      const raw = {
+        headersSent: false,
+        statusCode: 304,
+        setHeader: vi.fn(),
+      } as unknown as ServerResponse;
+
+      const source = Readable.from(["data"]);
+      pipeSpy.mockClear();
+
+      await streamResponse(raw, source);
+
+      expect(raw.statusCode).toBe(304);
+      expect(pipeSpy).toHaveBeenCalled();
+    });
+
+    it("should skip setting headers if headersSent is true", async () => {
+      const setHeaderSpy = vi.fn();
+      const raw = {
+        headersSent: true,
+        statusCode: 200,
+        setHeader: setHeaderSpy,
+      } as unknown as ServerResponse;
+
+      const source = Readable.from(["data"]);
+      pipeSpy.mockClear();
+
+      await streamResponse(raw, source, {
+        status: 201,
+        contentType: "text/plain",
+      });
+
+      expect(setHeaderSpy).not.toHaveBeenCalled();
+      expect(raw.statusCode).toBe(200);
+      expect(pipeSpy).toHaveBeenCalled();
     });
   });
 });

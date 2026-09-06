@@ -90,7 +90,19 @@ describe("runPipeline", () => {
 
     await expect(runPipeline(handlers, req, res)).rejects.toThrow("Pipeline Stop");
   });
+it("should skip undefined or falsy handlers in the handlers array", async () => {
+    const executed: number[] = [];
+    const handlers = [
+      undefined as unknown as IHandler,
+      async (_req: IRequest, _res: IResponse, next: NextFunction) => {
+        executed.push(1);
+        await next();
+      },
+    ];
 
+    await runPipeline(handlers, req, res);
+    expect(executed).toEqual([1]);
+  });
   it("should catch synchronous exceptions in handlers and reject", async () => {
     const handlers: IHandler[] = [
       () => {

@@ -54,6 +54,13 @@ describe("Response Header and Status Services", () => {
       warnSpy.mockRestore();
     });
 
+    it("should ignore a string header when its value is undefined", () => {
+      setHeader(raw, headersMap, false, "X-Missing", undefined);
+
+      expect(headersMap.has("x-missing")).toBe(false);
+      expect(raw.setHeader).not.toHaveBeenCalledWith("X-Missing", undefined);
+    });
+
     it("should throw SubatomError if header value contains CR or LF characters", () => {
       expect(() =>
         assertNoHeaderInjection("X-Injected", "value\r\nInjected-Header: evil"),
@@ -71,6 +78,12 @@ describe("Response Header and Status Services", () => {
       expect(headersMap.get("accept-encoding")).toBe("gzip");
     });
 
+    it("should set a new header with multiple values as an array", () => {
+      appendHeader(raw, headersMap, false, "Accept-Encoding", ["gzip", "br"]);
+
+      expect(headersMap.get("accept-encoding")).toEqual(["gzip", "br"]);
+    });
+
     it("should merge string or array into an array of header values", () => {
       appendHeader(raw, headersMap, false, "Set-Cookie", "a=1");
       appendHeader(raw, headersMap, false, "Set-Cookie", "b=2");
@@ -78,6 +91,14 @@ describe("Response Header and Status Services", () => {
 
       appendHeader(raw, headersMap, false, "Set-Cookie", ["c=3", "d=4"]);
       expect(headersMap.get("set-cookie")).toEqual(["a=1", "b=2", "c=3", "d=4"]);
+    });
+
+    it("should append to an existing array-valued header", () => {
+      headersMap.set("set-cookie", ["a=1", "b=2"]);
+
+      appendHeader(raw, headersMap, false, "Set-Cookie", "c=3");
+
+      expect(headersMap.get("set-cookie")).toEqual(["a=1", "b=2", "c=3"]);
     });
   });
 
@@ -109,6 +130,21 @@ describe("Response Header and Status Services", () => {
 
       varyHeader(raw, headersMap, false, "Origin");
       expect(headersMap.get("vary")).toBe("Origin, User-Agent");
+    });
+
+    it("should preserve wildcard and avoid duplicate Vary fields", () => {
+      varyHeader(raw, headersMap, false, "*");
+      varyHeader(raw, headersMap, false, "*");
+
+      expect(headersMap.get("vary")).toBe("*");
+    });
+
+    it("should normalize an existing array-valued Vary header", () => {
+      headersMap.set("vary", ["Origin", "Accept"]);
+
+      varyHeader(raw, headersMap, false, "User-Agent");
+
+      expect(headersMap.get("vary")).toBe("Origin, Accept, User-Agent");
     });
   });
 

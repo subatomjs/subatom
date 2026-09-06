@@ -1,391 +1,177 @@
-# Subatom Enterprise Deployment Guide
+# Deployment
 
-This guide covers production deployment patterns for Subatom applications with TLS, load balancing, distributed sessions, and multi-process orchestration.
+This guide covers production deployment for a Subatom application using the public server, middleware, and configuration APIs.
 
-## Single-Process Production Deployment
+## Production Configuration
 
-### Node.js HTTP Server (HTTP/2 via TLS Reverse Proxy)
+Create `subatom.config.ts` in the application root when you need shared server settings:
+
+```typescript
+export default {
+  entry: "src/index.ts",
+  outDir: "dist",
+  port: 3000,
+  host: "0.0.0.0",
+  sourcemap: true,
+  minify: false,
+};
+```
+
+Supported configuration keys are `entry`, `outDir`, `port`, `host`, `sourcemap`, `minify`, and `watch`. The `watch` object supports `extensions`, `debounceMs`, and `ignore`.
+
+Build the application with:
+
+```bash
+npm run build
+```
+
+The CLI also provides `subatom build`, `subatom start`, `subatom preview`, and `subatom dev` commands when the package binary is installed.
+
+## Starting the Server
+
+Use `listen()` for a direct HTTP server start. Its signature is `listen(port = 8080, host?, appName?)`:
 
 ```typescript
 import { Subatom } from "subatom";
-import { session } from "subatom";
 
 const app = new Subatom();
 
-// Configure Redis sessions (required in production)
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    // Redis auto-detection: reads REDIS_URL from environment
-    // No need to configure the store explicitly
-  })
-);
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
-app.get("/", (req, res) => res.json({ ok: true }));
+const server = app.listen(3000, "0.0.0.0", "subatom-api");
 
-const server = new (await import("subatom")).SubatomServer(app.router);
-await server.start({
-  port: process.env.PORT || 3000,
-  // Admission control: shed load at configured concurrency
+process.once("SIGTERM", () => {
+  server.close(() => process.exit(0));
+});
+```
+
+Use `start()` when configuration should be resolved from the application configuration and optional overrides:
+
+```typescript
+import { Subatom } from "subatom";
+
+const app = new Subatom();
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+await app.start({
+  port: 3000,
+  host: "0.0.0.0",
   maxConcurrentRequests: 500,
 });
 ```
 
-### Environment Configuration
+`maxConcurrentRequests` limits accepted concurrent requests. Requests above the limit receive HTTP 503 with a `Retry-After` header.
 
-```bash
-# Required for distributed sessions
-export REDIS_URL="redis://localhost:6379/0"
+The server configuration also supports `appName`, `shutdownTimeoutMs`, `headersTimeout`, `requestTimeout`, `keepAliveTimeout`, and `maxConnections`.
 
-# Server configuration
-export NODE_ENV=production
-export PORT=3000
-export SESSION_SECRET=$(openssl rand -hex 32)
-```
-
-### Docker Deployment
+## Docker
 
 ```dockerfile
 FROM node:24-alpine
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY . .
 RUN npm run build
 
 EXPOSE 3000
-CMD ["node", "dist/start/cli.js"]
+CMD ["node", "dist/start/cli.js", "start"]
 ```
 
-**Docker Compose with Redis:**
+Pass production settings through environment variables or `subatom.config.ts`. The framework does not automatically convert arbitrary environment variables into server configuration values.
 
-```yaml
-version: "3.8"
-services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-      REDIS_URL: redis://redis:6379/0
-      SESSION_SECRET: ${SESSION_SECRET}
-    depends_on:
-      - redis
+## Reverse Proxy and TLS
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-volumes:
-  redis_data:
-```
-
-## Load Balancing and Multi-Process Orchestration
-
-### Kubernetes Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: subatom-api
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: subatom-api
-  template:
-    metadata:
-      labels:
-        app: subatom-api
-    spec:
-      containers:
-      - name: subatom
-        image: my-registry/subatom-api:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: NODE_ENV
-          value: production
-        - name: REDIS_URL
-          valueFrom:
-            secretKeyRef:
-              name: app-secrets
-              key: redis-url
-        - name: SESSION_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: app-secrets
-              key: session-secret
-        - name: PORT
-          value: "3000"
-        - name: MAX_CONCURRENT_REQUESTS
-          value: "500"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: subatom-api
-spec:
-  selector:
-    app: subatom-api
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 3000
-  type: LoadBalancer
-```
-
-### Health Check Endpoint
-
-```typescript
-import { Subatom } from "subatom";
-
-const app = new Subatom();
-
-// Expose health and readiness endpoints
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-app.get("/ready", (req, res) => {
-  // Check dependencies (Redis, etc.)
-  const ready = checkRedisConnection() && checkDatabaseConnection();
-  res.status(ready ? 200 : 503).json({ ready });
-});
-
-app.get("/metrics", (req, res) => {
-  // Return server metrics for monitoring
-  const metrics = app.server.getMetrics();
-  res.json(metrics);
-});
-```
-
-## TLS Termination
-
-TLS termination is handled by the reverse proxy layer, not the Node.js application.
-
-### NGINX Configuration
+Terminate TLS at a reverse proxy such as NGINX or Caddy and forward HTTP traffic to the Subatom listener. Configure the application host as `0.0.0.0` when it must accept traffic from outside the container or host:
 
 ```nginx
 upstream subatom_backend {
-    server app:3000;
-    server app:3001;
-    server app:3002;
+    server 127.0.0.1:3000;
 }
 
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
     server_name api.example.com;
 
     ssl_certificate /etc/ssl/certs/api.example.com.crt;
     ssl_certificate_key /etc/ssl/private/api.example.com.key;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
 
     location / {
         proxy_pass http://subatom_backend;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
     }
 }
-
-server {
-    listen 80;
-    server_name api.example.com;
-    return 301 https://$server_name$request_uri;
-}
 ```
 
-### Caddy Configuration
+## Streaming Request Bodies
 
-```caddy
-api.example.com {
-    reverse_proxy localhost:3000
-}
-```
-
-## Streaming Large Payloads
-
-For file uploads, video streams, or large JSON payloads, use the streaming middleware:
+Use the exported `streaming()` middleware for accepted content types such as binary, audio, video, and multipart requests:
 
 ```typescript
+import { createWriteStream } from "node:fs";
 import { Subatom, streaming } from "subatom";
-import fs from "node:fs";
 
 const app = new Subatom();
 
-app.post("/upload", streaming(), async (req, res) => {
-  if (!req.bodyStream) {
+app.post("/upload", streaming(), (req, res, next) => {
+  const stream = req.bodyStream;
+  if (!stream) {
     res.status(400).json({ error: "Stream unavailable" });
     return;
   }
 
-  const uploadPath = `/uploads/${Date.now()}.bin`;
-  req.bodyStream.pipe(fs.createWriteStream(uploadPath));
-
-  req.bodyStream.on("error", (err) => {
-    console.error("Upload stream error:", err);
-    res.status(400).json({ error: "Stream error" });
-  });
-
-  req.bodyStream.on("end", () => {
-    res.json({ uploaded: uploadPath });
-  });
+  stream.on("error", next);
+  stream.pipe(createWriteStream("./upload.bin"));
+  stream.on("end", () => res.json({ uploaded: true }));
 });
 ```
 
-The streaming middleware avoids buffering large payloads in memory.
+The middleware accepts `chunkSizeKb`, `acceptTypes`, and `onStreamError` options. It attaches the raw request stream as `req.bodyStream` only when the request content type matches one of the configured patterns.
 
-## Distributed Sessions
+## Sessions
 
-### Redis Setup
-
-**Via Docker:**
-
-```bash
-docker run -d -p 6379:6379 redis:7-alpine
-```
-
-**Via AWS ElastiCache:**
+The session middleware requires a secret:
 
 ```typescript
+import { Subatom, session } from "subatom";
+
 const app = new Subatom();
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
-    // Auto-detection: uses REDIS_URL environment variable
-    // Set REDIS_URL to your ElastiCache endpoint
-  })
+    secret: process.env.SESSION_SECRET ?? "development-only-secret",
+  }),
 );
 ```
 
-**Via Node.js redis module:**
+In production, configure `REDIS_URL` for the Redis session store, pass a custom `store`, or explicitly set `allowInMemoryInProduction: true`. Do not rely on the in-memory store for distributed deployments.
 
-```bash
-npm install redis
-export REDIS_URL="redis://:password@elasticache-endpoint.cache.amazonaws.com:6379/0"
-```
+## Health Checks
 
-### Session Persistence Across Deployments
-
-With Redis configured, session data persists across:
-
-- Process restarts
-- Rolling deployments
-- Horizontal scaling (multiple processes/containers)
-- Server failures (Redis replication)
-
-## Admission Control and Load Shedding
-
-The `maxConcurrentRequests` option sheds load by returning 503 when concurrency limits are exceeded:
+Expose a lightweight endpoint for a load balancer or container probe:
 
 ```typescript
-const server = new SubatomServer(app.router);
-await server.start({
-  port: 3000,
-  maxConcurrentRequests: 500, // Return 503 if exceeded
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
 });
-
-// Monitor metrics
-setInterval(() => {
-  const metrics = server.getMetrics();
-  console.log("Active requests:", metrics.activeRequests);
-  console.log("Total requests:", metrics.totalRequests);
-  console.log("Failed requests:", metrics.failedRequests);
-}, 10_000);
 ```
+
+Keep dependency checks separate from the liveness endpoint when a temporary dependency failure should not cause the process to be restarted.
 
 ## Graceful Shutdown
 
-```typescript
-import { Subatom } from "subatom";
-
-const app = new Subatom();
-const server = new (await import("subatom")).SubatomServer(app.router);
-
-await server.start({ port: 3000 });
-
-const gracefulShutdown = async () => {
-  console.log("Shutting down gracefully...");
-  server.close(() => {
-    console.log("Server closed");
-    process.exit(0);
-  });
-};
-
-process.on("SIGTERM", gracefulShutdown);
-process.on("SIGINT", gracefulShutdown);
-```
-
-## Monitoring and Observability
-
-### Health and Metrics Endpoints
+The `Subatom` application registers process-boundary handling and exposes `gracefulShutdown(exitCode?)`. Use it for application-owned shutdown hooks:
 
 ```typescript
-app.get("/health", (req, res) => {
-  const health = server.getHealth();
-  res.status(health.healthy ? 200 : 503).json(health);
-});
-
-app.get("/metrics", (req, res) => {
-  res.json(server.getMetrics());
+process.once("SIGTERM", () => {
+  app.gracefulShutdown(0);
 });
 ```
 
-### Request Tracing
-
-Subatom automatically tracks request IDs and timing:
-
-```typescript
-app.get("/traced", (req, res) => {
-  // req.id is auto-generated for each request
-  console.log(`[${req.id}] Request received`);
-  res.json({ id: req.id });
-});
-```
-
-## Summary
-
-Subatom is designed to work seamlessly with standard deployment infrastructure:
-
-- **Single-process:** Expose via HTTP on a port, proxy through NGINX/Caddy for TLS
-- **Multi-process:** Use containers (Docker), Kubernetes, or process managers
-- **Sessions:** Auto-detect Redis via `REDIS_URL`, no manual store configuration needed
-- **Load shedding:** Configure `maxConcurrentRequests` for admission control
-- **Streaming:** Use the `streaming()` middleware for large payloads
-- **Monitoring:** Expose `/health` and `/metrics` endpoints for observability
-
-This model integrates naturally with any container orchestration platform, load balancer, or cloud provider.
+The public `SubatomServer` class also supports `start(config?)`, `close(callback)`, `getMetrics()`, and `getHealth()` when you construct it directly with a router and middleware arrays. For normal applications, prefer `Subatom.start()` or `Subatom.listen()` so the application-owned router and middleware are configured consistently.

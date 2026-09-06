@@ -5,7 +5,7 @@ import type { ISubatom } from "../../packages/core/subatom/types/subatom.types.j
 
 interface MockResponse {
 	json: ReturnType<typeof vi.fn>;
-	status: ReturnType<typeof vi.fn>;
+	status?: ReturnType<typeof vi.fn>;
 	setHeader: ReturnType<typeof vi.fn>;
 	send: ReturnType<typeof vi.fn>;
 }
@@ -19,13 +19,12 @@ interface MockApp {
 }
 
 function createMockResponse(): MockResponse {
-	const res: MockResponse = {
+	return {
 		json: vi.fn(),
 		status: vi.fn().mockReturnThis(),
 		setHeader: vi.fn(),
 		send: vi.fn(),
 	};
-	return res;
 }
 
 describe("registerDocs", () => {
@@ -46,15 +45,43 @@ describe("registerDocs", () => {
 		expect(app.get).toHaveBeenCalledWith("/docs", expect.any(Function));
 	});
 
-	it("should register custom docs path when provided in options", () => {
+	it("should register custom docs path and pass full options (title, version, description, branding)", () => {
+		const routeHandlers: Record<string, Function> = {};
 		const app: MockApp = {
-			get: vi.fn(),
+			get: vi.fn((path: string, handler: Function) => {
+				routeHandlers[path] = handler;
+			}),
 			getRoutes: () => [],
 		};
 
-		SubAtomDocs(app as unknown as ISubatom, { path: "/custom-api-docs" });
+		SubAtomDocs(app as unknown as ISubatom, {
+			path: "/api-reference",
+			title: "Custom Title",
+			version: "3.0.0",
+			description: "Custom Description",
+			appName: "Subatom Core",
+			darkLogoUrl: "https://example.com/dark.png",
+			liteLogoUrl: "https://example.com/lite.png",
+		});
 
-		expect(app.get).toHaveBeenCalledWith("/custom-api-docs", expect.any(Function));
+		expect(app.get).toHaveBeenCalledWith("/api-reference", expect.any(Function));
+
+		const resJson = createMockResponse();
+		routeHandlers["/openapi.json"]({}, resJson);
+		expect(resJson.json).toHaveBeenCalledWith(
+			expect.objectContaining({
+				info: {
+					title: "Custom Title",
+					version: "3.0.0",
+					description: "Custom Description",
+				},
+			}),
+		);
+
+		const resUi = createMockResponse();
+		routeHandlers["/api-reference"]({}, resUi);
+		expect(resUi.send).toHaveBeenCalledWith(expect.stringContaining("Subatom Core"));
+		expect(resUi.send).toHaveBeenCalledWith(expect.stringContaining("https://example.com/dark.png"));
 	});
 
 	it("should serve HTML with content-type text/html on docs endpoint", () => {
@@ -216,7 +243,7 @@ describe("registerDocs", () => {
 		expect(firstCallSpec).toEqual(secondCallSpec);
 	});
 
-	it("should catch errors during spec generation, log error, and return 500 status", () => {
+	it("should catch Error instances during spec generation, log error, and return 500 status", () => {
 		const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 		const routeHandlers: Record<string, Function> = {};
 
@@ -242,6 +269,35 @@ describe("registerDocs", () => {
 		expect(res.json).toHaveBeenCalledWith({
 			error: "Failed to generate OpenAPI specification.",
 			message: "Router failure",
+		});
+	});
+
+	it("should handle non-Error throwables and responses without a status method", () => {
+		vi.spyOn(console, "error").mockImplementation(() => {});
+		const routeHandlers: Record<string, Function> = {};
+
+		const app: MockApp = {
+			get: vi.fn((path: string, handler: Function) => {
+				routeHandlers[path] = handler;
+			}),
+			getRoutes: () => {
+				throw "A string rejection error";
+			},
+		};
+
+		SubAtomDocs(app as unknown as ISubatom);
+
+		const res: MockResponse = {
+			json: vi.fn(),
+			setHeader: vi.fn(),
+			send: vi.fn(),
+		};
+
+		routeHandlers["/openapi.json"]({}, res);
+
+		expect(res.json).toHaveBeenCalledWith({
+			error: "Failed to generate OpenAPI specification.",
+			message: "A string rejection error",
 		});
 	});
 });

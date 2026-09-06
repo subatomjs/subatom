@@ -43,10 +43,27 @@ describe("acceptsHeader and parseAcceptTypes", () => {
       expect(acceptsHeader({ accept: "application/json" }, "text/html")).toBe(false);
     });
 
+    it("should reject a matching media type with a different subtype", () => {
+      expect(acceptsHeader({ accept: "application/xml" }, "application/json")).toBe(false);
+    });
+
     it("should reject matches when the client specifies q=0", () => {
       const headers = { accept: "text/html;q=0, application/json;q=1" };
       expect(acceptsHeader(headers, "text/html")).toBe(false);
       expect(acceptsHeader(headers, "application/json")).toBe(true);
     });
+  });
+
+  it("should default q to 1.0 when q parameter cannot be parsed as a float", () => {
+      const parsed = parseAcceptTypes("application/json;q=invalid");
+      expect(parsed).toEqual([
+        { type: "application", subtype: "json", q: 1.0 },
+      ]);
+    });
+    it("should ignore q-value when parseFloat returns NaN", () => {
+    const parsed = parseAcceptTypes("text/html;q=.");
+    expect(parsed).toEqual([
+      { type: "text", subtype: "html", q: 1.0 },
+    ]);
   });
 });

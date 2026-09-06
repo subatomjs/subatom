@@ -51,6 +51,17 @@ describe("session() Middleware", () => {
 		);
 	});
 
+	it("should allow in-memory store in production when allowInMemoryInProduction is true", () => {
+		const originalEnv = process.env.NODE_ENV;
+		process.env.NODE_ENV = "production";
+
+		expect(() =>
+			session({ secret, allowInMemoryInProduction: true }),
+		).not.toThrow();
+
+		process.env.NODE_ENV = originalEnv;
+	});
+
 	it("should throw error in production environment when store is missing and REDIS_URL not set", () => {
 		const originalEnv = process.env.NODE_ENV;
 		process.env.NODE_ENV = "production";
@@ -107,6 +118,65 @@ describe("session() Middleware", () => {
 		await middleware.close();
 	});
 
+	it("should re-generate session ID if signature is valid but store has no matching entry", async () => {
+		const store = new MemoryStore();
+		const signed = sign("evicted-sid", secret);
+		const { req, res, rawRes } = createMockSessionContext(`sid=${signed}`);
+		const middleware = session({ secret, store });
+
+		await middleware(req, res, async () => {
+			expect(req.session.isNew).toBe(true);
+			expect(req.session.id).not.toBe("evicted-sid");
+			rawRes.end();
+		});
+
+		await middleware.close();
+	});
+
+	it("should support resave and rolling options when session data did not change", async () => {
+		const store = new MemoryStore();
+		await store.set("rolling-sid", { user: "Bob" }, 60000);
+
+		const signed = sign("rolling-sid", secret);
+		const { req, res, rawRes, headersMap } = createMockSessionContext(
+			`sid=${signed}`,
+		);
+		const middleware = session({
+			secret,
+			store,
+			resave: true,
+			rolling: true,
+		});
+
+		await middleware(req, res, async () => {
+			rawRes.end();
+		});
+
+		expect(headersMap["Set-Cookie"]).toBeDefined();
+		await middleware.close();
+	});
+
+	it("should work seamlessly when response has no raw.end method", async () => {
+		const store = new MemoryStore();
+		const middleware = session({ secret, store, saveUninitialized: true });
+		const reqRaw = new IncomingMessage(new Socket());
+		const req = { raw: reqRaw } as IRequest;
+		const res = {
+			raw: {},
+			setHeader: vi.fn(),
+		} as unknown as IResponse;
+
+		await middleware(req, res, async () => {
+			req.session.data = "saved";
+		});
+
+		expect(res.setHeader).toHaveBeenCalledWith(
+			"Set-Cookie",
+			expect.stringContaining("sid="),
+		);
+		await middleware.close();
+	});
+
 	it("should regenerate session ID and destroy previous state on regenerate()", async () => {
 		const store = new MemoryStore();
 		await store.set("old-sid", { loggedIn: true }, 60000);
@@ -147,7 +217,6 @@ describe("session() Middleware", () => {
 	});
 
 	it("should replace a corrupted signed cookie without reading from the store", async () => {
-		// Arrange
 		const store = new MemoryStore();
 		const getSpy = vi.spyOn(store, "get");
 		const { req, res, rawRes } = createMockSessionContext(
@@ -159,20 +228,17 @@ describe("session() Middleware", () => {
 			genid: () => "replacement-id",
 		});
 
-		// Act
 		await middleware(req, res, async () => {
 			expect(req.session.id).toBe("replacement-id");
 			expect(req.session.isNew).toBe(true);
 			rawRes.end();
 		});
 
-		// Assert
 		expect(getSpy).not.toHaveBeenCalled();
 		await middleware.close();
 	});
 
 	it("should log a store persistence timeout while still ending the response", async () => {
-		// Arrange
 		const store: ISessionStore = {
 			get: async () => null,
 			set: async () => {
@@ -186,13 +252,11 @@ describe("session() Middleware", () => {
 		const { req, res, rawRes } = createMockSessionContext();
 		const middleware = session({ secret, store, saveUninitialized: true });
 
-		// Act
 		await middleware(req, res, async () => {
 			rawRes.end();
 		});
 		await new Promise<void>((resolve) => setImmediate(resolve));
 
-		// Assert
 		expect(rawRes.end).toHaveBeenCalledOnce();
 		expect(consoleSpy).toHaveBeenCalledWith(
 			"[session] failed to persist session:",
@@ -204,32 +268,25 @@ describe("session() Middleware", () => {
 	});
 
 	it("should restore the original response end method after finalization", async () => {
-		// Arrange
 		const store = new MemoryStore();
 		const { req, res, rawRes } = createMockSessionContext();
 		const originalEnd = rawRes.end;
 		const middleware = session({ secret, store });
 
-		// Act
 		await middleware(req, res, async () => undefined);
 
-		// Assert
 		expect(rawRes.end).toBe(originalEnd);
 		await middleware.close();
 	});
 
 	it("should surface the Redis client import fallback when production configuration supplies REDIS_URL", () => {
-		// Arrange
 		const nodeEnvironment = process.env.NODE_ENV;
 		const redisUrl = process.env.REDIS_URL;
 		process.env.NODE_ENV = "production";
 		process.env.REDIS_URL = "redis://127.0.0.1:6379";
 
 		try {
-			// Act
 			const createMiddleware = () => session({ secret });
-
-			// Assert
 			expect(createMiddleware).toThrow("Failed to import Redis client");
 		} finally {
 			if (nodeEnvironment === undefined) delete process.env.NODE_ENV;

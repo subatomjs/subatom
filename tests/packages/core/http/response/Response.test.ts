@@ -151,6 +151,32 @@ describe("Response", () => {
       expect(response.get("content-type")).toBe("text/html; charset=utf-8");
       expect(raw.end).toHaveBeenCalledWith("<p>Subatom</p>");
     });
+
+    it("should preserve an existing content type when rendering html", () => {
+      response.type("text/custom");
+
+      response.html("<p>Custom</p>");
+
+      expect(response.get("content-type")).toBe("text/custom");
+    });
+
+    it("should not write again after the response has ended", () => {
+      rawState.writableEnded = true;
+
+      response.send("ignored");
+      response.json({ ignored: true });
+
+      expect(raw.end).not.toHaveBeenCalled();
+    });
+
+    it("should delegate object bodies to json serialization", () => {
+      const jsonSpy = vi.spyOn(response, "json").mockImplementation(() => response);
+      const body = { delegated: true };
+
+      response.send(body);
+
+      expect(jsonSpy).toHaveBeenCalledWith(body);
+    });
   });
 
   describe("Streaming and File Methods", () => {

@@ -9,6 +9,7 @@ import type {
 	IRouter,
 } from "../../../../packages/core/router/types/router.types.js";
 import { Subatom } from "../../../../packages/core/subatom/Subatom.js";
+import * as processBoundaryService from "../../../../packages/core/subatom/services/processBoundary.service.js";
 
 vi.mock("../../../../packages/core/subatom/config/env/env.js", () => ({
 	configEnv: vi.fn(),
@@ -236,6 +237,61 @@ describe("Subatom Application Class", () => {
 
 		const startRes = await app.start({ port: 9001 });
 		expect(startRes).toEqual({ status: "started" });
+	});
+
+	it("should delegate an explicit listen port with a callback-shaped argument", () => {
+		const callback = vi.fn();
+		const listen = app.listen as unknown as (
+			port: number,
+			host?: unknown,
+		) => unknown;
+
+		expect(listen.call(app, 3000, callback)).toEqual({ port: 3000 });
+	});
+
+	it("should delegate an options-shaped listen argument", () => {
+		const options = { port: 4000 };
+		const listen = app.listen as unknown as (options: unknown, callback?: unknown) => unknown;
+		const callback = vi.fn();
+
+		expect(listen.call(app, options, callback)).toEqual({ port: options });
+	});
+
+	it("should use the default listen port when called without arguments", () => {
+		expect(app.listen()).toEqual({ port: 8080 });
+	});
+
+	it("should expose the server getter and shutdown callback through process boundaries", () => {
+		const rejectionListener = process.listeners("unhandledRejection").at(-1);
+		const signalListener = process.listeners("SIGTERM").at(-1);
+
+		if (
+			typeof rejectionListener !== "function" ||
+			typeof signalListener !== "function"
+		) {
+			throw new Error("Expected Subatom process-boundary listeners");
+		}
+
+		rejectionListener(new Error("inspect server getter"), Promise.resolve());
+		signalListener();
+
+		expect(exitSpy).toHaveBeenCalledWith(0);
+	});
+
+	it("should tolerate missing process-boundary unregister callbacks", () => {
+		const registerSpy = vi
+			.spyOn(processBoundaryService, "registerProcessBoundary")
+			.mockReturnValueOnce(undefined as unknown as () => void);
+		const unregisteredApp = new Subatom();
+		const internalApp = unregisteredApp as unknown as {
+			unregisterProcessBoundary?: () => void;
+		};
+
+		internalApp.unregisterProcessBoundary = undefined;
+		unregisteredApp.gracefulShutdown(0);
+
+		expect(registerSpy).toHaveBeenCalled();
+		registerSpy.mockRestore();
 	});
 
 	it("should propagate server initialization failures from start()", async () => {

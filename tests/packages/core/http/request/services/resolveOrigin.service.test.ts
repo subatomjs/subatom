@@ -69,4 +69,19 @@ describe("resolveOrigin", () => {
       host: "api.subatom.dev",
     });
   });
+
+  it("should fall back when forwarded headers contain only empty commas or whitespace", () => {
+    const raw = { socket: { encrypted: false } } as unknown as IncomingMessage;
+    const headers = {
+      "x-forwarded-proto": "   ",
+      "x-forwarded-host": "",
+      host: "backup.subatom.dev",
+    };
+
+    const origin = resolveOrigin(raw, headers, {}, true);
+    expect(origin).toEqual({
+      protocol: "http",
+      host: "backup.subatom.dev",
+    });
+  });
 });

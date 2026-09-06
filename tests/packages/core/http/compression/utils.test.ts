@@ -57,6 +57,7 @@ describe("Compression Utilities", () => {
       expect(parseQValue("0")).toBe(0);
       expect(parseQValue("0.8")).toBe(0.8);
       expect(parseQValue("0.123")).toBe(0.123);
+      expect(parseQValue("1.0")).toBe(1);
     });
 
     it("should return null for empty or invalid strings", () => {
@@ -67,8 +68,9 @@ describe("Compression Utilities", () => {
       expect(parseQValue("1.5")).toBeNull();
     });
 
-    it("should return null when decimal places exceed 3 digits", () => {
+    it("should return null when decimal places exceed 3 digits (line 83)", () => {
       expect(parseQValue("0.1234")).toBeNull();
+      expect(parseQValue("0.123")).toBe(0.123);
     });
   });
 
@@ -159,6 +161,14 @@ describe("Compression Utilities", () => {
       expect(headers.get("Vary")).toBe("Origin, Accept-Encoding");
     });
 
+    it("should cover parseQValue decimal index branches (line 83)", () => {
+    // decimalIndex !== -1 and decimalPlaces <= 3 -> parses number
+    expect(parseQValue("0.5")).toBe(0.5);
+    expect(parseQValue("0.55")).toBe(0.55);
+    expect(parseQValue("0.555")).toBe(0.555);
+    // decimalIndex !== -1 and decimalPlaces > 3 -> returns null
+    expect(parseQValue("0.5555")).toBeNull();
+  });
     it("should support array-formatted existing Vary headers", () => {
       const headers = new Map<string, unknown>([["Vary", ["Origin", "Cookie"]]]);
       const res = {

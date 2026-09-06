@@ -72,16 +72,17 @@ describe("pipeline.service", () => {
       const { raw } = createMockResponse();
       const source = new PassThrough();
       const onError = vi.fn();
+      const onClientDisconnect = vi.fn();
 
-      const controller = new AbortController();
       const promise = pipeToResponse(raw, source, {
-        signal: controller.signal,
         onError,
+        onClientDisconnect,
       });
 
-      controller.abort();
+      raw.emit("close");
       await promise;
 
+      expect(onClientDisconnect).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(expect.any(StreamAbortedError));
     });
 
@@ -110,8 +111,39 @@ describe("pipeline.service", () => {
       expect(onError).toHaveBeenCalled();
       expect(raw.destroy).toHaveBeenCalled();
     });
-  });
 
+it("should not call raw.destroy if raw.writableEnded is true when error occurs after headers sent", async () => {
+      const { raw, state } = createMockResponse();
+      state.headersSent = true;
+      state.writableEnded = true;
+
+      const source = new PassThrough();
+      const promise = pipeToResponse(raw, source);
+
+      source.destroy(new Error("Error after response ended"));
+
+      await promise;
+      // Internal pipeline() calls destroy once during teardown;
+      // pipeToResponse does not invoke destroy a second time because writableEnded is true.
+      expect(raw.destroy).toHaveBeenCalledTimes(1);
+    });
+  });
+it("should abort pipeline when external signal aborts", async () => {
+      const { raw } = createMockResponse();
+      const source = new PassThrough();
+      const onError = vi.fn();
+      const controller = new AbortController();
+
+      const promise = pipeToResponse(raw, source, {
+        signal: controller.signal,
+        onError,
+      });
+
+      controller.abort();
+      await promise;
+
+      expect(onError).toHaveBeenCalledWith(expect.any(StreamAbortedError));
+    });
   describe("composePipeline", () => {
     it("should return the source unchanged when no transforms are passed", () => {
       const source = new PassThrough();
@@ -134,12 +166,27 @@ describe("pipeline.service", () => {
       const composed = composePipeline(source, t1, t2);
       expect(composed).toBe(t2);
 
-      // Prevent unhandled error event on the stream pipeline tail
       composed.on("error", () => {});
 
       const err = new Error("Upstream pipe broke");
       source.emit("error", err);
       expect(t1.destroyed).toBe(true);
+    });
+
+    it("should skip destroying transform if transform is already destroyed when upstream errors", () => {
+      const source = new PassThrough();
+      const t1 = new Transform({
+        transform(chunk, _enc, cb) {
+          cb(null, chunk);
+        },
+      });
+
+      composePipeline(source, t1);
+      t1.destroy();
+      const destroySpy = vi.spyOn(t1, "destroy");
+
+      source.emit("error", new Error("Upstream error after transform destroyed"));
+      expect(destroySpy).not.toHaveBeenCalled();
     });
   });
 });

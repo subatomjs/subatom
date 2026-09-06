@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Readable, PassThrough, Writable } from "node:stream";
+import { Readable, PassThrough } from "node:stream";
 import fs from "node:fs";
 import { parseMultipart } from "../../../packages/pipelines/files/parseMultipart.js";
 import {
@@ -78,10 +78,14 @@ describe("parseMultipart", () => {
 
 			const stream = new Readable({ read() {} });
 			await expect(
-				parseMultipart(stream, { "content-type": "multipart/form-data; boundary=xyz" }, {
-					storage: "disk",
-					dest: "/protected/path",
-				}),
+				parseMultipart(
+					stream,
+					{ "content-type": "multipart/form-data; boundary=xyz" },
+					{
+						storage: "disk",
+						dest: "/protected/path",
+					},
+				),
 			).rejects.toThrow(BadRequestError);
 		});
 	});
@@ -90,7 +94,11 @@ describe("parseMultipart", () => {
 		it("should reject with BadRequestError if busboy initialization throws", async () => {
 			const stream = new Readable({ read() {} });
 			await expect(
-				parseMultipart(stream, { "content-type": "invalid-multipart" }, { storage: "memory" }),
+				parseMultipart(
+					stream,
+					{ "content-type": "invalid-multipart" },
+					{ storage: "memory" },
+				),
 			).rejects.toThrow(BadRequestError);
 		});
 	});
@@ -154,12 +162,128 @@ describe("parseMultipart", () => {
 						contentType: "image/svg",
 						content: Buffer.from("<svg></svg>"),
 					},
+					{
+						name: "bin",
+						filename: "file.zip",
+						contentType: "binary/octet-stream",
+						content: Buffer.from("PK"),
+					},
 				],
 			);
 
 			const result = await parseMultipart(stream, headers, { storage: "memory" });
 			expect(result.files["document"]?.[0]?.mimetype).toBe("application/pdf");
 			expect(result.files["image"]?.[0]?.mimetype).toBe("image/svg+xml");
+			expect(result.files["bin"]?.[0]?.mimetype).toBe("application/zip");
+		});
+
+		it("should cover line 122 (exact match targetMime === target) and line 127 (target.replace(/^\./, '') === ext)", async () => {
+			const { stream, headers } = createMultipartPayload(
+				[],
+				[
+					{
+						name: "exactMatch",
+						filename: "file.custom",
+						contentType: "application/x-custom",
+						content: Buffer.from("custom-data"),
+					},
+					{
+						name: "extWithDotMatch",
+						filename: "picture.png",
+						contentType: "image/png",
+						content: Buffer.from("png-data"),
+					},
+				],
+			);
+
+			const result = await parseMultipart(stream, headers, {
+				storage: "memory",
+				allowedMimeTypes: ["application/x-custom", ".png"],
+			});
+
+			expect(result.files["exactMatch"]?.[0]?.mimetype).toBe("application/x-custom");
+			expect(result.files["extWithDotMatch"]?.[0]?.mimetype).toBe("image/png");
+		});
+
+		it("should allow matching via wildcard prefix, wildcard '*', and exact match", async () => {
+			const { stream, headers } = createMultipartPayload(
+				[],
+				[
+					{
+						name: "f1",
+						filename: "photo.jpg",
+						contentType: "image/jpeg",
+						content: Buffer.from("jpg"),
+					},
+					{
+						name: "f2",
+						filename: "exact.json",
+						contentType: "application/json",
+						content: Buffer.from("{}"),
+					},
+					{
+						name: "f3",
+						filename: "any.bin",
+						contentType: "application/octet-stream",
+						content: Buffer.from([0]),
+					},
+				],
+			);
+
+			const result = await parseMultipart(stream, headers, {
+				storage: "memory",
+				allowedMimeTypes: ["image/*", "application/json", "*"],
+			});
+
+			expect(result.files["f1"]?.[0]?.mimetype).toBe("image/jpeg");
+			expect(result.files["f2"]?.[0]?.mimetype).toBe("application/json");
+			expect(result.files["f3"]?.[0]?.mimetype).toBe("application/octet-stream");
+		});
+
+		it("should allow the SVG MIME alias", async () => {
+			const { stream, headers } = createMultipartPayload(
+				[],
+				[
+					{
+						name: "vector",
+						filename: "vector.svg",
+						contentType: "image/svg+xml",
+						content: Buffer.from("<svg />"),
+					},
+				],
+			);
+
+			const result = await parseMultipart(stream, headers, {
+				storage: "memory",
+				allowedMimeTypes: ["image/svg"],
+			});
+
+			expect(result.files.vector?.[0]?.mimetype).toBe("image/svg+xml");
+		});
+
+		it("should append multiple files under the same field name", async () => {
+			const { stream, headers } = createMultipartPayload(
+				[],
+				[
+					{
+						name: "docs",
+						filename: "doc1.txt",
+						contentType: "text/plain",
+						content: Buffer.from("First"),
+					},
+					{
+						name: "docs",
+						filename: "doc2.txt",
+						contentType: "text/plain",
+						content: Buffer.from("Second"),
+					},
+				],
+			);
+
+			const result = await parseMultipart(stream, headers, { storage: "memory" });
+			expect(result.files["docs"]).toHaveLength(2);
+			expect(result.files["docs"]?.[0]?.filename).toBe("doc1.txt");
+			expect(result.files["docs"]?.[1]?.filename).toBe("doc2.txt");
 		});
 
 		it("should skip processing if file has no filename", async () => {
@@ -199,33 +323,162 @@ describe("parseMultipart", () => {
 				}),
 			).rejects.toThrow(UnprocessableEntityError);
 		});
+	});
 
-		it("should permit wildcards and SVG aliasing matching in allowedMimeTypes", async () => {
-			const { stream, headers } = createMultipartPayload(
-				[],
-				[
-					{
-						name: "file1",
-						filename: "icon.svg",
-						contentType: "image/svg+xml",
-						content: Buffer.from("<svg/>"),
-					},
-					{
-						name: "file2",
-						filename: "doc.txt",
-						contentType: "text/plain",
-						content: Buffer.from("hello"),
-					},
-				],
-			);
+	describe("Stream lifecycle and events in memory mode (lines 230-231, 263-264, 270-271)", () => {
+		it("should resume a file stream emitted after parsing has been aborted", async () => {
+			const stream = new PassThrough();
+			const headers = {
+				"content-type": "multipart/form-data; boundary=----AfterAbort",
+			};
+			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
+				?._readableState?.pipes;
+			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
+			const fileStream = new PassThrough();
+			const resumeSpy = vi.spyOn(fileStream, "resume");
 
-			const result = await parseMultipart(stream, headers, {
-				storage: "memory",
-				allowedMimeTypes: ["image/svg", "*/*"],
+			stream.emit("aborted");
+			bbInstance.emit("file", "late", fileStream, {
+				filename: "late.txt",
+				encoding: "7bit",
+				mimeType: "text/plain",
 			});
 
-			expect(result.files["file1"]?.[0]?.filename).toBe("icon.svg");
-			expect(result.files["file2"]?.[0]?.filename).toBe("doc.txt");
+			await expect(parsePromise).rejects.toThrow("Client aborted the upload");
+			expect(resumeSpy).toHaveBeenCalled();
+		});
+
+		it("should resume and ignore a file event without a filename", async () => {
+			const stream = new PassThrough();
+			const headers = {
+				"content-type": "multipart/form-data; boundary=----NoFilename",
+			};
+			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
+				?._readableState?.pipes;
+			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
+			const fileStream = new PassThrough();
+			const resumeSpy = vi.spyOn(fileStream, "resume");
+
+			bbInstance.emit("file", "unnamed", fileStream, {
+				filename: "",
+				encoding: "7bit",
+				mimeType: "text/plain",
+			});
+			bbInstance.emit("finish");
+
+			const result = await parsePromise;
+			expect(resumeSpy).toHaveBeenCalled();
+			expect(result.files.unnamed).toBeUndefined();
+		});
+
+		it("should resolve without creating an upload for a truncated file stream", async () => {
+			const stream = new PassThrough();
+			const headers = {
+				"content-type": "multipart/form-data; boundary=----Truncated",
+			};
+			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
+				?._readableState?.pipes;
+			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
+			const fileStream = new PassThrough() as PassThrough & {
+				truncated?: boolean;
+			};
+			fileStream.truncated = true;
+
+			bbInstance.emit("file", "truncated", fileStream, {
+				filename: "truncated.txt",
+				encoding: "7bit",
+				mimeType: "text/plain",
+			});
+			fileStream.on("end", () => bbInstance.emit("finish"));
+			fileStream.push(Buffer.from("partial"));
+			fileStream.push(null);
+
+			const result = await parsePromise;
+			expect(result.files.truncated).toBeUndefined();
+		});
+
+		it("should trigger fileStream close event (lines 263-264)", async () => {
+			const boundary = "----BoundaryMemCloseDirect";
+			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const stream = new PassThrough();
+
+			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+
+			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
+				?._readableState?.pipes;
+			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
+
+			const memStream = new PassThrough();
+			bbInstance.emit("file", "memClose", memStream, {
+				filename: "close.txt",
+				encoding: "7bit",
+				mimeType: "text/plain",
+			});
+
+			memStream.push(Buffer.from("data"));
+			memStream.push(null);
+			// Directly emit close on the fileStream
+			memStream.emit("close");
+
+			bbInstance.emit("finish");
+
+			const res = await parsePromise;
+			expect(res.files["memClose"]).toBeDefined();
+		});
+
+		it("should reject when fileStream emits an error event in memory mode (lines 270-271)", async () => {
+			const boundary = "----BoundaryMemErrDirect";
+			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const stream = new PassThrough();
+
+			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+
+			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
+				?._readableState?.pipes;
+			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
+
+			const erroredStream = new PassThrough();
+			bbInstance.emit("file", "errField", erroredStream, {
+				filename: "bad.txt",
+				encoding: "7bit",
+				mimeType: "text/plain",
+			});
+
+			process.nextTick(() => {
+				erroredStream.emit("error", new Error("Simulated memory stream failure"));
+			});
+
+			await expect(parsePromise).rejects.toThrow(
+				"File stream error on field 'errField': Simulated memory stream failure",
+			);
+		});
+
+		it("should reject when fileStream emits limit event in memory mode (lines 230-231)", async () => {
+			const boundary = "----BoundaryMemLimitDirect";
+			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const stream = new PassThrough();
+
+			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+
+			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
+				?._readableState?.pipes;
+			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
+
+			const limitStream = new PassThrough();
+			bbInstance.emit("file", "limitedField", limitStream, {
+				filename: "limit.txt",
+				encoding: "7bit",
+				mimeType: "text/plain",
+			});
+
+			process.nextTick(() => {
+				limitStream.emit("limit");
+			});
+
+			await expect(parsePromise).rejects.toThrow(PayloadTooLargeError);
 		});
 	});
 
@@ -239,6 +492,7 @@ describe("parseMultipart", () => {
 			vi.mocked(fs.createWriteStream).mockImplementationOnce(() => {
 				setTimeout(() => {
 					mockWriteStream.emit("finish");
+					mockWriteStream.emit("close");
 				}, 10);
 				return mockWriteStream;
 			});
@@ -310,18 +564,12 @@ describe("parseMultipart", () => {
 				?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 
-			// Construct mock file stream that errors mid-pipe
 			const erroredFileStream = new PassThrough();
-			bbInstance.emit(
-				"file",
-				"corrupt",
-				erroredFileStream,
-				{
-					filename: "corrupt.txt",
-					encoding: "7bit",
-					mimeType: "text/plain",
-				},
-			);
+			bbInstance.emit("file", "corrupt", erroredFileStream, {
+				filename: "corrupt.txt",
+				encoding: "7bit",
+				mimeType: "text/plain",
+			});
 
 			process.nextTick(() => {
 				erroredFileStream.emit("error", new Error("Simulated file read failure"));
@@ -330,30 +578,41 @@ describe("parseMultipart", () => {
 			await expect(parsePromise).rejects.toThrow(BadRequestError);
 			expect(fs.promises.unlink).toHaveBeenCalled();
 		});
+
+		it("should trigger fileStream close event in disk mode", async () => {
+			const dummyWriteStream = new PassThrough() as unknown as fs.WriteStream;
+			vi.mocked(fs.createWriteStream).mockReturnValueOnce(dummyWriteStream);
+
+			const boundary = "----BoundaryDiskClose";
+			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const stream = new PassThrough();
+
+			const parsePromise = parseMultipart(stream, headers, { storage: "disk" });
+
+			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
+				?._readableState?.pipes;
+			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
+
+			const diskFileStream = new PassThrough();
+			bbInstance.emit("file", "diskClose", diskFileStream, {
+				filename: "disk_close.txt",
+				encoding: "7bit",
+				mimeType: "text/plain",
+			});
+
+			diskFileStream.push(Buffer.from("data"));
+			diskFileStream.push(null);
+			diskFileStream.emit("close");
+			dummyWriteStream.emit("finish");
+
+			bbInstance.emit("finish");
+
+			const res = await parsePromise;
+			expect(res.files["diskClose"]).toBeDefined();
+		});
 	});
 
 	describe("Limits & Abort Conditions", () => {
-		it("should reject when fileStream emits limit in memory mode", async () => {
-			const { stream, headers } = createMultipartPayload(
-				[],
-				[
-					{
-						name: "largeFile",
-						filename: "large.bin",
-						contentType: "application/octet-stream",
-						content: Buffer.alloc(100),
-					},
-				],
-			);
-
-			await expect(
-				parseMultipart(stream, headers, {
-					storage: "memory",
-					limits: { fileSize: 10 },
-				}),
-			).rejects.toThrow(PayloadTooLargeError);
-		});
-
 		it("should reject when fileStream emits limit in disk mode", async () => {
 			const mockWriteStream = new PassThrough() as unknown as fs.WriteStream;
 			vi.mocked(fs.createWriteStream).mockReturnValue(mockWriteStream);

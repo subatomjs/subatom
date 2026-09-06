@@ -22,10 +22,12 @@ describe("Middleware Utilities", () => {
 			expect(parseLimit("2kb")).toBe(2 * 1024);
 			expect(parseLimit("1.5mb")).toBe(1.5 * 1024 * 1024);
 			expect(parseLimit("1gb")).toBe(1024 * 1024 * 1024);
+			expect(parseLimit("200")).toBe(200); // defaults unit to 'b'
 		});
 
-		it("should fallback to 1MB when limit string is malformed", () => {
+		it("should fallback to 1MB when limit string is malformed or invalid unit", () => {
 			expect(parseLimit("invalid-size")).toBe(1024 * 1024);
+			expect(parseLimit("100tb")).toBe(100); // unit not in dictionary falls back to value * 1
 		});
 	});
 
@@ -35,8 +37,10 @@ describe("Middleware Utilities", () => {
 			expect(parseCookieHeader("")).toEqual({});
 		});
 
-		it("should parse and decode valid cookies", () => {
-			const parsed = parseCookieHeader("user=John%20Doe; session=abc123; invalidCookie");
+		it("should parse and decode valid cookies and skip empty or malformed pairs", () => {
+			const parsed = parseCookieHeader(
+				"user=John%20Doe; session=abc123; invalidCookie; =noName; ;   ",
+			);
 			expect(parsed).toEqual({
 				user: "John Doe",
 				session: "abc123",
@@ -140,12 +144,13 @@ describe("Middleware Utilities", () => {
 			await expect(readLimitedBody(req, 1024)).rejects.toThrow(PayloadTooLargeError);
 		});
 
-		it("should read stream chunks within limit successfully", async () => {
+		it("should read stream chunks within limit successfully, converting non-buffer chunks", async () => {
 			const req = new IncomingMessage(new Socket());
 			req.headers["content-length"] = "5";
 
 			const promise = readLimitedBody(req, 10);
-			req.push(Buffer.from("hello"));
+			// Push string chunk to hit !Buffer.isBuffer branch
+			req.push("hello");
 			req.push(null);
 
 			const result = await promise;
@@ -185,6 +190,13 @@ describe("Middleware Utilities", () => {
 			vi.advanceTimersByTime(2000);
 			expect(await store.get("s1")).toBeNull();
 
+			// Touch non-existent session
+			await store.touch("non-existent", 1000);
+
+			// Touch with non-number maxAgeMs
+			await store.set("s3", { item: 1 });
+			await store.touch("s3", undefined);
+
 			await store.set("s2", { user: "bob" });
 			await store.destroy("s2");
 			expect(await store.get("s2")).toBeNull();
@@ -221,6 +233,15 @@ describe("Middleware Utilities", () => {
 			client = {
 				eval: vi.fn(),
 			};
+		});
+
+		it("should fallback constructor options to defaults when non-integers or invalid types are supplied", () => {
+			const store = new RedisSessionStore(client, {
+				timeoutMs: -10,
+				retries: -5,
+				retryDelayMs: "bad" as unknown as number,
+			});
+			expect(store).toBeDefined();
 		});
 
 		it("should get session data and parse json payload", async () => {
@@ -276,10 +297,12 @@ describe("Middleware Utilities", () => {
 				10000,
 			);
 
-			await store.touch("sid-1", 0); // No-op if maxAgeMs <= 0
+			await store.touch("sid-1", 0);
+			await store.touch("sid-1", -5);
+			await store.touch("sid-1", undefined);
 		});
 
-		it("should retry operations upon failure and throw if retries exceeded", async () => {
+	it("should retry operations upon failure with delay and throw if retries exceeded", async () => {
 			vi.mocked(client.eval)
 				.mockRejectedValueOnce(new Error("Connection reset"))
 				.mockResolvedValueOnce(1);
@@ -288,8 +311,8 @@ describe("Middleware Utilities", () => {
 			await expect(store.destroy("s1")).resolves.toBeUndefined();
 			expect(client.eval).toHaveBeenCalledTimes(2);
 
-			vi.mocked(client.eval).mockRejectedValue(new Error("Fatal Redis Error"));
-			await expect(store.destroy("s2")).rejects.toThrow("Fatal Redis Error");
+			vi.mocked(client.eval).mockRejectedValue("Non-error string thrown");
+			await expect(store.destroy("s2")).rejects.toThrow("Non-error string thrown");
 		});
 
 		it("should timeout long-running calls", async () => {

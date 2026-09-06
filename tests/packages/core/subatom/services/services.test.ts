@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	ErrorMiddlewareHandler,
@@ -15,6 +16,8 @@ import type { SubatomServer } from "../../../../../packages/core/server/SubatomS
 import type { Router } from "../../../../../packages/core/router/Router.js";
 import type { IRouter } from "../../../../../packages/core/router/types/router.types.js";
 import type { Subatom } from "../../../../../packages/core/subatom/Subatom.js";
+
+let mockIsProd = true;
 
 vi.mock("../../../../../packages/core/server/SubatomServer.js", () => {
 	return {
@@ -49,7 +52,7 @@ vi.mock("../../../../../config/env/env.js", () => {
 	return {
 		env: {
 			get isProd(): boolean {
-				return true;
+				return mockIsProd;
 			},
 		},
 		configEnv: vi.fn(),
@@ -175,6 +178,18 @@ describe("Services: groupDispatcher", () => {
 		const builder = dispatchGroup(app, router, "/api");
 		expect(builder).toBeInstanceOf(RouteGroupBuilder);
 	});
+
+	it("should merge a router when the prefix is omitted", async () => {
+		const app = {} as Subatom;
+		const router = {} as Router;
+		const subRouter = { _isRouter: true } as unknown as IRouter;
+		const merger = await import(
+			"../../../../../packages/core/router/services/routerMerger.service.js"
+		);
+
+		expect(dispatchGroup(app, router, undefined, subRouter)).toBe(app);
+		expect(merger.mergeSubRouter).toHaveBeenCalledWith(router, "", subRouter);
+	});
 });
 
 describe("Services: processBoundary", () => {
@@ -206,6 +221,28 @@ describe("Services: processBoundary", () => {
 		expect(serverMock.tryRecoverFromOrphanedRejection).toHaveBeenCalled();
 
 		unregister();
+	});
+
+	it("should reuse global listeners and stop processing after recovery", () => {
+		const recover = vi.fn(() => true);
+		const serverMock = {
+			tryRecoverFromOrphanedRejection: recover,
+		} as unknown as SubatomServer;
+		const firstUnregister = registerProcessBoundary(() => serverMock, vi.fn());
+		const secondUnregister = registerProcessBoundary(() => serverMock, vi.fn());
+		const rejectionListener = process.listeners("unhandledRejection").at(-1);
+
+		try {
+			if (typeof rejectionListener !== "function") {
+				throw new Error("Expected unhandled rejection listener");
+			}
+			rejectionListener(new Error("recoverable rejection"), Promise.resolve());
+			expect(recover).toHaveBeenCalledOnce();
+		} finally {
+			firstUnregister();
+			secondUnregister();
+			secondUnregister();
+		}
 	});
 
 	it("should report unrecovered promise rejections and contain shutdown hook failures", () => {
@@ -240,6 +277,31 @@ describe("Services: processBoundary", () => {
 		}
 	});
 
+	it("should log an unrecovered Error rejection and stringify non-Error shutdown failures", () => {
+		const shutdownAction = vi.fn(() => {
+			throw "string shutdown failure";
+		});
+		const unregister = registerProcessBoundary(() => undefined, shutdownAction);
+		const rejectionListener = process.listeners("unhandledRejection").at(-1);
+		const exceptionListener = process.listeners("uncaughtException").at(-1);
+
+		try {
+			if (
+				typeof rejectionListener !== "function" ||
+				typeof exceptionListener !== "function"
+			) {
+				throw new Error("Expected process boundary listeners");
+			}
+			rejectionListener(new Error("unrecovered error"), Promise.resolve());
+			exceptionListener(new Error("fatal error"), "uncaughtException");
+			expect(errSpy).toHaveBeenCalledWith(
+				"[Subatom] Error during emergency shutdown: string shutdown failure",
+			);
+		} finally {
+			unregister();
+		}
+	});
+
 	it("should invoke graceful shutdown for SIGINT and SIGTERM while isolating hook failures", () => {
 		// Arrange
 		const sigintShutdown = vi.fn();
@@ -254,7 +316,7 @@ describe("Services: processBoundary", () => {
 
 		try {
 			// Act
-			sigintListener();
+			sigintListener("SIGINT");
 
 			// Assert
 			expect(sigintShutdown).toHaveBeenCalledWith(0);
@@ -276,7 +338,7 @@ describe("Services: processBoundary", () => {
 
 		try {
 			// Act
-			sigtermListener();
+			sigtermListener("SIGTERM");
 
 			// Assert
 			expect(sigtermShutdown).toHaveBeenCalledWith(0);
@@ -285,6 +347,51 @@ describe("Services: processBoundary", () => {
 			);
 		} finally {
 			unregisterSigterm();
+		}
+	});
+
+	it("should stringify non-Error signal shutdown failures", () => {
+		const shutdownAction = vi.fn(() => {
+			throw "signal string failure";
+		});
+		const unregister = registerProcessBoundary(() => undefined, shutdownAction);
+		const sigintHandler = process.listeners("SIGINT").at(-1);
+
+		try {
+			if (typeof sigintHandler !== "function") {
+				throw new Error("Expected SIGINT listener");
+			}
+			sigintHandler("SIGINT");
+			expect(errSpy).toHaveBeenCalledWith(
+				"[Subatom] Error during signal shutdown: signal string failure",
+			);
+		} finally {
+			unregister();
+		}
+	});
+
+	it("should fall back to error messages when stack traces are unavailable", () => {
+		const unregister = registerProcessBoundary(() => undefined, vi.fn());
+		const rejectionListener = process.listeners("unhandledRejection").at(-1);
+		const exceptionListener = process.listeners("uncaughtException").at(-1);
+		const rejection = new Error("rejection message");
+		const exception = new Error("exception message");
+		Object.defineProperty(rejection, "stack", { value: undefined });
+		Object.defineProperty(exception, "stack", { value: undefined });
+
+		try {
+			if (
+				typeof rejectionListener !== "function" ||
+				typeof exceptionListener !== "function"
+			) {
+				throw new Error("Expected process boundary listeners");
+			}
+			rejectionListener(rejection, Promise.resolve());
+			exceptionListener(exception, "uncaughtException");
+			expect(errSpy).toHaveBeenCalledWith("rejection message");
+			expect(errSpy).toHaveBeenCalledWith("exception message");
+		} finally {
+			unregister();
 		}
 	});
 
@@ -302,5 +409,43 @@ describe("Services: processBoundary", () => {
 		expect(shutdownAction).toHaveBeenCalledWith(1);
 
 		unregister();
+	});
+
+	it("should log uncaught exceptions without shutting down in development mode", () => {
+		mockIsProd = false;
+		const shutdownAction = vi.fn();
+		const unregister = registerProcessBoundary(() => undefined, shutdownAction);
+		const uncaughtHandler = process.listeners("uncaughtException").at(-1);
+
+		try {
+			if (typeof uncaughtHandler !== "function") {
+				throw new Error("Expected uncaught exception listener");
+			}
+			uncaughtHandler(new Error("development failure"), "uncaughtException");
+			expect(shutdownAction).not.toHaveBeenCalled();
+			expect(errSpy).toHaveBeenCalledWith(
+				"\n💥 [Subatom Fatal Error] Uncaught Synchronous Exception:",
+			);
+		} finally {
+			unregister();
+			mockIsProd = true;
+		}
+	});
+
+	it("should execute signal shutdown only once for repeated signal notifications", () => {
+		const shutdownAction = vi.fn();
+		const unregister = registerProcessBoundary(() => undefined, shutdownAction);
+		const sigtermHandler = process.listeners("SIGTERM").at(-1);
+
+		try {
+			if (typeof sigtermHandler !== "function") {
+				throw new Error("Expected SIGTERM listener");
+			}
+			sigtermHandler("SIGTERM");
+			sigtermHandler("SIGTERM");
+			expect(shutdownAction).toHaveBeenCalledOnce();
+		} finally {
+			unregister();
+		}
 	});
 });

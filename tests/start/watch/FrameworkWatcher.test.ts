@@ -39,6 +39,16 @@ describe("FrameworkWatcher", () => {
     vi.restoreAllMocks();
   });
 
+  it("should use default options when watchPaths and debounceMs are omitted", async () => {
+    const fw = new FrameworkWatcher({
+      onChange: vi.fn(),
+    });
+
+    await fw.start();
+    expect(capturedPaths[0]).toBe(process.cwd());
+    await fw.close();
+  });
+
   it("should subscribe to directories and process valid file events", async () => {
     const onChange = vi.fn();
     const fw = new FrameworkWatcher({
@@ -51,12 +61,48 @@ describe("FrameworkWatcher", () => {
     expect(capturedPaths).toHaveLength(1);
     expect(capturedCallback).not.toBeNull();
 
+    // Rapid successive events to test debounce clearing
+    capturedCallback!(null, [{ path: "/app/src/index.ts", type: "update" }]);
+    vi.advanceTimersByTime(25);
     capturedCallback!(null, [{ path: "/app/src/index.ts", type: "update" }]);
     vi.advanceTimersByTime(50);
 
+    expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith("/app/src/index.ts");
     await fw.close();
     expect(mockUnsubscribe).toHaveBeenCalled();
+  });
+
+  it("should ignore empty or undefined events array", async () => {
+    const onChange = vi.fn();
+    const fw = new FrameworkWatcher({
+      watchPaths: ["/app"],
+      onChange,
+    });
+
+    await fw.start();
+    capturedCallback!(null, []);
+    capturedCallback!(null, undefined as any);
+
+    vi.advanceTimersByTime(200);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("should ignore events when closed or when onError is not provided on error", async () => {
+    const onChange = vi.fn();
+    const fw = new FrameworkWatcher({
+      watchPaths: ["/app"],
+      onChange,
+    });
+
+    await fw.start();
+    capturedCallback!(new Error("Ignored error"), []);
+
+    await fw.close();
+    capturedCallback!(null, [{ path: "/app/index.ts", type: "update" }]);
+    vi.advanceTimersByTime(200);
+
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("should trigger onError when subscription passes an error", async () => {
@@ -87,6 +133,24 @@ describe("FrameworkWatcher", () => {
       { path: "/app/node_modules/pkg/index.js", type: "update" },
     ]);
     vi.advanceTimersByTime(50);
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("should not call onChange if watcher is closed before debounce timer fires", async () => {
+    const onChange = vi.fn();
+    const fw = new FrameworkWatcher({
+      watchPaths: ["/app/src"],
+      debounceMs: 50,
+      onChange,
+    });
+
+    await fw.start();
+    capturedCallback!(null, [{ path: "/app/src/index.ts", type: "update" }]);
+
+    // Close before the debounce time elapses
+    await fw.close();
+    vi.advanceTimersByTime(60);
 
     expect(onChange).not.toHaveBeenCalled();
   });

@@ -619,14 +619,6 @@ export function generateOpenApiSpec(
 			}
 		}
 
-		for (const handler of candidateHandlers) {
-			const metadata = extractFileMetadata(handler);
-			if (metadata) {
-				fileUploadInfo = metadata;
-				break;
-			}
-		}
-
 		const parameters: OpenApiParameter[] = [];
 
 		if (paramsSchema?.properties) {

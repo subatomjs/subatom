@@ -158,5 +158,60 @@ describe("logger", () => {
       expect(output).not.toContain("Routes registered");
       expect(output).not.toContain("Documentation");
     });
+
+
+    it("should print individual documentation endpoints when partially provided", () => {
+      logger.startup({
+        host: "127.0.0.1",
+        port: 8080,
+        documentation: {
+          swagger: "http://127.0.0.1:8080/docs",
+        },
+      });
+
+      let output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+      expect(output).toContain("Swagger UI");
+      expect(output).not.toContain("ReDoc");
+      expect(output).not.toContain("OpenAPI");
+
+      logSpy.mockClear();
+
+      logger.startup({
+        host: "127.0.0.1",
+        port: 8080,
+        documentation: {
+          redoc: "http://127.0.0.1:8080/redoc",
+        },
+      });
+
+      output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+      expect(output).toContain("ReDoc");
+
+      logSpy.mockClear();
+
+      logger.startup({
+        host: "127.0.0.1",
+        port: 8080,
+        documentation: {
+          openapi: "http://127.0.0.1:8080/openapi.json",
+        },
+      });
+
+      output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+      expect(output).toContain("OpenAPI");
+    });
+
+    it("should handle documentation object provided with all undefined properties", () => {
+      logger.startup({
+        host: "127.0.0.1",
+        port: 8080,
+        documentation: {},
+      });
+
+      const output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+      expect(output).not.toContain("Swagger UI");
+      expect(output).not.toContain("ReDoc");
+      expect(output).not.toContain("OpenAPI");
+    });
   });
 });

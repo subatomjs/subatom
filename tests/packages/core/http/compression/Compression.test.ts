@@ -1,4 +1,6 @@
+/// <reference types="node" />
 import type { IncomingMessage, ServerResponse } from "node:http";
+import zlib from "node:zlib";
 import { describe, it, expect, vi } from "vitest";
 import { Compression } from "../../../../../packages/core/http/compression/Compression.js";
 
@@ -31,7 +33,26 @@ describe("Compression", () => {
     expect(result.algorithm).toBe("gzip");
     expect(result.qValue).toBe(0.8);
   });
+it("should handle non-finite threshold and breach mitigation disabled (lines 46, 104, 142)", () => {
+    // Line 46: options.threshold is NaN -> falls back to 1024
+    const nonFinite = new Compression({ threshold: Number.NaN });
+    expect(nonFinite.opts.threshold).toBe(1024);
 
+    // Line 104: enableBreachMitigation is false -> sensitive headers do not reject compression
+    const noBreach = new Compression({ enableBreachMitigation: false });
+    const headerStore = new Map<string, unknown>([
+      ["content-type", "text/html"],
+      ["set-cookie", "token=secret"],
+      ["content-length", 2048], // Line 142: content-length is already a number
+    ]);
+    const req = { method: "GET" } as IncomingMessage;
+    const res = {
+      statusCode: 200,
+      getHeader: (k: string) => headerStore.get(k.toLowerCase()),
+    } as unknown as ServerResponse;
+
+    expect(noBreach.isCompressible(req, res)).toBe(true);
+  });
   describe("isCompressible", () => {
     const createMocks = (headers: Record<string, unknown> = {}) => {
       const headerStore = new Map<string, unknown>(Object.entries(headers));
@@ -76,9 +97,12 @@ describe("Compression", () => {
       expect(compression.isCompressible(req, res, 2048)).toBe(false);
     });
 
-    it("should reject when content-type is missing or ineligible", () => {
+    it("should reject when content-type is missing or normalizes to empty string (line 121)", () => {
       const compression = new Compression();
       const { req, res, headerStore } = createMocks();
+      expect(compression.isCompressible(req, res, 2048)).toBe(false);
+
+      headerStore.set("content-type", ";;;   ");
       expect(compression.isCompressible(req, res, 2048)).toBe(false);
 
       headerStore.set("content-type", "image/png");
@@ -123,6 +147,12 @@ describe("Compression", () => {
         "content-length": "-1",
       });
       expect(compression.isCompressible(req, res)).toBe(false);
+
+      const invalidMocks = createMocks({
+        "content-type": "text/html",
+        "content-length": "not-a-number",
+      });
+      expect(compression.isCompressible(invalidMocks.req, invalidMocks.res)).toBe(false);
     });
   });
 
@@ -135,6 +165,16 @@ describe("Compression", () => {
       expect(
         compression.createCompressorStream("identity" as never),
       ).toBeNull();
+    });
+
+    it("should return null if compressor initialization throws an error (line 186)", () => {
+      const compression = new Compression();
+      const spy = vi.spyOn(zlib, "createGzip").mockImplementation(() => {
+        throw new Error("Zlib allocation failure");
+      });
+
+      expect(compression.createCompressorStream("gzip")).toBeNull();
+      spy.mockRestore();
     });
   });
 });

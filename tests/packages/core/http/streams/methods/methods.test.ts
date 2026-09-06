@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { PassThrough, Readable } from "node:stream";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -43,6 +42,7 @@ interface MockServerResponseFixture {
     writableEnded: boolean;
     writableFinished: boolean;
     headersSent: boolean;
+    destroyedWith?: Error;
   };
 }
 
@@ -51,6 +51,7 @@ function createMockServerResponse(): MockServerResponseFixture {
     writableEnded: false,
     writableFinished: false,
     headersSent: false,
+    destroyedWith: undefined as Error | undefined,
   };
 
   const pt = new PassThrough();
@@ -62,6 +63,7 @@ function createMockServerResponse(): MockServerResponseFixture {
 
   const originalWrite = pt.write.bind(pt);
   const originalEnd = pt.end.bind(pt);
+  const originalDestroy = pt.destroy.bind(pt);
 
   raw.write = vi.fn((chunk: unknown, enc?: unknown, cb?: unknown) => {
     return originalWrite(chunk as never, enc as never, cb as never);
@@ -74,7 +76,8 @@ function createMockServerResponse(): MockServerResponseFixture {
   }) as never;
 
   raw.destroy = vi.fn((err?: Error) => {
-    pt.destroy(err);
+    state.destroyedWith = err;
+    originalDestroy(err);
     return raw;
   });
 
@@ -113,6 +116,13 @@ describe("Stream Methods", () => {
       expect(pipe(source, dest)).toBe(dest);
     });
 
+    it("should complete successfully when pipeline receives 2 or more streams", async () => {
+      const source = Readable.from(["hello", "world"]);
+      const destination = new PassThrough();
+
+      await expect(pipeline(source, destination)).resolves.toBeUndefined();
+    });
+
     it("should reject pipeline() if fewer than 2 streams are supplied", async () => {
       const s = new PassThrough();
       await expect(
@@ -134,6 +144,19 @@ describe("Stream Methods", () => {
         }),
       ).rejects.toThrow("Transform fault");
     });
+
+    it("should catch non-Error thrown exceptions in createTransform and wrap them in an Error", async () => {
+      const transform = createTransform(() => {
+        throw "String error";
+      });
+
+      await expect(
+        new Promise((_, reject) => {
+          transform.on("error", reject);
+          transform.write("data");
+        }),
+      ).rejects.toThrow("String error");
+    });
   });
 
   describe("File Methods", () => {
@@ -147,6 +170,15 @@ describe("Stream Methods", () => {
       expect(s).toBeDefined();
     });
 
+    it("should throw an error in resSendFile if headers have already been sent", () => {
+      const { raw, state } = createMockServerResponse();
+      state.headersSent = true;
+
+      expect(() => resSendFile(raw, "file.txt")).toThrow(
+        "[Subatom File Error]: Headers already sent.",
+      );
+    });
+
     it("should prevent directory traversal in resSendFile with 403", () => {
       const { raw } = createMockServerResponse();
 
@@ -155,6 +187,20 @@ describe("Stream Methods", () => {
       expect(raw.end).toHaveBeenCalledWith(
         expect.stringContaining("Path traversal restriction"),
       );
+    });
+
+    it("should set 404 in resSendFile when path points to a non-file", () => {
+      const { raw } = createMockServerResponse();
+
+      mockStat.mockImplementation(
+        (_p: string, cb: (err: null, stats: { isFile: () => boolean }) => void) => {
+          cb(null, { isFile: () => false });
+        },
+      );
+
+      resSendFile(raw, "directory", { root: "/var/www" });
+      expect(raw.statusCode).toBe(404);
+      expect(raw.end).toHaveBeenCalledWith("File Not Found");
     });
 
     it("should set 404 in resSendFile when file does not exist", () => {
@@ -171,7 +217,83 @@ describe("Stream Methods", () => {
       expect(raw.end).toHaveBeenCalledWith("File Not Found");
     });
 
-    it("should configure Content-Disposition attachment header in resDownload", () => {
+    it("should pipe file stream and set Content-Type header on success in resSendFile without root", () => {
+      const { raw } = createMockServerResponse();
+      const fakeStream = new PassThrough();
+      mockCreateReadStream.mockReturnValue(fakeStream);
+
+      mockStat.mockImplementation(
+        (
+          _p: string,
+          cb: (
+            err: null,
+            stats: { isFile: () => boolean; size: number },
+          ) => void,
+        ) => {
+          cb(null, { isFile: () => true, size: 256 });
+        },
+      );
+
+      resSendFile(raw, "public/file.png", { contentType: "image/png" });
+
+      expect(raw.statusCode).toBe(200);
+      expect(raw.setHeader).toHaveBeenCalledWith("Content-Type", "image/png");
+      expect(raw.setHeader).toHaveBeenCalledWith("Content-Length", "256");
+    });
+
+    it("should handle file stream error in resSendFile when headers have not been sent", () => {
+      const { raw, state } = createMockServerResponse();
+      const fakeStream = new PassThrough();
+      mockCreateReadStream.mockReturnValue(fakeStream);
+
+      mockStat.mockImplementation(
+        (
+          _p: string,
+          cb: (
+            err: null,
+            stats: { isFile: () => boolean; size: number },
+          ) => void,
+        ) => {
+          cb(null, { isFile: () => true, size: 128 });
+        },
+      );
+
+      resSendFile(raw, "doc.txt");
+      state.headersSent = false;
+      fakeStream.emit("error", new Error("Disk Read Error"));
+
+      expect(raw.statusCode).toBe(500);
+      expect(raw.end).toHaveBeenCalledWith("Failed to read file.");
+    });
+
+ it("should destroy response with error in resSendFile when headers were already sent", () => {
+      const { raw, state } = createMockServerResponse();
+      raw.on("error", () => {}); // Catch the error event emitted on destroy
+
+      const fakeStream = new PassThrough();
+      mockCreateReadStream.mockReturnValue(fakeStream);
+
+      mockStat.mockImplementation(
+        (
+          _p: string,
+          cb: (
+            err: null,
+            stats: { isFile: () => boolean; size: number },
+          ) => void,
+        ) => {
+          cb(null, { isFile: () => true, size: 128 });
+        },
+      );
+
+      resSendFile(raw, "doc.txt");
+      state.headersSent = true;
+      const streamErr = new Error("Mid-stream disk failure");
+      fakeStream.emit("error", streamErr);
+
+      expect(raw.destroy).toHaveBeenCalledWith(streamErr);
+    });
+
+    it("should configure Content-Disposition attachment header in resDownload with explicit filename", () => {
       const { raw } = createMockServerResponse();
 
       mockStat.mockImplementation(
@@ -195,6 +317,31 @@ describe("Stream Methods", () => {
         expect.stringContaining('attachment; filename="my-report.pdf"'),
       );
     });
+
+    it("should default to basename when filename is omitted in resDownload", () => {
+      const { raw } = createMockServerResponse();
+
+      mockStat.mockImplementation(
+        (
+          _p: string,
+          cb: (
+            err: null,
+            stats: { isFile: () => boolean; size: number },
+          ) => void,
+        ) => {
+          cb(null, {
+            isFile: () => true,
+            size: 100,
+          });
+        },
+      );
+
+      resDownload(raw, "/data/auto-named-report.pdf");
+      expect(raw.setHeader).toHaveBeenCalledWith(
+        "Content-Disposition",
+        expect.stringContaining('attachment; filename="auto-named-report.pdf"'),
+      );
+    });
   });
 
   describe("Request Methods", () => {
@@ -209,6 +356,10 @@ describe("Stream Methods", () => {
       req.emit("data", "chunk");
       expect(dataSpy).toHaveBeenCalledWith(Buffer.from("chunk"));
 
+      const bufferChunk = Buffer.from("already-buffer");
+      req.emit("data", bufferChunk);
+      expect(dataSpy).toHaveBeenCalledWith(bufferChunk);
+
       req.emit("end");
       expect(endSpy).toHaveBeenCalled();
 
@@ -216,6 +367,18 @@ describe("Stream Methods", () => {
       unEnd();
       expect(req.listenerCount("data")).toBe(0);
       expect(req.listenerCount("end")).toBe(0);
+    });
+
+    it("should pipe successfully when request is active", () => {
+      const req = new PassThrough() as unknown as IncomingMessage;
+      const dest = new PassThrough();
+
+      expect(reqPipe(req, dest)).toBe(dest);
+    });
+
+    it("should return the readable request stream when not destroyed", () => {
+      const req = new PassThrough() as unknown as IncomingMessage;
+      expect(reqStream(req)).toBe(req);
     });
 
     it("should throw in reqPipe and reqStream if request is already destroyed", () => {
@@ -229,7 +392,7 @@ describe("Stream Methods", () => {
     });
   });
 
-describe("Response Methods", () => {
+  describe("Response Methods", () => {
     let raw: ServerResponse;
     let state: MockServerResponseFixture["state"];
 
@@ -258,6 +421,17 @@ describe("Response Methods", () => {
       const written = resWrite(raw, "data", undefined, cb);
       expect(written).toBe(false);
       expect(cb).toHaveBeenCalledWith(expect.any(Error));
+
+      const writtenNoCb = resWrite(raw, "data");
+      expect(writtenNoCb).toBe(false);
+    });
+
+    it("should support encoding callback overload and write to open response in resWrite", () => {
+      const cb = vi.fn();
+      const writeResult = resWrite(raw, "test-data", cb as unknown as BufferEncoding);
+
+      expect(writeResult).toBe(true);
+      expect(raw.write).toHaveBeenCalledWith("test-data", "utf-8", cb);
     });
 
     it("should set headers and pipe in resSendStream", () => {

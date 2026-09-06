@@ -2,7 +2,10 @@
 import { EventEmitter } from "node:events";
 import type { ServerResponse } from "node:http";
 import { describe, it, expect, vi } from "vitest";
-import { bindAbortSignal, onClientDisconnect } from "../../../../../../packages/core/http/streams/utils/abort.utils.js";
+import {
+  bindAbortSignal,
+  onClientDisconnect,
+} from "../../../../../../packages/core/http/streams/utils/abort.utils.js";
 import { writeWithBackpressure } from "../../../../../../packages/core/http/streams/utils/backpressure.utils.js";
 
 interface MockResponseFixture {
@@ -39,6 +42,14 @@ describe("Stream Utils", () => {
       expect(typeof unbind).toBe("function");
       unbind();
       expect(onAbort).not.toHaveBeenCalled();
+    });
+    it("should unbind signal event listener when returned cleanup is called", () => {
+      const controller = new AbortController();
+      const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
+      const unbind = bindAbortSignal(controller.signal, () => {});
+
+      unbind();
+      expect(removeSpy).toHaveBeenCalled();
     });
 
     it("should immediately fire callback if signal is already aborted", () => {
@@ -160,6 +171,49 @@ describe("Stream Utils", () => {
       );
     });
 
+    it("should catch synchronous errors thrown during raw.write and reject with Error", async () => {
+      const { raw } = createMockResponse();
+      vi.mocked(raw.write).mockImplementation(() => {
+        throw new Error("Sync write crash");
+      });
+
+      await expect(writeWithBackpressure(raw, "chunk")).rejects.toThrow(
+        "Sync write crash",
+      );
+
+      vi.mocked(raw.write).mockImplementation(() => {
+        throw "String write crash";
+      });
+
+      await expect(writeWithBackpressure(raw, "chunk")).rejects.toThrow(
+        "String write crash",
+      );
+    });
+
+    it("should resolve via raw.write callback if write completed without backpressure", async () => {
+      const { raw } = createMockResponse();
+      vi.mocked(raw.write).mockImplementation((_chunk, cb) => {
+        if (typeof cb === "function") {
+          (cb as () => void)();
+        }
+        return true;
+      });
+
+      await expect(writeWithBackpressure(raw, "chunk")).resolves.toBeUndefined();
+    });
+
+    it("should ignore close event when raw.writableEnded is true", async () => {
+      const { raw, state } = createMockResponse();
+      vi.mocked(raw.write).mockReturnValue(false);
+
+      const promise = writeWithBackpressure(raw, "chunk");
+      state.writableEnded = true;
+      raw.emit("close");
+
+      raw.emit("drain");
+      await expect(promise).resolves.toBeUndefined();
+    });
+
     it("should reject when response closes or aborts prior to completion", async () => {
       const { raw } = createMockResponse();
       vi.mocked(raw.write).mockReturnValue(false);
@@ -175,6 +229,50 @@ describe("Stream Utils", () => {
       await expect(promiseAbort).rejects.toThrow(
         "Response aborted before the write completed",
       );
+    });
+
+    it("should ignore drain event when waitingForDrain is false", () => {
+      const { raw } = createMockResponse();
+      vi.mocked(raw.write).mockReturnValue(true);
+
+      const promise = writeWithBackpressure(raw, "chunk");
+      raw.emit("drain"); // fires when waitingForDrain is false
+
+      return expect(promise).resolves.toBeUndefined();
+    });
+
+    it("should handle write callback when waitingForDrain is true", async () => {
+      const { raw } = createMockResponse();
+      let writeCb: ((err?: Error | null) => void) | undefined;
+
+      vi.mocked(raw.write).mockImplementation((_chunk, cb) => {
+        writeCb = cb as unknown as (err?: Error | null) => void;
+        return false; // triggers backpressure
+      });
+
+      const promise = writeWithBackpressure(raw, "heavy-chunk");
+
+      // Write callback fires with no error while waiting for drain
+      writeCb?.();
+
+      raw.emit("drain");
+      await expect(promise).resolves.toBeUndefined();
+    });
+
+    it("should reject if write callback receives an error while waiting for drain", async () => {
+      const { raw } = createMockResponse();
+      let writeCb: ((err?: Error | null) => void) | undefined;
+
+      vi.mocked(raw.write).mockImplementation((_chunk, cb) => {
+        writeCb = cb as unknown as (err?: Error | null) => void;
+        return false;
+      });
+
+      const promise = writeWithBackpressure(raw, "heavy-chunk");
+
+      writeCb?.(new Error("Async write callback error"));
+
+      await expect(promise).rejects.toThrow("Async write callback error");
     });
   });
 });
