@@ -38,7 +38,11 @@ describe("Next", () => {
 				return next();
 			});
 
-			const pipeline = new Next([handler1, handler2, handler3], mockReq, mockRes);
+			const pipeline = new Next(
+				[handler1, handler2, handler3],
+				mockReq,
+				mockRes,
+			);
 			await pipeline.run();
 
 			expect(executionOrder).toEqual([1, 2, 3]);
@@ -102,7 +106,9 @@ describe("Next", () => {
 		});
 
 		it("should maintain binding when next function is detached and passed around", async () => {
-			let detachedNextRef: ((err?: unknown) => void | Promise<void>) | undefined;
+			let detachedNextRef:
+				| ((err?: unknown) => void | Promise<void>)
+				| undefined;
 
 			const handler1: IHandler = vi.fn((_req, _res, next) => {
 				detachedNextRef = next;

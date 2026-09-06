@@ -69,9 +69,9 @@ describe("sleep utility", () => {
 			const controller = new AbortController();
 			controller.abort();
 
-			await expect(
-				sleep.abortable(1000, controller.signal),
-			).rejects.toThrow("Aborted");
+			await expect(sleep.abortable(1000, controller.signal)).rejects.toThrow(
+				"Aborted",
+			);
 		});
 
 		test("aborts and rejects mid-delay when abort event fires", async () => {

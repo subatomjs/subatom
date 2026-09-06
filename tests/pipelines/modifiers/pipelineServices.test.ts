@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
 	registerTransformer,
@@ -23,7 +24,9 @@ import type {
 } from "../../../packages/pipelines/pipeline.types.js";
 import type { IResponse } from "../../../packages/core/http/response/types/response.types.js";
 
-function createMockContext(overrides?: Partial<IPipelineContext>): IPipelineContext {
+function createMockContext(
+	overrides?: Partial<IPipelineContext>,
+): IPipelineContext {
 	return {
 		req: {} as any,
 		res: {
@@ -159,7 +162,7 @@ describe("Pipeline Services", () => {
 
 			const routerConfig = {
 				transformers: [t1, t2], // t2 duplicate
-				interceptors: [i1],     // i1 duplicate
+				interceptors: [i1], // i1 duplicate
 				serializers: [],
 			};
 
@@ -287,7 +290,12 @@ describe("Pipeline Services", () => {
 				afterRequest: async (data) => (data as number) + 5,
 			};
 
-			const result = await runTransformerHook([t1, t2, t3], "afterRequest", 10, ctx);
+			const result = await runTransformerHook(
+				[t1, t2, t3],
+				"afterRequest",
+				10,
+				ctx,
+			);
 			expect(result).toBe(25);
 		});
 
@@ -346,7 +354,12 @@ describe("Pipeline Services", () => {
 				serialize: async () => undefined,
 			};
 
-			const result = await runSerializers([sXml], "plain-text", ctx, "text/plain");
+			const result = await runSerializers(
+				[sXml],
+				"plain-text",
+				ctx,
+				"text/plain",
+			);
 			expect(result).toBe("plain-text");
 		});
 

@@ -30,8 +30,12 @@ describe("cors.utils", () => {
 
 	describe("isOriginAllowed", () => {
 		it("should match identical string origin", () => {
-			expect(isOriginAllowed("https://subatomjs.dev", "https://subatomjs.dev")).toBe(true);
-			expect(isOriginAllowed("https://subatomjs.dev", "https://other.com")).toBe(false);
+			expect(
+				isOriginAllowed("https://subatomjs.dev", "https://subatomjs.dev"),
+			).toBe(true);
+			expect(
+				isOriginAllowed("https://subatomjs.dev", "https://other.com"),
+			).toBe(false);
 		});
 
 		it("should evaluate RegExp origin rules", () => {
@@ -91,7 +95,9 @@ describe("cors.utils", () => {
 
 		it("should resolve array origin if any rule matches", async () => {
 			const origins = ["https://a.com", /b\.com$/];
-			expect(await resolveOrigin("https://a.com", origins)).toBe("https://a.com");
+			expect(await resolveOrigin("https://a.com", origins)).toBe(
+				"https://a.com",
+			);
 			expect(await resolveOrigin("https://test.b.com", origins)).toBe(
 				"https://test.b.com",
 			);
@@ -100,7 +106,9 @@ describe("cors.utils", () => {
 
 		describe("functional originConfig", () => {
 			it("should resolve 1-parameter async/promise function returning boolean", async () => {
-				const fn = vi.fn(async (origin?: string) => origin?.includes("allowed"));
+				const fn = vi.fn(async (origin?: string) =>
+					origin?.includes("allowed"),
+				);
 				const res = await resolveOrigin("https://allowed.com", fn);
 
 				expect(fn).toHaveBeenCalledWith("https://allowed.com");
@@ -166,7 +174,10 @@ describe("cors.utils", () => {
 
 		it("should return false for unsupported config types", async () => {
 			expect(
-				await resolveOrigin("https://example.com", 12345 as unknown as CorsOrigin),
+				await resolveOrigin(
+					"https://example.com",
+					12345 as unknown as CorsOrigin,
+				),
 			).toBe(false);
 		});
 	});

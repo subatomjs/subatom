@@ -30,7 +30,13 @@ describe("validateConfig", () => {
 
 	describe("port validation", () => {
 		it("should reject ports that are not numbers, NaN, or out of bounds (1-65535)", () => {
-			const invalidPorts = [0, -1, 65536, Number.NaN, "8080" as unknown as number];
+			const invalidPorts = [
+				0,
+				-1,
+				65536,
+				Number.NaN,
+				"8080" as unknown as number,
+			];
 
 			for (const port of invalidPorts) {
 				const cfg = { ...validConfig, port };
@@ -48,12 +54,12 @@ describe("validateConfig", () => {
 
 	describe("host validation", () => {
 		it("should reject non-string or whitespace-only host", () => {
-			expect(() =>
-				validateConfig({ ...validConfig, host: "" }),
-			).toThrow(ConfigError);
-			expect(() =>
-				validateConfig({ ...validConfig, host: "   " }),
-			).toThrow(ConfigError);
+			expect(() => validateConfig({ ...validConfig, host: "" })).toThrow(
+				ConfigError,
+			);
+			expect(() => validateConfig({ ...validConfig, host: "   " })).toThrow(
+				ConfigError,
+			);
 			expect(() =>
 				validateConfig({ ...validConfig, host: 127 as unknown as string }),
 			).toThrow(ConfigError);
@@ -62,12 +68,12 @@ describe("validateConfig", () => {
 
 	describe("entry validation", () => {
 		it("should reject non-string or whitespace-only entry", () => {
-			expect(() =>
-				validateConfig({ ...validConfig, entry: "" }),
-			).toThrow(ConfigError);
-			expect(() =>
-				validateConfig({ ...validConfig, entry: " \t " }),
-			).toThrow(ConfigError);
+			expect(() => validateConfig({ ...validConfig, entry: "" })).toThrow(
+				ConfigError,
+			);
+			expect(() => validateConfig({ ...validConfig, entry: " \t " })).toThrow(
+				ConfigError,
+			);
 			expect(() =>
 				validateConfig({ ...validConfig, entry: null as unknown as string }),
 			).toThrow(ConfigError);
@@ -96,12 +102,12 @@ describe("validateConfig", () => {
 
 	describe("outDir validation", () => {
 		it("should reject non-string or empty outDir", () => {
-			expect(() =>
-				validateConfig({ ...validConfig, outDir: "" }),
-			).toThrow(ConfigError);
-			expect(() =>
-				validateConfig({ ...validConfig, outDir: "   " }),
-			).toThrow(ConfigError);
+			expect(() => validateConfig({ ...validConfig, outDir: "" })).toThrow(
+				ConfigError,
+			);
+			expect(() => validateConfig({ ...validConfig, outDir: "   " })).toThrow(
+				ConfigError,
+			);
 			expect(() =>
 				validateConfig({ ...validConfig, outDir: 123 as unknown as string }),
 			).toThrow(ConfigError);
@@ -141,9 +147,9 @@ describe("validateConfig", () => {
 			];
 
 			for (const watch of invalidWatchConfigs) {
-				expect(() =>
-					validateConfig({ ...validConfig, watch }),
-				).toThrow(ConfigError);
+				expect(() => validateConfig({ ...validConfig, watch })).toThrow(
+					ConfigError,
+				);
 			}
 		});
 

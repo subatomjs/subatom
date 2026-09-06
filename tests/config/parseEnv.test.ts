@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noTemplateCurlyInString: explanation */
 import { describe, expect, it } from "vitest";
 import { parseEnv } from "../../config/env/parseEnv.js";
 

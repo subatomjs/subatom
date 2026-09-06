@@ -145,7 +145,9 @@ describe("env utility", () => {
 	describe("env.json()", () => {
 		test("parses valid JSON string", () => {
 			process.env.METRIC_CONFIG = '{"enabled":true,"rate":10}';
-			expect(env.json<{ enabled: boolean; rate: number }>("METRIC_CONFIG")).toEqual({
+			expect(
+				env.json<{ enabled: boolean; rate: number }>("METRIC_CONFIG"),
+			).toEqual({
 				enabled: true,
 				rate: 10,
 			});

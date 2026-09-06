@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	IInterceptor,
@@ -59,17 +60,18 @@ vi.mock("../../../../packages/core/router/helpers/isRouterInstance.js", () => ({
 	default: (val: unknown): boolean =>
 		Boolean(val && typeof val === "object" && "_isRouter" in val),
 }));
-
 describe("Subatom Application Class", () => {
 	let app: Subatom;
 	let exitSpy: ReturnType<typeof vi.spyOn>;
 	let logSpy: ReturnType<typeof vi.spyOn>;
+	let errSpy: ReturnType<typeof vi.spyOn>; // 1. Add error spy variable
 
 	beforeEach(() => {
 		exitSpy = vi
 			.spyOn(process, "exit")
 			.mockImplementation((() => undefined) as never);
 		logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+		errSpy = vi.spyOn(console, "error").mockImplementation(() => {}); // 2. Mock console.error
 		app = new Subatom();
 	});
 
@@ -77,8 +79,11 @@ describe("Subatom Application Class", () => {
 		app.gracefulShutdown(0);
 		exitSpy.mockRestore();
 		logSpy.mockRestore();
+		errSpy.mockRestore(); // 3. Restore console.error
 		vi.restoreAllMocks();
 	});
+
+	// ... rest of your tests
 
 	it("should configure custom settings and sync to active server", () => {
 		app.setConfig({ port: 8000 });
@@ -251,7 +256,10 @@ describe("Subatom Application Class", () => {
 
 	it("should delegate an options-shaped listen argument", () => {
 		const options = { port: 4000 };
-		const listen = app.listen as unknown as (options: unknown, callback?: unknown) => unknown;
+		const listen = app.listen as unknown as (
+			options: unknown,
+			callback?: unknown,
+		) => unknown;
 		const callback = vi.fn();
 
 		expect(listen.call(app, options, callback)).toEqual({ port: options });
@@ -273,7 +281,7 @@ describe("Subatom Application Class", () => {
 		}
 
 		rejectionListener(new Error("inspect server getter"), Promise.resolve());
-		signalListener();
+		signalListener("SIGTERM");
 
 		expect(exitSpy).toHaveBeenCalledWith(0);
 	});

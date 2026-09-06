@@ -153,9 +153,9 @@ describe("Security Utilities", () => {
 
 		test("throws InvalidDirectiveError for empty, non-string, or invalid characters", () => {
 			expect(() => validateDirectiveName("")).toThrow(InvalidDirectiveError);
-			expect(() =>
-				validateDirectiveName(null as unknown as string),
-			).toThrow(InvalidDirectiveError);
+			expect(() => validateDirectiveName(null as unknown as string)).toThrow(
+				InvalidDirectiveError,
+			);
 			expect(() => validateDirectiveName("script_src")).toThrow(
 				InvalidDirectiveError,
 			);

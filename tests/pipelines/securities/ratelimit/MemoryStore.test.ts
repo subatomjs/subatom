@@ -29,7 +29,9 @@ describe("MemoryStore", () => {
 				now: Date.now(),
 			};
 
-			await expect(store.evaluate(params)).rejects.toThrow("MemoryStore is closed.");
+			await expect(store.evaluate(params)).rejects.toThrow(
+				"MemoryStore is closed.",
+			);
 		});
 
 		it("should clear cache and stop gc timer on destroy", async () => {
@@ -133,38 +135,38 @@ describe("MemoryStore", () => {
 	});
 
 	describe("algorithm: sliding-window", () => {
-	it("should correctly prune old requests from history", async () => {
-    const baseTime = 10000;
-    const p = (now: number): StoreEvalParams => ({
-        key: "sliding-user",
-        algorithm: "sliding-window",
-        limit: 2,
-        windowMs: 5000,
-        capacity: 2,
-        refillRate: 0,
-        refillIntervalMs: 5000,
-        now,
-    });
+		it("should correctly prune old requests from history", async () => {
+			const baseTime = 10000;
+			const p = (now: number): StoreEvalParams => ({
+				key: "sliding-user",
+				algorithm: "sliding-window",
+				limit: 2,
+				windowMs: 5000,
+				capacity: 2,
+				refillRate: 0,
+				refillIntervalMs: 5000,
+				now,
+			});
 
-    const r1 = await store.evaluate(p(baseTime));
-    expect(r1.allowed).toBe(true);
-    expect(r1.remaining).toBe(1);
+			const r1 = await store.evaluate(p(baseTime));
+			expect(r1.allowed).toBe(true);
+			expect(r1.remaining).toBe(1);
 
-    const r2 = await store.evaluate(p(baseTime + 1000));
-    expect(r2.allowed).toBe(true);
-    expect(r2.remaining).toBe(0);
+			const r2 = await store.evaluate(p(baseTime + 1000));
+			expect(r2.allowed).toBe(true);
+			expect(r2.remaining).toBe(0);
 
-    // Exceeded: history is now [10000, 11000, 12000]
-    const r3 = await store.evaluate(p(baseTime + 2000));
-    expect(r3.allowed).toBe(false);
-    expect(r3.remaining).toBe(0);
+			// Exceeded: history is now [10000, 11000, 12000]
+			const r3 = await store.evaluate(p(baseTime + 2000));
+			expect(r3.allowed).toBe(false);
+			expect(r3.remaining).toBe(0);
 
-    // Advance beyond 11000 (11000 + 5000 = 16000), e.g. baseTime + 6500 = 16500
-    // Prunes 10000 and 11000, leaving [12000] -> new history becomes [12000, 16500] (len 2 <= 2)
-    const r4 = await store.evaluate(p(baseTime + 6500));
-    expect(r4.allowed).toBe(true);
-    expect(r4.remaining).toBe(0);
-});
+			// Advance beyond 11000 (11000 + 5000 = 16000), e.g. baseTime + 6500 = 16500
+			// Prunes 10000 and 11000, leaving [12000] -> new history becomes [12000, 16500] (len 2 <= 2)
+			const r4 = await store.evaluate(p(baseTime + 6500));
+			expect(r4.allowed).toBe(true);
+			expect(r4.remaining).toBe(0);
+		});
 	});
 
 	describe("algorithm: token-bucket", () => {

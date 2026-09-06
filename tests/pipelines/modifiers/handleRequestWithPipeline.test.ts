@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleRequestWithPipeline } from "../../../packages/pipelines/modifiers/handleRequestWithPipeline.js";
 import { ErrorFormatter } from "../../../packages/errors/ErrorFormatter.js";
@@ -55,7 +56,10 @@ describe("handleRequestWithPipeline", () => {
 	}
 
 	it("should parse clean path from URL, run pipeline, and flush response from controller return", async () => {
-		const { req, res } = createMockReqRes({ url: "/api/items?filter=active", method: "GET" });
+		const { req, res } = createMockReqRes({
+			url: "/api/items?filter=active",
+			method: "GET",
+		});
 
 		vi.mocked(router.match).mockReturnValueOnce({
 			route: {
@@ -79,9 +83,11 @@ describe("handleRequestWithPipeline", () => {
 	it("should flush using terminal capture method when handler calls res.send()", async () => {
 		const { req, res } = createMockReqRes({ path: "/text" });
 
-		vi.mocked(router.dispatch).mockImplementationOnce(async (_req, capturedRes: any) => {
-			capturedRes.send("Hello World");
-		});
+		vi.mocked(router.dispatch).mockImplementationOnce(
+			async (_req, capturedRes: any) => {
+				capturedRes.send("Hello World");
+			},
+		);
 
 		await handleRequestWithPipeline(router, req, res, appPipelineConfig);
 
@@ -105,7 +111,10 @@ describe("handleRequestWithPipeline", () => {
 
 	it("should log error and avoid ErrorFormatter if response has already writableEnded", async () => {
 		const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-		const { req, res } = createMockReqRes({ path: "/late-error", writableEnded: true });
+		const { req, res } = createMockReqRes({
+			path: "/late-error",
+			writableEnded: true,
+		});
 
 		vi.mocked(router.dispatch).mockRejectedValueOnce(new Error("Late failure"));
 
@@ -122,14 +131,16 @@ describe("handleRequestWithPipeline", () => {
 		const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 		const { req, res } = createMockReqRes({ path: "/double-action" });
 
-		vi.mocked(router.dispatch).mockImplementationOnce((_req, capturedRes: any) => {
-			capturedRes.json({ first: true });
-			return new Promise((_, reject) => {
-				setTimeout(() => {
-					reject(new Error("Post-capture rejection"));
-				}, 10);
-			});
-		});
+		vi.mocked(router.dispatch).mockImplementationOnce(
+			(_req, capturedRes: any) => {
+				capturedRes.json({ first: true });
+				return new Promise((_, reject) => {
+					setTimeout(() => {
+						reject(new Error("Post-capture rejection"));
+					}, 10);
+				});
+			},
+		);
 
 		await handleRequestWithPipeline(router, req, res, appPipelineConfig);
 

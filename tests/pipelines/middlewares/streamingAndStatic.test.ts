@@ -507,6 +507,7 @@ describe("Body Parsing Middlewares", () => {
 					"content-type": "application/x-www-form-urlencoded",
 					"content-length": "100",
 				},
+				// biome-ignore lint/style/useTemplate: using string concatenation for test clarity
 				bodyPayload: "key=" + "v".repeat(90),
 			});
 
@@ -621,7 +622,7 @@ describe("Body Parsing Middlewares", () => {
 				catalog: {
 					"@_status": "active",
 					"@_version": "2",
-					title: 'Subatom & Node <v1> \'fast\' "safe"',
+					title: "Subatom & Node <v1> 'fast' \"safe\"",
 					category: ["Web", "Framework", "TypeScript"],
 				},
 			});
@@ -634,7 +635,7 @@ describe("Body Parsing Middlewares", () => {
 					"content-type": "application/xml",
 					"content-length": "24",
 				},
-				bodyPayload: '<item key="val" id=\'1\' />',
+				bodyPayload: "<item key=\"val\" id='1' />",
 			});
 			await xml()(req1, res1, vi.fn());
 			expect(req1.body).toEqual({ "@_key": "val", "@_id": "1" });

@@ -16,12 +16,10 @@ describe("serverShutdown.service", () => {
 	it("should close server, clear force-timer, and invoke callback on success", () => {
 		const openSockets = new Set<Socket>();
 		const callback = vi.fn();
-		const serverCloseMock = vi.fn(
-			(cb?: (err?: Error) => void): Server => {
-				cb?.();
-				return {} as Server;
-			},
-		);
+		const serverCloseMock = vi.fn((cb?: (err?: Error) => void): Server => {
+			cb?.();
+			return {} as Server;
+		});
 		const mockServer = {
 			close: serverCloseMock,
 		} as unknown as Server;
@@ -55,7 +53,9 @@ describe("serverShutdown.service", () => {
 		vi.advanceTimersByTime(3000);
 
 		expect(warnSpy).toHaveBeenCalledWith(
-			expect.stringContaining("2 connection(s) still open after 3000ms; force-closing."),
+			expect.stringContaining(
+				"2 connection(s) still open after 3000ms; force-closing.",
+			),
 		);
 		expect(destroy1).toHaveBeenCalledTimes(1);
 		expect(destroy2).toHaveBeenCalledTimes(1);

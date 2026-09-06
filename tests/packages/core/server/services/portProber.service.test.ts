@@ -44,7 +44,9 @@ describe("portProber.service", () => {
 		const { server, emitter } = createMockServer();
 
 		const listenPromise = listenOnPort(server, 80, "0.0.0.0");
-		const genericError = new Error("EACCES permission denied") as NodeJS.ErrnoException;
+		const genericError = new Error(
+			"EACCES permission denied",
+		) as NodeJS.ErrnoException;
 		genericError.code = "EACCES";
 
 		emitter.emit("error", genericError);

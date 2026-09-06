@@ -50,7 +50,7 @@ export function parseEnv(src: string): Record<string, string> {
 			value = match[4].replace(/\\`/g, "`");
 		} else {
 			// Unquoted value
-			value = match[5]!.trim();
+			value = match[5]?.trim() || "";
 		}
 
 		obj[key] = value;

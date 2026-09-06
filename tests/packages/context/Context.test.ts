@@ -1,6 +1,9 @@
 /// <reference types="node" />
 import { describe, test, expect, vi } from "vitest";
-import { Context, getOrCreateContext } from "../../../packages/context/Context.js";
+import {
+	Context,
+	getOrCreateContext,
+} from "../../../packages/context/Context.js";
 import type { IRequest } from "../../../packages/core/http/request/types/request.types.js";
 import type {
 	IResponse,
@@ -13,7 +16,9 @@ import type {
 import type { ISession } from "../../../packages/pipelines/middlewares/types/session.types.js";
 import { Readable } from "node:stream";
 
-const createMockReq = (overrides: Partial<Record<string, unknown>> = {}): IRequest => {
+const createMockReq = (
+	overrides: Partial<Record<string, unknown>> = {},
+): IRequest => {
 	return {
 		params: { id: "123" },
 		query: { search: "test" },
@@ -34,13 +39,17 @@ const createMockReq = (overrides: Partial<Record<string, unknown>> = {}): IReque
 		hostname: "localhost",
 		session: { id: "sess_1" } as unknown as ISession,
 		sessionID: "sess_1",
-		get: vi.fn((header: string) => (header === "authorization" ? "Bearer token" : undefined)),
+		get: vi.fn((header: string) =>
+			header === "authorization" ? "Bearer token" : undefined,
+		),
 		accepts: vi.fn((...args: unknown[]) => args[0] === "json"),
 		...overrides,
 	} as unknown as IRequest;
 };
 
-const createMockRes = (overrides: Partial<Record<string, unknown>> = {}): IResponse => {
+const createMockRes = (
+	overrides: Partial<Record<string, unknown>> = {},
+): IResponse => {
 	return {
 		headersSent: false,
 		writableEnded: false,
@@ -247,9 +256,13 @@ describe("Context", () => {
 		ctx.sendFile("/path/to/file", sendOpts);
 		expect(res.sendFile).toHaveBeenCalledWith("/path/to/file", sendOpts);
 
-		const downloadOpts: DownloadOptions = { };
+		const downloadOpts: DownloadOptions = {};
 		ctx.download("/path/to/file", "custom.pdf", downloadOpts);
-		expect(res.download).toHaveBeenCalledWith("/path/to/file", "custom.pdf", downloadOpts);
+		expect(res.download).toHaveBeenCalledWith(
+			"/path/to/file",
+			"custom.pdf",
+			downloadOpts,
+		);
 
 		const stream = new Readable({ read() {} });
 		const streamPromise = ctx.stream(stream);

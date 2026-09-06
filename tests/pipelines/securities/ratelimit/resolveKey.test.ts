@@ -22,7 +22,10 @@ describe("resolveKey", () => {
 		const req = createRequest();
 		const resolver = vi.fn(async () => 12345);
 
-		const key = await resolveKey(req, resolver as unknown as (r: IRequest) => string);
+		const key = await resolveKey(
+			req,
+			resolver as unknown as (r: IRequest) => string,
+		);
 
 		expect(resolver).toHaveBeenCalledWith(req);
 		expect(key).toBe("12345");
@@ -57,7 +60,10 @@ describe("resolveKey", () => {
 		});
 
 		it("should fallback to ip resolution if user is missing or has no id", async () => {
-			const req = createRequest({ ip: "10.0.0.1", user: null } as unknown as Partial<IRequest>);
+			const req = createRequest({
+				ip: "10.0.0.1",
+				user: null,
+			} as unknown as Partial<IRequest>);
 			expect(await resolveKey(req, "user")).toBe("10.0.0.1");
 		});
 	});
@@ -102,9 +108,12 @@ describe("resolveKey", () => {
 
 	describe("resolver: 'route'", () => {
 		it("should prefix route with baseUrl and prefer req.path", async () => {
-			const req = Object.assign(createRequest({ path: "/users", url: "/users?page=1" }), {
-				baseUrl: "/v1",
-			});
+			const req = Object.assign(
+				createRequest({ path: "/users", url: "/users?page=1" }),
+				{
+					baseUrl: "/v1",
+				},
+			);
 			expect(await resolveKey(req, "route")).toBe("route:/v1/users");
 		});
 
@@ -123,6 +132,8 @@ describe("resolveKey", () => {
 
 	it("should default to IP resolution for unsupported resolver string types", async () => {
 		const req = createRequest({ ip: "172.16.0.1" });
-		expect(await resolveKey(req, "unknown-type" as unknown as "ip")).toBe("172.16.0.1");
+		expect(await resolveKey(req, "unknown-type" as unknown as "ip")).toBe(
+			"172.16.0.1",
+		);
 	});
 });

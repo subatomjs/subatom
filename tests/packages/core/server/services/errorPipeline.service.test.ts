@@ -22,10 +22,14 @@ describe("errorPipeline.service", () => {
 		const mockRes = { writableEnded: true } as unknown as IResponse;
 		const middleware = vi.fn();
 
-		await handleErrorPipeline(new Error("late error"), mockReq, mockRes, [middleware]);
+		await handleErrorPipeline(new Error("late error"), mockReq, mockRes, [
+			middleware,
+		]);
 
 		expect(consoleSpy).toHaveBeenCalledWith(
-			expect.stringContaining("[SubatomServer Warning]: Error occurred after response was sent:"),
+			expect.stringContaining(
+				"[SubatomServer Warning]: Error occurred after response was sent:",
+			),
 			expect.any(Error),
 		);
 		expect(middleware).not.toHaveBeenCalled();
@@ -79,7 +83,12 @@ describe("errorPipeline.service", () => {
 			undefined as unknown as ErrorMiddlewareHandler,
 		];
 
-		await handleErrorPipeline(new Error("sparse"), mockReq, mockRes, sparseMiddlewares);
+		await handleErrorPipeline(
+			new Error("sparse"),
+			mockReq,
+			mockRes,
+			sparseMiddlewares,
+		);
 
 		expect(m1).toHaveBeenCalledTimes(1);
 		expect(ErrorFormatter.handle).toHaveBeenCalledTimes(1);

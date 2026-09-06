@@ -66,10 +66,21 @@ describe("FileUpload", () => {
 	describe("Symbol.hasInstance", () => {
 		it("should return false for primitives and nullish values", () => {
 			expect((null as unknown as object) instanceof FileUpload).toBe(false);
-			expect((undefined as unknown as object) instanceof FileUpload).toBe(false);
-			expect(("string" as unknown as object) instanceof (FileUpload as unknown as { new (): unknown })).toBe(false);
-			expect((123 as unknown as object) instanceof (FileUpload as unknown as { new (): unknown })).toBe(false);
-			expect((true as unknown as object) instanceof (FileUpload as unknown as { new (): unknown })).toBe(false);
+			expect((undefined as unknown as object) instanceof FileUpload).toBe(
+				false,
+			);
+			expect(
+				("string" as unknown as object) instanceof
+					(FileUpload as unknown as { new (): unknown }),
+			).toBe(false);
+			expect(
+				(123 as unknown as object) instanceof
+					(FileUpload as unknown as { new (): unknown }),
+			).toBe(false);
+			expect(
+				(true as unknown as object) instanceof
+					(FileUpload as unknown as { new (): unknown }),
+			).toBe(false);
 		});
 
 		it("should recognize an actual FileUpload instance", () => {
@@ -113,7 +124,9 @@ describe("FileUpload", () => {
 			});
 
 			await upload.destroy();
-			await expect(upload.buffer()).rejects.toThrow("Cannot access buffer of destroyed UploadFile.");
+			await expect(upload.buffer()).rejects.toThrow(
+				"Cannot access buffer of destroyed UploadFile.",
+			);
 		});
 
 		it("should return buffer directly for memory storage", async () => {
@@ -155,7 +168,9 @@ describe("FileUpload", () => {
 				storageType: "memory",
 			});
 
-			await expect(upload.buffer()).rejects.toThrow("File content unavailable.");
+			await expect(upload.buffer()).rejects.toThrow(
+				"File content unavailable.",
+			);
 		});
 	});
 
@@ -170,7 +185,9 @@ describe("FileUpload", () => {
 			});
 
 			await upload.destroy();
-			expect(() => upload.stream()).toThrow("Cannot create stream for destroyed UploadFile.");
+			expect(() => upload.stream()).toThrow(
+				"Cannot create stream for destroyed UploadFile.",
+			);
 		});
 
 		it("should return readable stream from buffer for memory storage", async () => {
@@ -193,7 +210,9 @@ describe("FileUpload", () => {
 		});
 
 		it("should create stream using fs.createReadStream when path exists", () => {
-			const mockStream = new Readable({ read() {} }) as unknown as fs.ReadStream;
+			const mockStream = new Readable({
+				read() {},
+			}) as unknown as fs.ReadStream;
 			vi.mocked(fs.createReadStream).mockReturnValueOnce(mockStream);
 
 			const upload = new FileUpload({

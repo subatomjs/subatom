@@ -10,6 +10,8 @@ interface MockResponse {
 	send: ReturnType<typeof vi.fn>;
 }
 
+type RouteHandler = (request: unknown, response: MockResponse) => void;
+
 interface MockApp {
 	get: ReturnType<typeof vi.fn>;
 	getRoutes?: () => IRoute[];
@@ -46,9 +48,9 @@ describe("registerDocs", () => {
 	});
 
 	it("should register custom docs path and pass full options (title, version, description, branding)", () => {
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 			getRoutes: () => [],
@@ -64,7 +66,10 @@ describe("registerDocs", () => {
 			liteLogoUrl: "https://example.com/lite.png",
 		});
 
-		expect(app.get).toHaveBeenCalledWith("/api-reference", expect.any(Function));
+		expect(app.get).toHaveBeenCalledWith(
+			"/api-reference",
+			expect.any(Function),
+		);
 
 		const resJson = createMockResponse();
 		routeHandlers["/openapi.json"]({}, resJson);
@@ -80,14 +85,18 @@ describe("registerDocs", () => {
 
 		const resUi = createMockResponse();
 		routeHandlers["/api-reference"]({}, resUi);
-		expect(resUi.send).toHaveBeenCalledWith(expect.stringContaining("Subatom Core"));
-		expect(resUi.send).toHaveBeenCalledWith(expect.stringContaining("https://example.com/dark.png"));
+		expect(resUi.send).toHaveBeenCalledWith(
+			expect.stringContaining("Subatom Core"),
+		);
+		expect(resUi.send).toHaveBeenCalledWith(
+			expect.stringContaining("https://example.com/dark.png"),
+		);
 	});
 
 	it("should serve HTML with content-type text/html on docs endpoint", () => {
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 			getRoutes: () => [],
@@ -99,11 +108,13 @@ describe("registerDocs", () => {
 		routeHandlers["/docs"]({}, res);
 
 		expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "text/html");
-		expect(res.send).toHaveBeenCalledWith(expect.stringContaining("<!doctype html>"));
+		expect(res.send).toHaveBeenCalledWith(
+			expect.stringContaining("<!doctype html>"),
+		);
 	});
 
 	it("should extract routes from app.getRoutes and serve generated OpenAPI spec", () => {
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 		const sampleRoutes: IRoute[] = [
 			{
 				method: "GET",
@@ -113,7 +124,7 @@ describe("registerDocs", () => {
 		];
 
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 			getRoutes: () => sampleRoutes,
@@ -135,7 +146,7 @@ describe("registerDocs", () => {
 	});
 
 	it("should extract routes from app.router.getRoutes if app.getRoutes is not defined", () => {
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 		const sampleRoutes: IRoute[] = [
 			{
 				method: "GET",
@@ -145,7 +156,7 @@ describe("registerDocs", () => {
 		];
 
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 			router: {
@@ -168,9 +179,9 @@ describe("registerDocs", () => {
 	});
 
 	it("should return empty paths if neither app nor app.router implements getRoutes", () => {
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 		};
@@ -188,14 +199,14 @@ describe("registerDocs", () => {
 	});
 
 	it("should cache generated specification when caching is enabled and route count remains identical", () => {
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 		const routes: IRoute[] = [
 			{ method: "GET", path: "/ping", handlers: [] } as unknown as IRoute,
 		];
 		const getRoutesSpy = vi.fn().mockReturnValue(routes);
 
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 			getRoutes: getRoutesSpy,
@@ -216,13 +227,13 @@ describe("registerDocs", () => {
 	});
 
 	it("should regenerate specification if cache is false", () => {
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 		const routes: IRoute[] = [
 			{ method: "GET", path: "/ping", handlers: [] } as unknown as IRoute,
 		];
 
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 			getRoutes: () => [...routes],
@@ -245,10 +256,10 @@ describe("registerDocs", () => {
 
 	it("should catch Error instances during spec generation, log error, and return 500 status", () => {
 		const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 			getRoutes: () => {
@@ -262,7 +273,9 @@ describe("registerDocs", () => {
 		routeHandlers["/openapi.json"]({}, res);
 
 		expect(errSpy).toHaveBeenCalledWith(
-			expect.stringContaining("[subatom:docs] Failed to generate OpenAPI spec:"),
+			expect.stringContaining(
+				"[subatom:docs] Failed to generate OpenAPI spec:",
+			),
 			expect.any(Error),
 		);
 		expect(res.status).toHaveBeenCalledWith(500);
@@ -274,10 +287,10 @@ describe("registerDocs", () => {
 
 	it("should handle non-Error throwables and responses without a status method", () => {
 		vi.spyOn(console, "error").mockImplementation(() => {});
-		const routeHandlers: Record<string, Function> = {};
+		const routeHandlers: Record<string, RouteHandler> = {};
 
 		const app: MockApp = {
-			get: vi.fn((path: string, handler: Function) => {
+			get: vi.fn((path: string, handler: RouteHandler) => {
 				routeHandlers[path] = handler;
 			}),
 			getRoutes: () => {

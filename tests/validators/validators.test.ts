@@ -12,11 +12,17 @@ import { compileObjectValidator } from "../../packages/validations/validators/ob
 import { compileFileValidator } from "../../packages/validations/validators/file.validator.js";
 import { ErrorValidator } from "../../packages/validations/ErrorValidator.js";
 import { FileUpload } from "../../packages/pipelines/files/FileUpload.js";
-import type { ISchemaBase, SchemaValidatorObject, ValidationIssue } from "../../packages/validations/types/validator.types.js";
+import type {
+	ISchemaBase,
+	SchemaValidatorObject,
+	ValidationIssue,
+} from "../../packages/validations/types/validator.types.js";
 
 describe("ErrorValidator", () => {
 	test("initializes with 422 status, code, details, and ValidationError name", () => {
-		const issues = [{ path: "email", rule: "format", message: "Invalid email" }];
+		const issues = [
+			{ path: "email", rule: "format", message: "Invalid email" },
+		];
 		const err = new ErrorValidator(issues);
 
 		expect(err).toBeInstanceOf(Error);
@@ -33,7 +39,12 @@ describe("String Validator", () => {
 		const validate = compileStringValidator({});
 		const issues = await validate(123, "username");
 		expect(issues).toEqual([
-			{ path: "username", rule: "type", message: "Expected string", received: "number" },
+			{
+				path: "username",
+				rule: "type",
+				message: "Expected string",
+				received: "number",
+			},
 		]);
 	});
 
@@ -70,7 +81,9 @@ describe("String Validator", () => {
 
 		const uuidVal = compileStringValidator({ format: "uuid" });
 		expect(await uuidVal("invalid-uuid", "uuid")).toHaveLength(1);
-		expect(await uuidVal("c9a646d3-9c61-4cc9-bc53-ae82f1b07f1a", "uuid")).toHaveLength(0);
+		expect(
+			await uuidVal("c9a646d3-9c61-4cc9-bc53-ae82f1b07f1a", "uuid"),
+		).toHaveLength(0);
 
 		const dateVal = compileStringValidator({ format: "date" });
 		expect(await dateVal("2026/09/06", "date")).toHaveLength(1);
@@ -92,7 +105,12 @@ describe("Number Validator", () => {
 	test("enforces integer type when specified", async () => {
 		const validate = compileNumberValidator({ type: "integer" });
 		expect(await validate(10.5, "count")).toEqual([
-			{ path: "count", rule: "type", message: "Expected integer, received float", received: 10.5 },
+			{
+				path: "count",
+				rule: "type",
+				message: "Expected integer, received float",
+				received: 10.5,
+			},
 		]);
 		expect(await validate(10, "count")).toHaveLength(0);
 	});
@@ -106,7 +124,10 @@ describe("Number Validator", () => {
 	});
 
 	test("validates exclusiveMinimum and exclusiveMaximum boundaries", async () => {
-		const validate = compileNumberValidator({ exclusiveMinimum: 10, exclusiveMaximum: 20 });
+		const validate = compileNumberValidator({
+			exclusiveMinimum: 10,
+			exclusiveMaximum: 20,
+		});
 		expect(await validate(10, "val")).toHaveLength(1);
 		expect(await validate(11, "val")).toHaveLength(0);
 		expect(await validate(19, "val")).toHaveLength(0);
@@ -124,7 +145,12 @@ describe("Boolean Validator", () => {
 	test("validates boolean types correctly", async () => {
 		const validate = compileBooleanValidator({});
 		expect(await validate("true", "flag")).toEqual([
-			{ path: "flag", rule: "type", message: "Expected boolean", received: "string" },
+			{
+				path: "flag",
+				rule: "type",
+				message: "Expected boolean",
+				received: "string",
+			},
 		]);
 		expect(await validate(true, "flag")).toHaveLength(0);
 		expect(await validate(false, "flag")).toHaveLength(0);
@@ -135,7 +161,12 @@ describe("Array Validator", () => {
 	test("rejects non-array inputs", async () => {
 		const validate = compileArrayValidator({});
 		expect(await validate("not-array", "list")).toEqual([
-			{ path: "list", rule: "type", message: "Expected array", received: "string" },
+			{
+				path: "list",
+				rule: "type",
+				message: "Expected array",
+				received: "string",
+			},
 		]);
 	});
 
@@ -152,12 +183,22 @@ describe("Array Validator", () => {
 		});
 		const issues = await validate([10, "invalid", 30], "users");
 		expect(issues).toEqual([
-			{ path: "users[1]", rule: "type", message: "Expected number", received: "string" },
+			{
+				path: "users[1]",
+				rule: "type",
+				message: "Expected number",
+				received: "string",
+			},
 		]);
 
 		const issuesEmptyPath = await validate(["invalid"], "");
 		expect(issuesEmptyPath).toEqual([
-			{ path: "[0]", rule: "type", message: "Expected number", received: "string" },
+			{
+				path: "[0]",
+				rule: "type",
+				message: "Expected number",
+				received: "string",
+			},
 		]);
 	});
 });
@@ -176,7 +217,11 @@ describe("Object Validator", () => {
 		});
 		const issues = await validate({ id: 1 }, "payload");
 		expect(issues).toEqual([
-			{ path: "payload.email", rule: "required", message: "Missing required property: email" },
+			{
+				path: "payload.email",
+				rule: "required",
+				message: "Missing required property: email",
+			},
 		]);
 
 		const rootIssues = await validate({}, "");
@@ -195,7 +240,12 @@ describe("Object Validator", () => {
 
 		const issues = await validate({ name: "A" }, "data");
 		expect(issues).toEqual([
-			{ path: "data.name", rule: "minLength", message: "Must be at least 2 characters", expected: 2 },
+			{
+				path: "data.name",
+				rule: "minLength",
+				message: "Must be at least 2 characters",
+				expected: 2,
+			},
 		]);
 	});
 
@@ -208,7 +258,12 @@ describe("Object Validator", () => {
 
 		const issues = await validate({ name: "A" }, "");
 		expect(issues).toEqual([
-			{ path: "name", rule: "minLength", message: "Must be at least 2 characters", expected: 2 },
+			{
+				path: "name",
+				rule: "minLength",
+				message: "Must be at least 2 characters",
+				expected: 2,
+			},
 		]);
 	});
 });
@@ -218,7 +273,12 @@ describe("File Validator", () => {
 		const validate = compileFileValidator({} as ISchemaBase);
 		const issues = await validate({}, "avatar");
 		expect(issues).toEqual([
-			{ path: "avatar", rule: "validation", message: "Invalid file validation schema", received: {} },
+			{
+				path: "avatar",
+				rule: "validation",
+				message: "Invalid file validation schema",
+				received: {},
+			},
 		]);
 	});
 
@@ -235,7 +295,11 @@ describe("File Validator", () => {
 			safeParse: vi.fn().mockResolvedValue({
 				success: false,
 				issues: [
-					{ path: ["sub", "ext"], message: "Invalid extension", rule: "file_type" },
+					{
+						path: ["sub", "ext"],
+						message: "Invalid extension",
+						rule: "file_type",
+					},
 					{ path: "size", message: "Too large" },
 					{ path: 1, message: "Index error" },
 					{ path: undefined as unknown as string, message: "No path" },
@@ -245,10 +309,34 @@ describe("File Validator", () => {
 		const validate = compileFileValidator(mockSchema as unknown as ISchemaBase);
 		const issues = await validate({}, "doc");
 		expect(issues).toEqual([
-			{ path: "doc.sub.ext", rule: "file_type", message: "Invalid extension", received: undefined, expected: undefined },
-			{ path: "doc.size", rule: "validation", message: "Too large", received: undefined, expected: undefined },
-			{ path: "doc.1", rule: "validation", message: "Index error", received: undefined, expected: undefined },
-			{ path: "doc", rule: "validation", message: "No path", received: undefined, expected: undefined },
+			{
+				path: "doc.sub.ext",
+				rule: "file_type",
+				message: "Invalid extension",
+				received: undefined,
+				expected: undefined,
+			},
+			{
+				path: "doc.size",
+				rule: "validation",
+				message: "Too large",
+				received: undefined,
+				expected: undefined,
+			},
+			{
+				path: "doc.1",
+				rule: "validation",
+				message: "Index error",
+				received: undefined,
+				expected: undefined,
+			},
+			{
+				path: "doc",
+				rule: "validation",
+				message: "No path",
+				received: undefined,
+				expected: undefined,
+			},
 		]);
 
 		const issuesEmptyPath = await validate({}, "");
@@ -265,9 +353,16 @@ describe("File Validator", () => {
 				},
 			}),
 		};
-		const validateNonArray = compileFileValidator(nonArrayMock as unknown as ISchemaBase);
+		const validateNonArray = compileFileValidator(
+			nonArrayMock as unknown as ISchemaBase,
+		);
 		expect(await validateNonArray("payload", "doc")).toEqual([
-			{ path: "doc", rule: "validation", message: "Root error", received: "payload" },
+			{
+				path: "doc",
+				rule: "validation",
+				message: "Root error",
+				received: "payload",
+			},
 		]);
 
 		// Fallback when message is undefined in non-array error
@@ -279,9 +374,16 @@ describe("File Validator", () => {
 				},
 			}),
 		};
-		const validateDefaultMsg = compileFileValidator(defaultMsgMock as unknown as ISchemaBase);
+		const validateDefaultMsg = compileFileValidator(
+			defaultMsgMock as unknown as ISchemaBase,
+		);
 		expect(await validateDefaultMsg("payload", "doc")).toEqual([
-			{ path: "doc", rule: "validation", message: "File validation failed", received: "payload" },
+			{
+				path: "doc",
+				rule: "validation",
+				message: "File validation failed",
+				received: "payload",
+			},
 		]);
 	});
 });
@@ -297,23 +399,52 @@ describe("SchemaValidator Orchestrator", () => {
 	});
 
 	test("dispatches compilation for all types and unhandled fallbacks", async () => {
-		expect(await SchemaValidator.compile({ type: "string" })("str", "p")).toHaveLength(0);
-		expect(await SchemaValidator.compile({ type: "number" })(10, "p")).toHaveLength(0);
-		expect(await SchemaValidator.compile({ type: "integer" })(10, "p")).toHaveLength(0);
-		expect(await SchemaValidator.compile({ type: "boolean" })(true, "p")).toHaveLength(0);
-		expect(await SchemaValidator.compile({ type: "array" })([], "p")).toHaveLength(0);
-		expect(await SchemaValidator.compile({ type: "object" })({}, "p")).toHaveLength(0);
-		expect(await SchemaValidator.compile({ type: "file", safeParse: () => ({ success: true }) })({}, "p")).toHaveLength(0);
-		expect(await SchemaValidator.compile({ type: "unknown" })("anything", "p")).toHaveLength(0);
+		expect(
+			await SchemaValidator.compile({ type: "string" })("str", "p"),
+		).toHaveLength(0);
+		expect(
+			await SchemaValidator.compile({ type: "number" })(10, "p"),
+		).toHaveLength(0);
+		expect(
+			await SchemaValidator.compile({ type: "integer" })(10, "p"),
+		).toHaveLength(0);
+		expect(
+			await SchemaValidator.compile({ type: "boolean" })(true, "p"),
+		).toHaveLength(0);
+		expect(
+			await SchemaValidator.compile({ type: "array" })([], "p"),
+		).toHaveLength(0);
+		expect(
+			await SchemaValidator.compile({ type: "object" })({}, "p"),
+		).toHaveLength(0);
+		expect(
+			await SchemaValidator.compile({
+				type: "file",
+				safeParse: () => ({ success: true }),
+			})({}, "p"),
+		).toHaveLength(0);
+		expect(
+			await SchemaValidator.compile({ type: "unknown" })("anything", "p"),
+		).toHaveLength(0);
 	});
 
 	test("handles nullability rules", async () => {
-		const notNullable = SchemaValidator.compile({ type: "string", nullable: false });
+		const notNullable = SchemaValidator.compile({
+			type: "string",
+			nullable: false,
+		});
 		expect(await notNullable(null, "p")).toEqual([
-			{ path: "p", rule: "nullable", message: "Value cannot be null or undefined" },
+			{
+				path: "p",
+				rule: "nullable",
+				message: "Value cannot be null or undefined",
+			},
 		]);
 
-		const nullable = SchemaValidator.compile({ type: "string", nullable: true });
+		const nullable = SchemaValidator.compile({
+			type: "string",
+			nullable: true,
+		});
 		expect(await nullable(null, "p")).toEqual([]);
 		expect(await nullable(undefined, "p")).toEqual([]);
 	});
@@ -466,7 +597,9 @@ describe("Errors and FileUpload Direct Verification", () => {
 		expect(strErr.message).toBe("String error");
 
 		const objErr = normalizeError({ reason: "unknown" });
-		expect(objErr.message).toBe("A non-Error value was thrown during request handling.");
+		expect(objErr.message).toBe(
+			"A non-Error value was thrown during request handling.",
+		);
 	});
 
 	test("verifies FileUpload stream, buffer, destroy, and symbol behaviors", async () => {
@@ -491,8 +624,12 @@ describe("Errors and FileUpload Direct Verification", () => {
 		await fileMem.destroy();
 		expect(fileMem.destroyed).toBe(true);
 
-		await expect(fileMem.buffer()).rejects.toThrow("Cannot access buffer of destroyed UploadFile.");
-		expect(() => fileMem.stream()).toThrow("Cannot create stream for destroyed UploadFile.");
+		await expect(fileMem.buffer()).rejects.toThrow(
+			"Cannot access buffer of destroyed UploadFile.",
+		);
+		expect(() => fileMem.stream()).toThrow(
+			"Cannot create stream for destroyed UploadFile.",
+		);
 
 		const emptyFile = new FileUpload({
 			filename: "empty.bin",
@@ -500,7 +637,9 @@ describe("Errors and FileUpload Direct Verification", () => {
 			mimetype: "application/octet-stream",
 			storageType: "disk",
 		});
-		await expect(emptyFile.buffer()).rejects.toThrow("File content unavailable.");
+		await expect(emptyFile.buffer()).rejects.toThrow(
+			"File content unavailable.",
+		);
 		expect(() => emptyFile.stream()).toThrow("File stream unavailable.");
 		await emptyFile.destroy();
 	});

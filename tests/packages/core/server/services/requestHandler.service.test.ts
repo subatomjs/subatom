@@ -13,16 +13,24 @@ import {
 	type ITrackedIncomingMessage,
 } from "../../../../../packages/core/server/services/requestHandler.service.js";
 
-vi.mock("../../../../../packages/pipelines/modifiers/handleRequestWithPipeline.js", () => ({
-	handleRequestWithPipeline: vi.fn(),
-}));
+vi.mock(
+	"../../../../../packages/pipelines/modifiers/handleRequestWithPipeline.js",
+	() => ({
+		handleRequestWithPipeline: vi.fn(),
+	}),
+);
 
-vi.mock("../../../../../packages/core/server/services/errorPipeline.service.js", () => ({
-	handleErrorPipeline: vi.fn(),
-}));
+vi.mock(
+	"../../../../../packages/core/server/services/errorPipeline.service.js",
+	() => ({
+		handleErrorPipeline: vi.fn(),
+	}),
+);
 
-function createMockIncomingMessage(): IncomingMessage & ITrackedIncomingMessage {
-	const emitter = new EventEmitter() as IncomingMessage & ITrackedIncomingMessage;
+function createMockIncomingMessage(): IncomingMessage &
+	ITrackedIncomingMessage {
+	const emitter = new EventEmitter() as IncomingMessage &
+		ITrackedIncomingMessage;
 	emitter.headers = {};
 	emitter.method = "GET";
 	emitter.url = "/";
@@ -92,15 +100,11 @@ describe("requestHandler.service", () => {
 
 		vi.mocked(handleRequestWithPipeline).mockRejectedValue(failure);
 
-		await processHttpRequest(
-			rawReq,
-			rawRes,
-			router,
-			[],
-			[],
-			requestContext,
-			{ transformers: [], interceptors: [], serializers: [] },
-		);
+		await processHttpRequest(rawReq, rawRes, router, [], [], requestContext, {
+			transformers: [],
+			interceptors: [],
+			serializers: [],
+		});
 
 		expect(handleErrorPipeline).toHaveBeenCalledTimes(1);
 		expect(handleErrorPipeline).toHaveBeenCalledWith(

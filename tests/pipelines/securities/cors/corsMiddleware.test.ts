@@ -218,7 +218,7 @@ describe("createCors", () => {
 		});
 
 		it("should reflect Access-Control-Request-Headers when no explicit allowedHeaders set", async () => {
-			mockReq.raw!.headers!["access-control-request-headers"] =
+			mockReq.raw.headers["access-control-request-headers"] =
 				"X-Custom-Token, Accept";
 
 			const cors = createCors({ allowedHeaders: [] });
@@ -228,11 +228,13 @@ describe("createCors", () => {
 				"Access-Control-Allow-Headers",
 				"X-Custom-Token, Accept",
 			);
-			expect(mockRes.vary).toHaveBeenCalledWith("Access-Control-Request-Headers");
+			expect(mockRes.vary).toHaveBeenCalledWith(
+				"Access-Control-Request-Headers",
+			);
 		});
 
 		it("should reflect array-based Access-Control-Request-Headers properly", async () => {
-			mockReq.raw!.headers!["access-control-request-headers"] = [
+			mockReq.raw.headers["access-control-request-headers"] = [
 				"X-One",
 				"X-Two",
 			] as unknown as string;

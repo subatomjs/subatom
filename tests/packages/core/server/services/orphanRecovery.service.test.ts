@@ -17,7 +17,10 @@ describe("orphanRecovery.service", () => {
 	it("should return false if res.writableEnded is true", () => {
 		const als = new AsyncLocalStorage<IRequestContext>();
 		const mockReq = {} as IRequest;
-		const mockRes = { writableEnded: true, headersSent: false } as unknown as IResponse;
+		const mockRes = {
+			writableEnded: true,
+			headersSent: false,
+		} as unknown as IResponse;
 
 		const result = als.run({ req: mockReq, res: mockRes }, () => {
 			return tryRecoverFromOrphanedRejection(als, [], new Error("test"));
@@ -29,7 +32,10 @@ describe("orphanRecovery.service", () => {
 	it("should return false if res.headersSent is true", () => {
 		const als = new AsyncLocalStorage<IRequestContext>();
 		const mockReq = {} as IRequest;
-		const mockRes = { writableEnded: false, headersSent: true } as unknown as IResponse;
+		const mockRes = {
+			writableEnded: false,
+			headersSent: true,
+		} as unknown as IResponse;
 
 		const result = als.run({ req: mockReq, res: mockRes }, () => {
 			return tryRecoverFromOrphanedRejection(als, [], new Error("test"));
@@ -41,7 +47,10 @@ describe("orphanRecovery.service", () => {
 	it("should route to handleErrorPipeline and return true when response is still writable", () => {
 		const als = new AsyncLocalStorage<IRequestContext>();
 		const mockReq = {} as IRequest;
-		const mockRes = { writableEnded: false, headersSent: false } as unknown as IResponse;
+		const mockRes = {
+			writableEnded: false,
+			headersSent: false,
+		} as unknown as IResponse;
 		const errorMiddlewares: ErrorMiddlewareHandler[] = [];
 		const error = new Error("async failure");
 

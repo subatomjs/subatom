@@ -173,7 +173,9 @@ describe("fileUploadErrorHandler", () => {
 
 	describe("Terminal Fallback", () => {
 		test("rethrows the error if response object matches no supported interface", () => {
-			const invalidRes = { customSink: true } as unknown as ErrorHandlerResponse;
+			const invalidRes = {
+				customSink: true,
+			} as unknown as ErrorHandlerResponse;
 			const next = vi.fn();
 			const originalErr = new Error("Unresolvable response sink");
 

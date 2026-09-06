@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ServerResponse } from "node:http";
 import { Readable } from "node:stream";
@@ -71,7 +72,12 @@ interface TestResponseHelper {
 }
 
 function createMockResponse(
-	type: "raw" | "rawResponse" | "framework" | "native" | "headersSent" = "native",
+	type:
+		| "raw"
+		| "rawResponse"
+		| "framework"
+		| "native"
+		| "headersSent" = "native",
 ) {
 	const helper: TestResponseHelper = {
 		headersSent: type === "headersSent",
@@ -263,7 +269,9 @@ describe("fileUploadPipeline", () => {
 
 		it("should fall back to next(err) with Error instance when Error is thrown (line 186)", async () => {
 			const err = new Error("Custom error");
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(err);
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				err,
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -275,7 +283,9 @@ describe("fileUploadPipeline", () => {
 		});
 
 		it("should fall back to next(err) with new Error(String(err)) when non-Error is thrown (line 186)", async () => {
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce("String error single");
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				"String error single",
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -413,7 +423,9 @@ describe("fileUploadPipeline", () => {
 		});
 
 		it("should fall back to next(err) if parsing fails with non-Error", async () => {
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce("Array primitive error");
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				"Array primitive error",
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -427,7 +439,9 @@ describe("fileUploadPipeline", () => {
 
 		it("should fall back to next(err) if parsing fails with Error instance", async () => {
 			const err = new Error("Array Error instance");
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(err);
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				err,
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -488,7 +502,9 @@ describe("fileUploadPipeline", () => {
 			const res = createMockResponse();
 			const next = vi.fn();
 
-			const sparseConfig = [undefined as unknown as { name: string; maxCount?: number }];
+			const sparseConfig = [
+				undefined as unknown as { name: string; maxCount?: number },
+			];
 			await fields(sparseConfig)(req, res, next);
 
 			expect(req.files).toEqual({});
@@ -559,7 +575,9 @@ describe("fileUploadPipeline", () => {
 
 		it("should delegate to next(err) with Error instance when fields parsing fails (line 242)", async () => {
 			const err = new Error("Fields Error instance");
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(err);
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				err,
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -571,7 +589,9 @@ describe("fileUploadPipeline", () => {
 		});
 
 		it("should delegate to next(err) with new Error(String(err)) when fields parsing fails with non-Error (line 242)", async () => {
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce("Fields primitive error");
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				"Fields primitive error",
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -614,7 +634,9 @@ describe("fileUploadPipeline", () => {
 
 		it("should delegate to next(err) with Error instance when anyFiles throws Error (line 300)", async () => {
 			const err = new Error("AnyFiles Error instance");
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(err);
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				err,
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -626,7 +648,9 @@ describe("fileUploadPipeline", () => {
 		});
 
 		it("should delegate to next(err) if anyFiles throws non-Error and headersSent is true (line 300)", async () => {
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce("AnyFiles primitive error");
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				"AnyFiles primitive error",
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -708,7 +732,9 @@ describe("fileUploadPipeline", () => {
 
 		it("should delegate to next(err) with Error instance when none() throws Error (line 338)", async () => {
 			const err = new Error("None Error instance");
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(err);
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				err,
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -720,7 +746,9 @@ describe("fileUploadPipeline", () => {
 		});
 
 		it("should delegate to next(err) if none() throws non-Error and headersSent is true (line 338)", async () => {
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce("None primitive error");
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				"None primitive error",
+			);
 
 			const req = createMockRequest({});
 			const res = createMockResponse("headersSent");
@@ -746,7 +774,9 @@ describe("fileUploadPipeline", () => {
 			await single("file")(req, res, next);
 
 			expect(res.statusCode).toBe(422);
-			expect(res.endedWith).toBe(JSON.stringify({ error: "Invalid file type" }));
+			expect(res.endedWith).toBe(
+				JSON.stringify({ error: "Invalid file type" }),
+			);
 			expect(next).not.toHaveBeenCalled();
 		});
 
@@ -768,7 +798,7 @@ describe("fileUploadPipeline", () => {
 			expect(next).not.toHaveBeenCalled();
 		});
 
-	it("should reach fallback writeHead branch when raw has no writeHead (lines 78-84)", async () => {
+		it("should reach fallback writeHead branch when raw has no writeHead (lines 78-84)", async () => {
 			const res: any = {
 				raw: {}, // rawRes is {}, so rawRes.writeHead is undefined, skipping block 1
 				headersSent: false,
@@ -803,7 +833,9 @@ describe("fileUploadPipeline", () => {
 			};
 
 			const err = new BadRequestError("Already sent bare writeHead");
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(err);
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				err,
+			);
 
 			const req = createMockRequest({});
 			const next = vi.fn();
@@ -847,7 +879,9 @@ describe("fileUploadPipeline", () => {
 			};
 
 			const err = new BadRequestError("Already sent bare writeHead");
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(err);
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				err,
+			);
 
 			const req = createMockRequest({});
 			const next = vi.fn();
@@ -857,8 +891,6 @@ describe("fileUploadPipeline", () => {
 			expect(res.writeHead).not.toHaveBeenCalled();
 			expect(next).toHaveBeenCalledWith(err);
 		});
-
-
 
 		it("should write to res.rawResponse when available", async () => {
 			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
@@ -898,7 +930,9 @@ describe("fileUploadPipeline", () => {
 			};
 
 			const err = new BadRequestError("Trigger catch block");
-			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(err);
+			vi.spyOn(parseMultipartModule, "parseMultipart").mockRejectedValueOnce(
+				err,
+			);
 
 			const req = createMockRequest({});
 			const next = vi.fn();
@@ -915,7 +949,9 @@ describe("fileUploadPipeline", () => {
 				mimetype: "text/plain",
 				storageType: "memory",
 			});
-			vi.spyOn(buggyFile, "destroy").mockRejectedValueOnce(new Error("Destroy error"));
+			vi.spyOn(buggyFile, "destroy").mockRejectedValueOnce(
+				new Error("Destroy error"),
+			);
 
 			vi.spyOn(parseMultipartModule, "parseMultipart").mockResolvedValueOnce({
 				body: {},

@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { RequestPipeline } from "../../../packages/pipelines/modifiers/RequestPipeline.js";
 import type { IRequest } from "../../../packages/core/http/request/types/request.types.js";

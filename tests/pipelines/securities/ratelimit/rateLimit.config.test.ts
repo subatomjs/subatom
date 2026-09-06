@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { normalizeConfig, parseDuration } from "../../../../packages/pipelines/securities/ratelimit/rateLimit.config.js";
+import {
+	normalizeConfig,
+	parseDuration,
+} from "../../../../packages/pipelines/securities/ratelimit/rateLimit.config.js";
 import { RateLimitConfigError } from "../../../../packages/errors/RateLimitError.js";
 import type { RateLimitOptions } from "../../../../packages/pipelines/securities/ratelimit/types/rateLimit.types.js";
 
@@ -63,7 +66,9 @@ describe("rateLimit.config", () => {
 		});
 
 		it("should throw when policies array is explicitly empty", () => {
-			expect(() => normalizeConfig({ policies: [] })).toThrow(RateLimitConfigError);
+			expect(() => normalizeConfig({ policies: [] })).toThrow(
+				RateLimitConfigError,
+			);
 		});
 
 		it("should normalize token-bucket policy correctly", () => {

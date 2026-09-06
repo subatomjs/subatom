@@ -4,12 +4,24 @@ import { Socket } from "node:net";
 import { parseLimit } from "../../../packages/pipelines/middlewares/utils/limit/parseLimit.js";
 import { parseCookieHeader } from "../../../packages/pipelines/middlewares/utils/cookies/parseCookieHeader.js";
 import { serializeCookie } from "../../../packages/pipelines/middlewares/utils/cookies/serializeCookie.js";
-import { sign, unsign } from "../../../packages/pipelines/middlewares/utils/signatures/signatures.js";
+import {
+	sign,
+	unsign,
+} from "../../../packages/pipelines/middlewares/utils/signatures/signatures.js";
 import { getMimeType } from "../../../packages/pipelines/middlewares/utils/mime/mime.js";
-import { readLimitedBody, isPayloadTooLarge } from "../../../packages/pipelines/middlewares/utils/readLimitedBody.js";
+import {
+	readLimitedBody,
+	isPayloadTooLarge,
+} from "../../../packages/pipelines/middlewares/utils/readLimitedBody.js";
 import { MemoryStore } from "../../../packages/pipelines/middlewares/utils/memory/MemoryStore.js";
-import { RedisSessionStore, type RedisSessionClient } from "../../../packages/pipelines/middlewares/utils/redis/RedisSessionStore.js";
-import { BadRequestError, PayloadTooLargeError } from "../../../packages/errors/Errors.js";
+import {
+	RedisSessionStore,
+	type RedisSessionClient,
+} from "../../../packages/pipelines/middlewares/utils/redis/RedisSessionStore.js";
+import {
+	BadRequestError,
+	PayloadTooLargeError,
+} from "../../../packages/errors/Errors.js";
 
 describe("Middleware Utilities", () => {
 	describe("parseLimit", () => {
@@ -99,7 +111,7 @@ describe("Middleware Utilities", () => {
 			const signed = sign("session-123", secret);
 			expect(unsign("session-123", secret)).toBe(false); // missing dot
 			expect(unsign(`${signed}extra`, secret)).toBe(false); // length mismatch
-			expect(unsign(signed.slice(0, -1) + "x", secret)).toBe(false); // bad hmac
+			expect(unsign(`${signed.slice(0, -1)}x`, secret)).toBe(false); // bad hmac
 		});
 	});
 
@@ -141,7 +153,9 @@ describe("Middleware Utilities", () => {
 			const req = new IncomingMessage(new Socket());
 			req.headers["content-length"] = "2048";
 
-			await expect(readLimitedBody(req, 1024)).rejects.toThrow(PayloadTooLargeError);
+			await expect(readLimitedBody(req, 1024)).rejects.toThrow(
+				PayloadTooLargeError,
+			);
 		});
 
 		it("should read stream chunks within limit successfully, converting non-buffer chunks", async () => {
@@ -219,7 +233,9 @@ describe("Middleware Utilities", () => {
 			await store.close();
 
 			expect(await store.get("s1")).toBeNull();
-			await expect(store.set("s1", {})).rejects.toThrow("MemoryStore is closed.");
+			await expect(store.set("s1", {})).rejects.toThrow(
+				"MemoryStore is closed.",
+			);
 			await expect(store.destroy("s1")).resolves.toBeUndefined();
 			await expect(store.touch("s1")).resolves.toBeUndefined();
 			await expect(store.close()).resolves.toBeUndefined();
@@ -245,7 +261,9 @@ describe("Middleware Utilities", () => {
 		});
 
 		it("should get session data and parse json payload", async () => {
-			vi.mocked(client.eval).mockResolvedValueOnce(JSON.stringify({ role: "admin" }));
+			vi.mocked(client.eval).mockResolvedValueOnce(
+				JSON.stringify({ role: "admin" }),
+			);
 			const store = new RedisSessionStore(client, { prefix: "app:" });
 
 			const result = await store.get("sid-1");
@@ -265,7 +283,9 @@ describe("Middleware Utilities", () => {
 			vi.mocked(client.eval).mockResolvedValueOnce("invalid-json");
 			expect(await store.get("bad")).toBeNull();
 
-			vi.mocked(client.eval).mockResolvedValueOnce(JSON.stringify(["not-object"]));
+			vi.mocked(client.eval).mockResolvedValueOnce(
+				JSON.stringify(["not-object"]),
+			);
 			expect(await store.get("arr")).toBeNull();
 		});
 
@@ -302,17 +322,22 @@ describe("Middleware Utilities", () => {
 			await store.touch("sid-1", undefined);
 		});
 
-	it("should retry operations upon failure with delay and throw if retries exceeded", async () => {
+		it("should retry operations upon failure with delay and throw if retries exceeded", async () => {
 			vi.mocked(client.eval)
 				.mockRejectedValueOnce(new Error("Connection reset"))
 				.mockResolvedValueOnce(1);
 
-			const store = new RedisSessionStore(client, { retries: 1, retryDelayMs: 5 });
+			const store = new RedisSessionStore(client, {
+				retries: 1,
+				retryDelayMs: 5,
+			});
 			await expect(store.destroy("s1")).resolves.toBeUndefined();
 			expect(client.eval).toHaveBeenCalledTimes(2);
 
 			vi.mocked(client.eval).mockRejectedValue("Non-error string thrown");
-			await expect(store.destroy("s2")).rejects.toThrow("Non-error string thrown");
+			await expect(store.destroy("s2")).rejects.toThrow(
+				"Non-error string thrown",
+			);
 		});
 
 		it("should timeout long-running calls", async () => {
@@ -320,15 +345,22 @@ describe("Middleware Utilities", () => {
 				() => new Promise((resolve) => setTimeout(resolve, 50)),
 			);
 
-			const store = new RedisSessionStore(client, { timeoutMs: 10, retries: 0 });
-			await expect(store.destroy("timeout-key")).rejects.toThrow("Redis session operation timed out.");
+			const store = new RedisSessionStore(client, {
+				timeoutMs: 10,
+				retries: 0,
+			});
+			await expect(store.destroy("timeout-key")).rejects.toThrow(
+				"Redis session operation timed out.",
+			);
 		});
 
 		it("should reject operations after store is closed", async () => {
 			const store = new RedisSessionStore(client);
 			await store.close();
 
-			await expect(store.get("closed")).rejects.toThrow("RedisSessionStore is closed.");
+			await expect(store.get("closed")).rejects.toThrow(
+				"RedisSessionStore is closed.",
+			);
 		});
 	});
 });

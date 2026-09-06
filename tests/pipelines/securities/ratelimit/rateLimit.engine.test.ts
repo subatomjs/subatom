@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { RateLimitEngine } from "../../../../packages/pipelines/securities/ratelimit/rateLimit.engine.js";
 import { MemoryStore } from "../../../../packages/pipelines/securities/ratelimit/stores/MemoryStore.js";
 import { RedisStore } from "../../../../packages/pipelines/securities/ratelimit/stores/RedisStore.js";
-import type { NormalizedConfig, RateLimitStore } from "../../../../packages/pipelines/securities/ratelimit/types/rateLimit.types.js";
+import type {
+	NormalizedConfig,
+	RateLimitStore,
+} from "../../../../packages/pipelines/securities/ratelimit/types/rateLimit.types.js";
 import type { IRequest } from "../../../../packages/core/http/request/types/request.types.js";
 
 describe("RateLimitEngine", () => {
@@ -26,7 +29,9 @@ describe("RateLimitEngine", () => {
 		};
 
 		const engine = new RateLimitEngine(config);
-		expect((engine as unknown as { store: RateLimitStore }).store).toBeInstanceOf(MemoryStore);
+		expect(
+			(engine as unknown as { store: RateLimitStore }).store,
+		).toBeInstanceOf(MemoryStore);
 	});
 
 	it("should initialize with RedisStore when store is 'redis' and redisClient is provided", () => {
@@ -44,7 +49,9 @@ describe("RateLimitEngine", () => {
 		};
 
 		const engine = new RateLimitEngine(config);
-		expect((engine as unknown as { store: RateLimitStore }).store).toBeInstanceOf(RedisStore);
+		expect(
+			(engine as unknown as { store: RateLimitStore }).store,
+		).toBeInstanceOf(RedisStore);
 	});
 
 	it("should throw an error if store is 'redis' but redisClient is missing", () => {
@@ -84,7 +91,9 @@ describe("RateLimitEngine", () => {
 		};
 
 		const engine = new RateLimitEngine(config);
-		expect((engine as unknown as { store: RateLimitStore }).store).toBe(customStore);
+		expect((engine as unknown as { store: RateLimitStore }).store).toBe(
+			customStore,
+		);
 	});
 
 	it("should evaluate multiple policies and return the strictest decision", async () => {

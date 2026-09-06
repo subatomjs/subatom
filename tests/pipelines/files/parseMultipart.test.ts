@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
+/** biome-ignore-all lint/complexity/useLiteralKeys: explanation */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Readable, PassThrough } from "node:stream";
 import fs from "node:fs";
@@ -35,14 +37,21 @@ vi.mock("node:fs", async (importOriginal) => {
 
 function createMultipartPayload(
 	fields: Array<{ name: string; value: string }>,
-	files: Array<{ name: string; filename: string; contentType: string; content: Buffer }>,
+	files: Array<{
+		name: string;
+		filename: string;
+		contentType: string;
+		content: Buffer;
+	}>,
 	boundary: string = "----SubatomTestBoundary",
 ): { stream: Readable; headers: Record<string, string> } {
 	const stream = new PassThrough();
 
 	for (const field of fields) {
 		stream.write(`--${boundary}\r\n`);
-		stream.write(`Content-Disposition: form-data; name="${field.name}"\r\n\r\n`);
+		stream.write(
+			`Content-Disposition: form-data; name="${field.name}"\r\n\r\n`,
+		);
 		stream.write(`${field.value}\r\n`);
 	}
 
@@ -74,7 +83,9 @@ describe("parseMultipart", () => {
 
 	describe("Directory creation", () => {
 		it("should reject with BadRequestError if disk directory creation fails", async () => {
-			vi.mocked(fs.promises.mkdir).mockRejectedValueOnce(new Error("Permission denied"));
+			vi.mocked(fs.promises.mkdir).mockRejectedValueOnce(
+				new Error("Permission denied"),
+			);
 
 			const stream = new Readable({ read() {} });
 			await expect(
@@ -125,7 +136,9 @@ describe("parseMultipart", () => {
 				[],
 			);
 
-			const result = await parseMultipart(stream, headers, { storage: "memory" });
+			const result = await parseMultipart(stream, headers, {
+				storage: "memory",
+			});
 
 			expect(result.body).toEqual({
 				isTrue: true,
@@ -171,13 +184,15 @@ describe("parseMultipart", () => {
 				],
 			);
 
-			const result = await parseMultipart(stream, headers, { storage: "memory" });
+			const result = await parseMultipart(stream, headers, {
+				storage: "memory",
+			});
 			expect(result.files["document"]?.[0]?.mimetype).toBe("application/pdf");
 			expect(result.files["image"]?.[0]?.mimetype).toBe("image/svg+xml");
 			expect(result.files["bin"]?.[0]?.mimetype).toBe("application/zip");
 		});
 
-		it("should cover line 122 (exact match targetMime === target) and line 127 (target.replace(/^\./, '') === ext)", async () => {
+		it("should cover line 122 (exact match targetMime === target) and line 127 (target.replace(/^./, '') === ext)", async () => {
 			const { stream, headers } = createMultipartPayload(
 				[],
 				[
@@ -201,7 +216,9 @@ describe("parseMultipart", () => {
 				allowedMimeTypes: ["application/x-custom", ".png"],
 			});
 
-			expect(result.files["exactMatch"]?.[0]?.mimetype).toBe("application/x-custom");
+			expect(result.files["exactMatch"]?.[0]?.mimetype).toBe(
+				"application/x-custom",
+			);
 			expect(result.files["extWithDotMatch"]?.[0]?.mimetype).toBe("image/png");
 		});
 
@@ -237,7 +254,9 @@ describe("parseMultipart", () => {
 
 			expect(result.files["f1"]?.[0]?.mimetype).toBe("image/jpeg");
 			expect(result.files["f2"]?.[0]?.mimetype).toBe("application/json");
-			expect(result.files["f3"]?.[0]?.mimetype).toBe("application/octet-stream");
+			expect(result.files["f3"]?.[0]?.mimetype).toBe(
+				"application/octet-stream",
+			);
 		});
 
 		it("should allow the SVG MIME alias", async () => {
@@ -280,7 +299,9 @@ describe("parseMultipart", () => {
 				],
 			);
 
-			const result = await parseMultipart(stream, headers, { storage: "memory" });
+			const result = await parseMultipart(stream, headers, {
+				storage: "memory",
+			});
 			expect(result.files["docs"]).toHaveLength(2);
 			expect(result.files["docs"]?.[0]?.filename).toBe("doc1.txt");
 			expect(result.files["docs"]?.[1]?.filename).toBe("doc2.txt");
@@ -299,7 +320,9 @@ describe("parseMultipart", () => {
 				],
 			);
 
-			const result = await parseMultipart(stream, headers, { storage: "memory" });
+			const result = await parseMultipart(stream, headers, {
+				storage: "memory",
+			});
 			expect(result.files["unnamed"]).toBeUndefined();
 		});
 
@@ -331,9 +354,12 @@ describe("parseMultipart", () => {
 			const headers = {
 				"content-type": "multipart/form-data; boundary=----AfterAbort",
 			};
-			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
-			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-				?._readableState?.pipes;
+			const parsePromise = parseMultipart(stream, headers, {
+				storage: "memory",
+			});
+			const pipes = (
+				stream as unknown as { _readableState?: { pipes?: unknown } }
+			)?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 			const fileStream = new PassThrough();
 			const resumeSpy = vi.spyOn(fileStream, "resume");
@@ -354,9 +380,12 @@ describe("parseMultipart", () => {
 			const headers = {
 				"content-type": "multipart/form-data; boundary=----NoFilename",
 			};
-			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
-			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-				?._readableState?.pipes;
+			const parsePromise = parseMultipart(stream, headers, {
+				storage: "memory",
+			});
+			const pipes = (
+				stream as unknown as { _readableState?: { pipes?: unknown } }
+			)?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 			const fileStream = new PassThrough();
 			const resumeSpy = vi.spyOn(fileStream, "resume");
@@ -378,9 +407,12 @@ describe("parseMultipart", () => {
 			const headers = {
 				"content-type": "multipart/form-data; boundary=----Truncated",
 			};
-			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
-			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-				?._readableState?.pipes;
+			const parsePromise = parseMultipart(stream, headers, {
+				storage: "memory",
+			});
+			const pipes = (
+				stream as unknown as { _readableState?: { pipes?: unknown } }
+			)?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 			const fileStream = new PassThrough() as PassThrough & {
 				truncated?: boolean;
@@ -402,13 +434,18 @@ describe("parseMultipart", () => {
 
 		it("should trigger fileStream close event (lines 263-264)", async () => {
 			const boundary = "----BoundaryMemCloseDirect";
-			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const headers = {
+				"content-type": `multipart/form-data; boundary=${boundary}`,
+			};
 			const stream = new PassThrough();
 
-			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+			const parsePromise = parseMultipart(stream, headers, {
+				storage: "memory",
+			});
 
-			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-				?._readableState?.pipes;
+			const pipes = (
+				stream as unknown as { _readableState?: { pipes?: unknown } }
+			)?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 
 			const memStream = new PassThrough();
@@ -426,18 +463,24 @@ describe("parseMultipart", () => {
 			bbInstance.emit("finish");
 
 			const res = await parsePromise;
+
 			expect(res.files["memClose"]).toBeDefined();
 		});
 
 		it("should reject when fileStream emits an error event in memory mode (lines 270-271)", async () => {
 			const boundary = "----BoundaryMemErrDirect";
-			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const headers = {
+				"content-type": `multipart/form-data; boundary=${boundary}`,
+			};
 			const stream = new PassThrough();
 
-			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+			const parsePromise = parseMultipart(stream, headers, {
+				storage: "memory",
+			});
 
-			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-				?._readableState?.pipes;
+			const pipes = (
+				stream as unknown as { _readableState?: { pipes?: unknown } }
+			)?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 
 			const erroredStream = new PassThrough();
@@ -448,7 +491,10 @@ describe("parseMultipart", () => {
 			});
 
 			process.nextTick(() => {
-				erroredStream.emit("error", new Error("Simulated memory stream failure"));
+				erroredStream.emit(
+					"error",
+					new Error("Simulated memory stream failure"),
+				);
 			});
 
 			await expect(parsePromise).rejects.toThrow(
@@ -458,13 +504,18 @@ describe("parseMultipart", () => {
 
 		it("should reject when fileStream emits limit event in memory mode (lines 230-231)", async () => {
 			const boundary = "----BoundaryMemLimitDirect";
-			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const headers = {
+				"content-type": `multipart/form-data; boundary=${boundary}`,
+			};
 			const stream = new PassThrough();
 
-			const parsePromise = parseMultipart(stream, headers, { storage: "memory" });
+			const parsePromise = parseMultipart(stream, headers, {
+				storage: "memory",
+			});
 
-			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-				?._readableState?.pipes;
+			const pipes = (
+				stream as unknown as { _readableState?: { pipes?: unknown } }
+			)?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 
 			const limitStream = new PassThrough();
@@ -555,13 +606,16 @@ describe("parseMultipart", () => {
 			vi.mocked(fs.createWriteStream).mockReturnValueOnce(dummyWriteStream);
 
 			const boundary = "----BoundaryFailDiskTest";
-			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const headers = {
+				"content-type": `multipart/form-data; boundary=${boundary}`,
+			};
 			const stream = new PassThrough();
 
 			const parsePromise = parseMultipart(stream, headers, { storage: "disk" });
 
-			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-				?._readableState?.pipes;
+			const pipes = (
+				stream as unknown as { _readableState?: { pipes?: unknown } }
+			)?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 
 			const erroredFileStream = new PassThrough();
@@ -572,7 +626,10 @@ describe("parseMultipart", () => {
 			});
 
 			process.nextTick(() => {
-				erroredFileStream.emit("error", new Error("Simulated file read failure"));
+				erroredFileStream.emit(
+					"error",
+					new Error("Simulated file read failure"),
+				);
 			});
 
 			await expect(parsePromise).rejects.toThrow(BadRequestError);
@@ -584,13 +641,16 @@ describe("parseMultipart", () => {
 			vi.mocked(fs.createWriteStream).mockReturnValueOnce(dummyWriteStream);
 
 			const boundary = "----BoundaryDiskClose";
-			const headers = { "content-type": `multipart/form-data; boundary=${boundary}` };
+			const headers = {
+				"content-type": `multipart/form-data; boundary=${boundary}`,
+			};
 			const stream = new PassThrough();
 
 			const parsePromise = parseMultipart(stream, headers, { storage: "disk" });
 
-			const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-				?._readableState?.pipes;
+			const pipes = (
+				stream as unknown as { _readableState?: { pipes?: unknown } }
+			)?._readableState?.pipes;
 			const bbInstance = (Array.isArray(pipes) ? pipes[0] : pipes) as any;
 
 			const diskFileStream = new PassThrough();
@@ -608,6 +668,7 @@ describe("parseMultipart", () => {
 			bbInstance.emit("finish");
 
 			const res = await parsePromise;
+
 			expect(res.files["diskClose"]).toBeDefined();
 		});
 	});
@@ -639,7 +700,9 @@ describe("parseMultipart", () => {
 
 		it("should reject when client request stream emits aborted or error", async () => {
 			const stream = new PassThrough();
-			const headers = { "content-type": "multipart/form-data; boundary=----Aborted" };
+			const headers = {
+				"content-type": "multipart/form-data; boundary=----Aborted",
+			};
 			const promise = parseMultipart(stream, headers, { storage: "memory" });
 
 			stream.emit("aborted");
@@ -648,7 +711,9 @@ describe("parseMultipart", () => {
 			const stream2 = new PassThrough();
 			const promise2 = parseMultipart(stream2, headers, { storage: "memory" });
 			stream2.emit("error", new Error("Socket reset"));
-			await expect(promise2).rejects.toThrow("Request stream error: Socket reset");
+			await expect(promise2).rejects.toThrow(
+				"Request stream error: Socket reset",
+			);
 		});
 
 		it("should reject when busboy reaches partsLimit, filesLimit, or fieldsLimit", async () => {
@@ -657,12 +722,15 @@ describe("parseMultipart", () => {
 				expectedMessage: string,
 			) => {
 				const stream = new PassThrough();
-				const headers = { "content-type": "multipart/form-data; boundary=----Limit" };
+				const headers = {
+					"content-type": "multipart/form-data; boundary=----Limit",
+				};
 				const promise = parseMultipart(stream, headers, { storage: "memory" });
 
 				setTimeout(() => {
-					const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-						?._readableState?.pipes;
+					const pipes = (
+						stream as unknown as { _readableState?: { pipes?: unknown } }
+					)?._readableState?.pipes;
 					const bbInstance = Array.isArray(pipes) ? pipes[0] : pipes;
 					if (bbInstance && typeof bbInstance.emit === "function") {
 						bbInstance.emit(event);
@@ -679,19 +747,24 @@ describe("parseMultipart", () => {
 
 		it("should reject on Busboy general error", async () => {
 			const stream = new PassThrough();
-			const headers = { "content-type": "multipart/form-data; boundary=----Err" };
+			const headers = {
+				"content-type": "multipart/form-data; boundary=----Err",
+			};
 			const promise = parseMultipart(stream, headers, { storage: "memory" });
 
 			setTimeout(() => {
-				const pipes = (stream as unknown as { _readableState?: { pipes?: unknown } })
-					?._readableState?.pipes;
+				const pipes = (
+					stream as unknown as { _readableState?: { pipes?: unknown } }
+				)?._readableState?.pipes;
 				const bbInstance = Array.isArray(pipes) ? pipes[0] : pipes;
 				if (bbInstance && typeof bbInstance.emit === "function") {
 					bbInstance.emit("error", new Error("Malformed boundary header"));
 				}
 			}, 10);
 
-			await expect(promise).rejects.toThrow("Multipart parsing error: Malformed boundary header");
+			await expect(promise).rejects.toThrow(
+				"Multipart parsing error: Malformed boundary header",
+			);
 		});
 	});
 });

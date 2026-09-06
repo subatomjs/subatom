@@ -20,9 +20,12 @@ vi.mock("../../../../../packages/core/subatom/config/env/env.js", () => ({
 	env: { isProd: false },
 }));
 
-vi.mock("../../../../../packages/core/subatom/services/processBoundary.service.js", () => ({
-	registerProcessBoundary: vi.fn(() => vi.fn()),
-}));
+vi.mock(
+	"../../../../../packages/core/subatom/services/processBoundary.service.js",
+	() => ({
+		registerProcessBoundary: vi.fn(() => vi.fn()),
+	}),
+);
 
 describe("Subordinate: Services", () => {
 	describe("pathComposer.service (appendPrefix)", () => {
@@ -32,8 +35,12 @@ describe("Subordinate: Services", () => {
 		});
 
 		it("should throw TypeError when segment is not a string", () => {
-			expect(() => appendPrefix("/api", 123 as unknown as string)).toThrow(TypeError);
-			expect(() => appendPrefix("/api", null as unknown as string)).toThrow(TypeError);
+			expect(() => appendPrefix("/api", 123 as unknown as string)).toThrow(
+				TypeError,
+			);
+			expect(() => appendPrefix("/api", null as unknown as string)).toThrow(
+				TypeError,
+			);
 		});
 	});
 
@@ -71,7 +78,10 @@ describe("Subordinate: Services", () => {
 		it("should throw TypeError if any handler is not a function", () => {
 			const middlewares: MiddlewareHandler[] = [];
 			expect(() =>
-				collectMiddlewares(middlewares, "invalid" as unknown as MiddlewareHandler),
+				collectMiddlewares(
+					middlewares,
+					"invalid" as unknown as MiddlewareHandler,
+				),
 			).toThrow(TypeError);
 
 			expect(() =>
@@ -226,9 +236,9 @@ describe("Subordinate: RouteGroupBuilder Class", () => {
 		const builder = new RouteGroupBuilder(app);
 		expect(builder).toBeInstanceOf(RouteGroupBuilder);
 
-		expect(
-			() => new RouteGroupBuilder(app, 999 as unknown as string),
-		).toThrow(TypeError);
+		expect(() => new RouteGroupBuilder(app, 999 as unknown as string)).toThrow(
+			TypeError,
+		);
 	});
 
 	it("should support fluent chaining for prefix, middleware, tag, and rateLimit", () => {
@@ -245,7 +255,9 @@ describe("Subordinate: RouteGroupBuilder Class", () => {
 	});
 
 	it("should register all HTTP methods (GET, POST, PUT, PATCH, DELETE) with handlers", () => {
-		const registerSpy = vi.spyOn(app, "_registerGroupRoute").mockImplementation(() => {});
+		const registerSpy = vi
+			.spyOn(app, "_registerGroupRoute")
+			.mockImplementation(() => {});
 		const builder = new RouteGroupBuilder(app, "/base");
 		const handler: IHandler = vi.fn();
 
@@ -294,7 +306,9 @@ describe("Subordinate: RouteGroupBuilder Class", () => {
 	});
 
 	it("should accept route options object for HTTP methods", () => {
-		const registerSpy = vi.spyOn(app, "_registerGroupRoute").mockImplementation(() => {});
+		const registerSpy = vi
+			.spyOn(app, "_registerGroupRoute")
+			.mockImplementation(() => {});
 		const builder = new RouteGroupBuilder(app, "/opt");
 		const options: IRouteOptions<IRouteSchema> = { controller: vi.fn() };
 
@@ -329,7 +343,9 @@ describe("Subordinate: RouteGroupBuilder Class", () => {
 
 		it("should throw TypeError when callback is not a function", () => {
 			const builder = new RouteGroupBuilder(app);
-			expect(() => builder.group({} as unknown as () => void)).toThrow(TypeError);
+			expect(() => builder.group({} as unknown as () => void)).toThrow(
+				TypeError,
+			);
 		});
 
 		it("should reject asynchronous group callbacks returning Promises", () => {

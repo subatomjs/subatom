@@ -33,9 +33,9 @@ describe("slug utility", () => {
 	});
 
 	test("truncates to maxLength and removes trailing delimiter", () => {
-		expect(slug("a very long title that should be shortened", { maxLength: 10 })).toBe(
-			"a-very-lon",
-		);
+		expect(
+			slug("a very long title that should be shortened", { maxLength: 10 }),
+		).toBe("a-very-lon");
 		expect(slug("short-slug-text", { maxLength: 6 })).toBe("short");
 	});
 });

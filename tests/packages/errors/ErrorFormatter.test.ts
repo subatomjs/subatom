@@ -281,7 +281,9 @@ describe("ErrorFormatter", () => {
 
 			const html = sendMock.mock.calls[0][0] as string;
 
-			expect(html).toContain("&lt;script&gt;alert(&#039;xss&#039;)&lt;/script&gt;");
+			expect(html).toContain(
+				"&lt;script&gt;alert(&#039;xss&#039;)&lt;/script&gt;",
+			);
 			expect(html).toContain(
 				'<div class="error-title">&lt;script&gt;alert(&#039;xss&#039;)&lt;/script&gt;</div>',
 			);

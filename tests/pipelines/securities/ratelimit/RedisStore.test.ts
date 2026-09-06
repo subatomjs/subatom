@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RedisStore } from "../../../../packages/pipelines/securities/ratelimit/stores/RedisStore.js";
-import type { RedisClientLike, StoreEvalParams } from "../../../../packages/pipelines/securities/ratelimit/types/rateLimit.types.js";
+import type {
+	RedisClientLike,
+	StoreEvalParams,
+} from "../../../../packages/pipelines/securities/ratelimit/types/rateLimit.types.js";
 
 describe("RedisStore", () => {
 	let mockRedisClient: RedisClientLike;
@@ -178,7 +181,9 @@ describe("RedisStore", () => {
 				cooldownMs: 5000,
 			});
 
-			vi.mocked(mockRedisClient.eval).mockRejectedValue(new Error("Redis offline"));
+			vi.mocked(mockRedisClient.eval).mockRejectedValue(
+				new Error("Redis offline"),
+			);
 
 			const p: StoreEvalParams = {
 				key: "circuit-key",
@@ -200,7 +205,9 @@ describe("RedisStore", () => {
 			);
 
 			// In cooldown -> immediate short-circuit without calling eval
-			await expect(store.evaluate(p)).rejects.toThrow("Redis rate-limit circuit is open.");
+			await expect(store.evaluate(p)).rejects.toThrow(
+				"Redis rate-limit circuit is open.",
+			);
 			expect(mockRedisClient.eval).toHaveBeenCalledTimes(2);
 
 			warnSpy.mockRestore();
@@ -228,7 +235,9 @@ describe("RedisStore", () => {
 				now: 1000,
 			};
 
-			await expect(store.evaluate(p)).rejects.toThrow("Redis rate-limit call timed out.");
+			await expect(store.evaluate(p)).rejects.toThrow(
+				"Redis rate-limit call timed out.",
+			);
 		});
 	});
 });

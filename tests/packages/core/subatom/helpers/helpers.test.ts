@@ -21,43 +21,101 @@ describe("Helpers: combinePaths", () => {
 	});
 
 	it("should collapse multiple consecutive slashes and trim whitespace", () => {
-		expect(combinePaths(" ///api/// ", " //v1// ", "items//")).toBe("/api/v1/items");
+		expect(combinePaths(" ///api/// ", " //v1// ", "items//")).toBe(
+			"/api/v1/items",
+		);
 	});
 });
 
 describe("Helpers: parseRateLimitSpec", () => {
 	it("should parse valid specifications across all supported time units", () => {
 		expect(parseRateLimitSpec("10/ms")).toEqual({ limit: 10, windowMs: 1 });
-		expect(parseRateLimitSpec("5/millisecond")).toEqual({ limit: 5, windowMs: 1 });
-		expect(parseRateLimitSpec("1/milliseconds")).toEqual({ limit: 1, windowMs: 1 });
+		expect(parseRateLimitSpec("5/millisecond")).toEqual({
+			limit: 5,
+			windowMs: 1,
+		});
+		expect(parseRateLimitSpec("1/milliseconds")).toEqual({
+			limit: 1,
+			windowMs: 1,
+		});
 
 		expect(parseRateLimitSpec("60/s")).toEqual({ limit: 60, windowMs: 1000 });
 		expect(parseRateLimitSpec("60/sec")).toEqual({ limit: 60, windowMs: 1000 });
-		expect(parseRateLimitSpec("60/secs")).toEqual({ limit: 60, windowMs: 1000 });
-		expect(parseRateLimitSpec("60/second")).toEqual({ limit: 60, windowMs: 1000 });
-		expect(parseRateLimitSpec("60/seconds")).toEqual({ limit: 60, windowMs: 1000 });
+		expect(parseRateLimitSpec("60/secs")).toEqual({
+			limit: 60,
+			windowMs: 1000,
+		});
+		expect(parseRateLimitSpec("60/second")).toEqual({
+			limit: 60,
+			windowMs: 1000,
+		});
+		expect(parseRateLimitSpec("60/seconds")).toEqual({
+			limit: 60,
+			windowMs: 1000,
+		});
 
-		expect(parseRateLimitSpec("100/m")).toEqual({ limit: 100, windowMs: 60000 });
-		expect(parseRateLimitSpec("100/min")).toEqual({ limit: 100, windowMs: 60000 });
-		expect(parseRateLimitSpec("100/mins")).toEqual({ limit: 100, windowMs: 60000 });
-		expect(parseRateLimitSpec("100/minute")).toEqual({ limit: 100, windowMs: 60000 });
-		expect(parseRateLimitSpec("100/minutes")).toEqual({ limit: 100, windowMs: 60000 });
+		expect(parseRateLimitSpec("100/m")).toEqual({
+			limit: 100,
+			windowMs: 60000,
+		});
+		expect(parseRateLimitSpec("100/min")).toEqual({
+			limit: 100,
+			windowMs: 60000,
+		});
+		expect(parseRateLimitSpec("100/mins")).toEqual({
+			limit: 100,
+			windowMs: 60000,
+		});
+		expect(parseRateLimitSpec("100/minute")).toEqual({
+			limit: 100,
+			windowMs: 60000,
+		});
+		expect(parseRateLimitSpec("100/minutes")).toEqual({
+			limit: 100,
+			windowMs: 60000,
+		});
 
-		expect(parseRateLimitSpec("1000/h")).toEqual({ limit: 1000, windowMs: 3600000 });
-		expect(parseRateLimitSpec("1000/hr")).toEqual({ limit: 1000, windowMs: 3600000 });
-		expect(parseRateLimitSpec("1000/hrs")).toEqual({ limit: 1000, windowMs: 3600000 });
-		expect(parseRateLimitSpec("1000/hour")).toEqual({ limit: 1000, windowMs: 3600000 });
-		expect(parseRateLimitSpec("1000/hours")).toEqual({ limit: 1000, windowMs: 3600000 });
+		expect(parseRateLimitSpec("1000/h")).toEqual({
+			limit: 1000,
+			windowMs: 3600000,
+		});
+		expect(parseRateLimitSpec("1000/hr")).toEqual({
+			limit: 1000,
+			windowMs: 3600000,
+		});
+		expect(parseRateLimitSpec("1000/hrs")).toEqual({
+			limit: 1000,
+			windowMs: 3600000,
+		});
+		expect(parseRateLimitSpec("1000/hour")).toEqual({
+			limit: 1000,
+			windowMs: 3600000,
+		});
+		expect(parseRateLimitSpec("1000/hours")).toEqual({
+			limit: 1000,
+			windowMs: 3600000,
+		});
 
-		expect(parseRateLimitSpec("5000/d")).toEqual({ limit: 5000, windowMs: 86400000 });
-		expect(parseRateLimitSpec("5000/day")).toEqual({ limit: 5000, windowMs: 86400000 });
-		expect(parseRateLimitSpec("5000/days")).toEqual({ limit: 5000, windowMs: 86400000 });
+		expect(parseRateLimitSpec("5000/d")).toEqual({
+			limit: 5000,
+			windowMs: 86400000,
+		});
+		expect(parseRateLimitSpec("5000/day")).toEqual({
+			limit: 5000,
+			windowMs: 86400000,
+		});
+		expect(parseRateLimitSpec("5000/days")).toEqual({
+			limit: 5000,
+			windowMs: 86400000,
+		});
 	});
 
 	it("should throw TypeError on invalid input shapes", () => {
 		expect(() => parseRateLimitSpec("")).toThrow(TypeError);
 		expect(() => parseRateLimitSpec("   ")).toThrow(TypeError);
-		expect(() => parseRateLimitSpec(null as unknown as string)).toThrow(TypeError);
+		expect(() => parseRateLimitSpec(null as unknown as string)).toThrow(
+			TypeError,
+		);
 		expect(() => parseRateLimitSpec("invalid")).toThrow(TypeError);
 		expect(() => parseRateLimitSpec("abc/min")).toThrow(TypeError);
 		expect(() => parseRateLimitSpec("0/min")).toThrow(TypeError);
@@ -113,9 +171,18 @@ describe("Helpers: createRateLimitMiddleware", () => {
 
 		middleware(req, res, next);
 		expect(next).toHaveBeenCalledTimes(1);
-		expect(rawResponse.setHeader).toHaveBeenCalledWith("X-RateLimit-Limit", "2");
-		expect(rawResponse.setHeader).toHaveBeenCalledWith("X-RateLimit-Remaining", "1");
-		expect(rawResponse.setHeader).toHaveBeenCalledWith("X-RateLimit-Reset", expect.any(String));
+		expect(rawResponse.setHeader).toHaveBeenCalledWith(
+			"X-RateLimit-Limit",
+			"2",
+		);
+		expect(rawResponse.setHeader).toHaveBeenCalledWith(
+			"X-RateLimit-Remaining",
+			"1",
+		);
+		expect(rawResponse.setHeader).toHaveBeenCalledWith(
+			"X-RateLimit-Reset",
+			expect.any(String),
+		);
 	});
 
 	it("should block requests that exceed limit with 429 status and JSON payload", () => {
@@ -130,7 +197,9 @@ describe("Helpers: createRateLimitMiddleware", () => {
 		const second = createMockResponse();
 		middleware(req, second.res, next);
 		expect(next).toHaveBeenCalledTimes(1);
-		expect(second.rawResponse.writeHead).toHaveBeenCalledWith(429, { "Content-Type": "application/json" });
+		expect(second.rawResponse.writeHead).toHaveBeenCalledWith(429, {
+			"Content-Type": "application/json",
+		});
 		expect(second.rawResponse.end).toHaveBeenCalledWith(
 			expect.stringContaining("Too Many Requests"),
 		);
@@ -167,7 +236,11 @@ describe("Helpers: createRateLimitMiddleware", () => {
 		expect(next).toHaveBeenCalledTimes(257);
 
 		vi.advanceTimersByTime(10);
-		middleware({ ip: "10.0.0.1" } as unknown as IRequest, createMockResponse().res, next);
+		middleware(
+			{ ip: "10.0.0.1" } as unknown as IRequest,
+			createMockResponse().res,
+			next,
+		);
 		expect(next).toHaveBeenCalledTimes(258);
 	});
 

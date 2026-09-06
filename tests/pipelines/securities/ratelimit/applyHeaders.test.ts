@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyHeaders } from "../../../../packages/pipelines/securities/ratelimit/applyHeaders.js";
 import type { IResponse } from "../../../../packages/core/http/response/types/response.types.js";
-import type { HeaderConfig, RateLimitResult } from "../../../../packages/pipelines/securities/ratelimit/types/rateLimit.types.js";
+import type {
+	HeaderConfig,
+	RateLimitResult,
+} from "../../../../packages/pipelines/securities/ratelimit/types/rateLimit.types.js";
 
 describe("applyHeaders", () => {
 	const createMockResponse = (headersSent = false) => {
@@ -38,13 +41,23 @@ describe("applyHeaders", () => {
 
 	it("should set standard RateLimit headers when enabled", () => {
 		const res = createMockResponse();
-		applyHeaders(res, baseMeta, { standard: true, legacy: false, retryAfter: false });
+		applyHeaders(res, baseMeta, {
+			standard: true,
+			legacy: false,
+			retryAfter: false,
+		});
 
 		expect(res.setHeader).toHaveBeenCalledWith("RateLimit-Limit", 100);
 		expect(res.setHeader).toHaveBeenCalledWith("RateLimit-Remaining", 99);
 		expect(res.setHeader).toHaveBeenCalledWith("RateLimit-Reset", 2); // Math.ceil(1500 / 1000)
-		expect(res.setHeader).not.toHaveBeenCalledWith("X-RateLimit-Limit", expect.anything());
-		expect(res.setHeader).not.toHaveBeenCalledWith("Retry-After", expect.anything());
+		expect(res.setHeader).not.toHaveBeenCalledWith(
+			"X-RateLimit-Limit",
+			expect.anything(),
+		);
+		expect(res.setHeader).not.toHaveBeenCalledWith(
+			"Retry-After",
+			expect.anything(),
+		);
 	});
 
 	it("should set legacy X-RateLimit headers with epoch timestamp when enabled", () => {
@@ -52,7 +65,11 @@ describe("applyHeaders", () => {
 		const now = 1700000000000;
 		vi.spyOn(Date, "now").mockReturnValue(now);
 
-		applyHeaders(res, baseMeta, { standard: false, legacy: true, retryAfter: false });
+		applyHeaders(res, baseMeta, {
+			standard: false,
+			legacy: true,
+			retryAfter: false,
+		});
 
 		expect(res.setHeader).toHaveBeenCalledWith("X-RateLimit-Limit", 100);
 		expect(res.setHeader).toHaveBeenCalledWith("X-RateLimit-Remaining", 99);
@@ -65,10 +82,17 @@ describe("applyHeaders", () => {
 	it("should set Retry-After header only when allowed is false and retryAfter config is true", () => {
 		const resAllowed = createMockResponse();
 		applyHeaders(resAllowed, { ...baseMeta, allowed: true }, fullConfig);
-		expect(resAllowed.setHeader).not.toHaveBeenCalledWith("Retry-After", expect.anything());
+		expect(resAllowed.setHeader).not.toHaveBeenCalledWith(
+			"Retry-After",
+			expect.anything(),
+		);
 
 		const resBlocked = createMockResponse();
-		applyHeaders(resBlocked, { ...baseMeta, allowed: false, resetMs: 4200 }, fullConfig);
+		applyHeaders(
+			resBlocked,
+			{ ...baseMeta, allowed: false, resetMs: 4200 },
+			fullConfig,
+		);
 		expect(resBlocked.setHeader).toHaveBeenCalledWith("Retry-After", 5);
 	});
 
@@ -79,6 +103,9 @@ describe("applyHeaders", () => {
 			{ ...baseMeta, allowed: false },
 			{ standard: true, legacy: false, retryAfter: false },
 		);
-		expect(res.setHeader).not.toHaveBeenCalledWith("Retry-After", expect.anything());
+		expect(res.setHeader).not.toHaveBeenCalledWith(
+			"Retry-After",
+			expect.anything(),
+		);
 	});
 });
