@@ -1,6 +1,6 @@
 {
 	"name": "subatom",
-	"version": "2.0.1",
+	"version": "2.0.2",
 	"description": "Subatom is a modern, high-performance, enterprise-grade web framework for Node.js.",
 	"keywords": [
 		"subatom",
