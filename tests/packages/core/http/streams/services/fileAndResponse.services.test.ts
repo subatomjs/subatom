@@ -44,6 +44,12 @@ describe("File & Response Streaming Services", () => {
 			expect(parseRange("items=0-10", fileSize)).toBeNull();
 		});
 
+		it("should throw RangeNotSatisfiableError for multi-range requests", () => {
+			expect(() => parseRange("bytes=0-99,200-299", fileSize)).toThrow(
+				RangeNotSatisfiableError,
+			);
+		});
+
 		it("should throw RangeNotSatisfiableError on invalid syntax or out-of-bounds offsets", () => {
 			expect(() => parseRange("bytes=500-100", fileSize)).toThrow(
 				RangeNotSatisfiableError,
@@ -229,6 +235,22 @@ describe("File & Response Streaming Services", () => {
 			await streamResponse(raw, source);
 
 			expect(raw.statusCode).toBe(304);
+			expect(pipeSpy).toHaveBeenCalled();
+		});
+
+		it("should fallback to 200 when neither options.status nor raw.statusCode are set", async () => {
+			const raw = {
+				headersSent: false,
+				statusCode: undefined,
+				setHeader: vi.fn(),
+			} as unknown as ServerResponse;
+
+			const source = Readable.from(["data"]);
+			pipeSpy.mockClear();
+
+			await streamResponse(raw, source);
+
+			expect(raw.statusCode).toBe(200);
 			expect(pipeSpy).toHaveBeenCalled();
 		});
 

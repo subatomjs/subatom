@@ -82,6 +82,11 @@ describe("Compression Utilities", () => {
 			);
 			expect(normalizeMimeType("")).toBe("");
 		});
+
+		it("should fall back to empty string when split yields no segments", () => {
+			const fakeValue = { split: () => [] } as unknown as string;
+			expect(normalizeMimeType(fakeValue)).toBe("");
+		});
 	});
 
 	describe("getHeaderString", () => {

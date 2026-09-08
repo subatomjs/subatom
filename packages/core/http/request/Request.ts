@@ -119,6 +119,8 @@ export class Request<
 		);
 		this.protocol = protocol as Protocol;
 		this.host = host as Hostname;
+		// Defensive fallback: a host with an empty leading segment also fails URL parsing below.
+		/* v8 ignore next */
 		this.hostname = host.split(":")[0] || "localhost";
 		this.secure = (protocol === "https") as Secure;
 

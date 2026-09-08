@@ -187,6 +187,44 @@ describe("response stream methods", () => {
 		expect(destroySpy).not.toHaveBeenCalled();
 	});
 
+	it("does nothing when the response becomes writableEnded before the catch handler runs", async () => {
+		const { response, state } = createResponse();
+		state.headersSent = true;
+		const destroySpy = vi.spyOn(response, "destroy");
+		vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+		const readable = new Readable({
+			read() {
+				state.writableEnded = true;
+				this.destroy(streamError("late failure"));
+			},
+		});
+
+		await resStream(response, readable);
+
+		// pipeline() itself destroys the destination once on source error;
+		// our own guard must not invoke destroy() a second time.
+		expect(destroySpy).toHaveBeenCalledTimes(1);
+	});
+
+	it("explicitly destroys the response exactly once when it is not yet ended after headers are sent", async () => {
+		const { response, state } = createResponse();
+		state.headersSent = true;
+		const destroySpy = vi.spyOn(response, "destroy");
+		vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+		const readable = new Readable({
+			read() {
+				this.destroy(streamError("still open failure"));
+			},
+		});
+
+		await resStream(response, readable);
+
+		expect(state.writableEnded).toBe(false);
+		expect(destroySpy).toHaveBeenCalledTimes(2);
+	});
+
 	it("returns early for ended responses and normalizes both resEnd callback overloads", () => {
 		const ended = createResponse();
 		ended.state.finished = true;

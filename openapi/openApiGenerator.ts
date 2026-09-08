@@ -411,6 +411,8 @@ function registerSchema(
 	schema: unknown,
 	preferredName: string,
 ): OpenApiSchema {
+	// Defensive guard: current call sites only pass truthy schemas.
+	/* v8 ignore next */
 	if (schema === undefined || schema === null) return {};
 	if (
 		typeof schema === "object" &&

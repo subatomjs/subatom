@@ -218,6 +218,34 @@ describe("Stream Utils", () => {
 			await expect(promise).resolves.toBeUndefined();
 		});
 
+		it("should reject when raw emits an error event directly", async () => {
+			const { raw } = createMockResponse();
+			vi.mocked(raw.write).mockReturnValue(false);
+
+			const promise = writeWithBackpressure(raw, "chunk");
+			raw.emit("error", new Error("socket error"));
+
+			await expect(promise).rejects.toThrow("socket error");
+		});
+
+		it("should ignore a settle triggered after the promise already settled", async () => {
+			const { raw } = createMockResponse();
+			let storedCallback: ((error?: Error) => void) | undefined;
+			vi.mocked(raw.write).mockImplementation((_chunk, cb) => {
+				storedCallback = cb as (error?: Error) => void;
+				return false;
+			});
+
+			const promise = writeWithBackpressure(raw, "chunk");
+			raw.emit("close");
+			await expect(promise).rejects.toThrow(
+				"Response closed before the write completed",
+			);
+
+			// The write callback fires late, after settle already resolved the promise.
+			expect(() => storedCallback?.()).not.toThrow();
+		});
+
 		it("should reject when response closes or aborts prior to completion", async () => {
 			const { raw } = createMockResponse();
 			vi.mocked(raw.write).mockReturnValue(false);

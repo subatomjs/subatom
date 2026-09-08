@@ -220,6 +220,76 @@ describe("createDynamicCompressionMiddleware", () => {
 		expect(res4.endedWith).toEqual(["data"]);
 	});
 
+	it("should invoke the callback overload when chunk and encoding are omitted", () => {
+		const middleware = createDynamicCompressionMiddleware(
+			engineFor({ algorithm: "identity", qValue: 1, acceptable: true }, true),
+		);
+		const res = createResponse();
+		middleware(createRequest("identity"), res, vi.fn());
+		const cb = vi.fn();
+		res.end(undefined, undefined as never, cb);
+		expect(cb).toHaveBeenCalled();
+	});
+
+	it("should invoke the chunk+callback overload when encoding is omitted", () => {
+		const middleware = createDynamicCompressionMiddleware(
+			engineFor({ algorithm: "identity", qValue: 1, acceptable: true }, true),
+		);
+		const res = createResponse();
+		middleware(createRequest("identity"), res, vi.fn());
+		const cb = vi.fn();
+		res.end("payload", undefined as never, cb);
+		expect(res.endedWith).toEqual(["payload"]);
+		expect(cb).toHaveBeenCalled();
+	});
+
+	it("should negotiate identity when accept-encoding header is not a single string value", () => {
+		const engine = engineFor(
+			{ algorithm: "identity", qValue: 1, acceptable: true },
+			true,
+		);
+		const response = createResponse();
+		const req = {
+			method: "GET",
+			headers: { "accept-encoding": ["gzip", "br"] },
+		} as unknown as IncomingMessage;
+
+		createDynamicCompressionMiddleware(engine)(req, response, vi.fn());
+		response.end("data");
+
+		expect(engine.negotiate).toHaveBeenCalledWith(undefined);
+	});
+
+	it("should wrap non-Error throws from the underlying write as Error instances", async () => {
+		const compressor = new PassThrough();
+		const response = createResponse();
+		response.write = (() => {
+			throw "boom";
+		}) as unknown as ResponseFixture["write"];
+		const destroySpy = vi.fn((error?: Error) => {
+			response.destroyed = true;
+			if (error) {
+				expect(error).toBeInstanceOf(Error);
+				expect(error.message).toBe("boom");
+			}
+			return response;
+		});
+		response.destroy = destroySpy as unknown as ResponseFixture["destroy"];
+
+		const middleware = createDynamicCompressionMiddleware(
+			engineFor(
+				{ algorithm: "gzip", qValue: 1, acceptable: true },
+				true,
+				compressor,
+			),
+		);
+		middleware(createRequest("gzip"), response, vi.fn());
+		response.write("chunk");
+
+		await new Promise<void>((resolve) => setImmediate(resolve));
+		expect(destroySpy).toHaveBeenCalled();
+	});
+
 	it("should handle all compressed res.end overloads (fn, callback, chunk+fn, chunk+cb)", () => {
 		const createCompressed = () => {
 			const res = createResponse();
