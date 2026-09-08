@@ -1,0 +1,102 @@
+name: Publish Package to npm
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "package.json"
+  workflow_dispatch:
+
+jobs:
+  evaluate_trigger:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Required to inspect HEAD~1
+
+      - name: Evaluate execution conditions
+        id: decide
+        run: |
+          # Extract current commit values
+          CURR_VERSION=$(node -p "require('./package.json').version || ''")
+          CURR_AMEND=$(node -p "require('./package.json').amendment || ''")
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+
+          # Extract previous commit (HEAD~1) values safely
+          PREV_VERSION=$(git show HEAD~1:package.json 2>/dev/null | node -e "let data=''; process.stdin.on('data', d=>data+=d); process.stdin.on('end', ()=>{ try { console.log(JSON.parse(data).version || '') } catch(e){ console.log('') } })")
+          PREV_AMEND=$(git show HEAD~1:package.json 2>/dev/null | node -e "let data=''; process.stdin.on('data', d=>data+=d); process.stdin.on('end', ()=>{ try { console.log(JSON.parse(data).amendment || '') } catch(e){ console.log('') } })")
+
+          echo "Previous Version: $PREV_VERSION | Current Version: $CURR_VERSION"
+          echo "Previous Amend:   $PREV_AMEND   | Current Amend:   $CURR_AMEND"
+
+          # Check if either version or amendment changed
+          CHANGED=false
+          if [ "$CURR_VERSION" != "$PREV_VERSION" ]; then
+            echo "Condition 1 met: version changed."
+            CHANGED=true
+          elif [ "$CURR_AMEND" != "$PREV_AMEND" ]; then
+            echo "Condition 2 met: amendment changed."
+            CHANGED=true
+          fi
+
+          if [ "$CHANGED" = "true" ]; then
+            # Verify target version does not already exist on npm
+            VERSION_EXISTS=$(npm view "${PACKAGE_NAME}@${CURR_VERSION}" version 2>/dev/null || echo "")
+
+            if [ -z "$VERSION_EXISTS" ]; then
+              echo "Version $CURR_VERSION is not on npm. Triggering publish pipeline."
+              echo "should_run=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            else
+              echo "Version $CURR_VERSION is already published on npm. Skipping."
+            fi
+          else
+            echo "Neither version nor amendment changed in package.json. Skipping."
+          fi
+
+          echo "should_run=false" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: evaluate_trigger
+    if: needs.evaluate_trigger.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit Tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.SUBATOM_NPM_TOKEN }}

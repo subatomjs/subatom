@@ -1,6 +1,7 @@
 {
 	"name": "subatom",
 	"version": "2.0.2",
+	"amendment": "0.0.0",
 	"description": "Subatom is a modern, high-performance, enterprise-grade web framework for Node.js.",
 	"keywords": [
 		"subatom",
@@ -21,12 +22,12 @@
 		"enterprise"
 	],
 	"homepage": "https://github.com/subatomjs/subatom#readme",
-	"bugs": {
-		"url": "https://github.com/subatomjs/subatom/issues"
-	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/subatomjs/subatom.git"
+	},
+	"bugs": {
+		"url": "https://github.com/subatomjs/subatom/issues"
 	},
 	"license": "MIT",
 	"author": "Kunal Chandra Das <kunal@subatomjs.dev>",
@@ -67,7 +68,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"pre:commit": "npm run clean && npm run build && npm run postbuild && npm run lint-fix && npm run test:coverage"
+		"pre:commit": "npm run clean && npm run build && npm run postbuild && npm run lint-fix && npm run test:coverage",
+		"prepare": "husky"
 	},
 	"dependencies": {
 		"@parcel/watcher": "^2.6.0",
