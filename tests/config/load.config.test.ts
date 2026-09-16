@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import fs from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG } from "../../config/helpers/default.config.js";

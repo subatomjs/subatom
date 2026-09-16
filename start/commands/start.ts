@@ -5,7 +5,7 @@
  * @license MIT
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { findAndLoadConfig } from "../../config/helpers/load.config.js";
 import { logger } from "../utils/logger.js";
@@ -18,25 +18,37 @@ interface StartOptions {
 	readonly host?: string;
 }
 
+function tryIsDirectory(p: string): boolean {
+	try {
+		const stat = statSync(p);
+		return stat ? stat.isDirectory() : false;
+	} catch {
+		return false;
+	}
+}
+
 function resolveCompiledEntry(
 	cwd: string,
 	entryFile: string,
 	outDir: string,
 ): string {
-	const relativeToCwd = path.relative(cwd, entryFile);
-	const firstSegment = relativeToCwd.split(path.sep)[0] ?? ".";
-
-	const sourceRoot =
-		path.dirname(relativeToCwd) === "" ? cwd : path.resolve(cwd, firstSegment);
-
-	const relativeEntry = path.relative(sourceRoot, entryFile);
-
+	// Dynamically map user's entry path to the compiled output directory
+	const relativeEntry = path.relative(cwd, entryFile);
 	const compiledRelativeEntry = relativeEntry.replace(
 		/\.(tsx?|mts|cts|jsx?|mjs|cjs)$/,
 		".js",
 	);
 
-	return path.resolve(cwd, outDir, compiledRelativeEntry);
+	let compiledEntry = path.resolve(cwd, outDir, compiledRelativeEntry);
+	if (
+		compiledRelativeEntry === "" ||
+		compiledRelativeEntry === "." ||
+		(existsSync(compiledEntry) && tryIsDirectory(compiledEntry))
+	) {
+		compiledEntry = path.join(compiledEntry, "index.js");
+	}
+
+	return compiledEntry;
 }
 
 function formatServerUrl(host: string, port: number): string {

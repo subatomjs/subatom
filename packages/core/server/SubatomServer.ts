@@ -186,7 +186,13 @@ export class SubatomServer {
 
 		const server = await listenOnPort(this.server, requestedPort, host);
 		this.acceptingRequests = true;
-		console.log(`${appName} is running on http://${host}:${requestedPort}`);
+		const cyan = "\x1b[36m";
+		const bold = "\x1b[1m";
+		const reset = "\x1b[0m";
+
+		console.log(
+			`${bold}${appName} is running on ${cyan}http://${host}:${requestedPort}${reset}`,
+		);
 		return server;
 	}
 

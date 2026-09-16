@@ -44,6 +44,9 @@ describe("runStart", () => {
 
 	it("should resolve entry and use default config port when port is not configured", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => false,
+		} as any);
 		vi.spyOn(resolveUtil, "resolveEntry").mockReturnValue("/app/src/main.ts");
 		vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
 			entry: "src/main.ts",
@@ -54,7 +57,7 @@ describe("runStart", () => {
 
 		expect(spawnUtil.runProcess).toHaveBeenCalledWith(
 			process.execPath,
-			["/app/dist/main.js"],
+			["/app/dist/src/main.js"],
 			expect.objectContaining({
 				env: expect.objectContaining({ PORT: "8080", HOST: "localhost" }),
 			}),
@@ -88,6 +91,9 @@ describe("runStart", () => {
 
 	it("should exit 1 when an invalid port range or non-integer is passed", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => false,
+		} as any);
 
 		await expect(runStart({ port: "70000" })).rejects.toThrow(
 			"process.exit called",
@@ -104,6 +110,9 @@ describe("runStart", () => {
 
 	it("should format host 0.0.0.0, ::, and ::0 to localhost", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => false,
+		} as any);
 		vi.spyOn(portUtil, "resolvePort").mockResolvedValue(3000);
 
 		await runStart({ host: "0.0.0.0", port: "3000" });
@@ -124,6 +133,9 @@ describe("runStart", () => {
 
 	it("should format IPv6 with brackets only when not already bracketed", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => false,
+		} as any);
 		vi.spyOn(portUtil, "resolvePort").mockResolvedValue(9000);
 
 		await runStart({ host: "::1", port: "9000" });
@@ -137,11 +149,14 @@ describe("runStart", () => {
 		);
 	});
 
-	it("should resolve a root-level entry and use the default fallback port", async () => {
+	it("should resolve a root-level entry and fallback to index.js if directory", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
-		vi.spyOn(resolveUtil, "resolveEntry").mockReturnValue("/app/index.ts");
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => true,
+		} as any);
+		vi.spyOn(resolveUtil, "resolveEntry").mockReturnValue("/app");
 		vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
-			entry: "index.ts",
+			entry: "",
 		} as any);
 		vi.spyOn(portUtil, "resolvePort").mockResolvedValue(8080);
 

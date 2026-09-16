@@ -1,5 +1,5 @@
 /**
- * @fileoverview The build.ts file will bundle the app.
+ * @fileoverview The build.ts file will build the application.
  * @author Kunal Chandra Das <kunal@subatomjs.dev>
  * @copyright Copyright (c) 2026 Subatom - (Kunal Chandra Das).
  * @license MIT
@@ -28,20 +28,83 @@ const SOURCE_EXTENSIONS = new Set([
 	".cjs",
 ]);
 
-const STATIC_ASSET_EXTENSIONS = new Set([".json", ".env", ".txt", ".graphql"]);
+const STATIC_ASSET_EXTENSIONS = new Set([".txt", ".graphql"]);
 
+/**
+ * Directories that should never be traversed while collecting
+ * project source files.
+ */
+const IGNORED_DIRECTORIES = new Set([
+	"node_modules",
+	".git",
+	".next",
+	".turbo",
+	"dist",
+	"build",
+	"coverage",
+	"tests",
+	"test",
+]);
+
+/**
+ * Specific filenames or patterns that should be completely ignored
+ * to prevent copying configuration and metadata files into the build output.
+ */
+const IGNORED_FILES = new Set([
+	"tsconfig.json",
+	"jsconfig.json",
+	"package.json",
+	"package-lock.json",
+	"pnpm-lock.yaml",
+	"yarn.lock",
+	".env",
+]);
+
+/**
+ * Checks if a filename matches config patterns like eslint.config.js, tsconfig.json, etc.,
+ * while safely allowing source files and static assets.
+ */
+function isIgnoredFile(filename: string): boolean {
+	const lower = filename.toLowerCase();
+	if (IGNORED_FILES.has(lower)) {
+		return true;
+	}
+	if (
+		lower.startsWith("eslint") ||
+		lower.startsWith("prettier") ||
+		lower.includes("tsconfig") ||
+		lower.includes("jsconfig") ||
+		lower.includes("vitest")
+	) {
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Recursively walks a directory and returns all files inside it.
+ */
 function walk(dir: string, files: string[] = []): string[] {
-	for (const entry of readdirSync(dir)) {
-		const fullPath = path.join(dir, entry);
-		const stat = statSync(fullPath);
+	const entries = readdirSync(dir, {
+		withFileTypes: true,
+	});
 
-		if (stat.isDirectory()) {
-			if (entry === "node_modules" || entry.startsWith(".")) {
+	for (const entry of entries) {
+		const fullPath = path.join(dir, entry.name);
+
+		if (entry.isDirectory()) {
+			if (IGNORED_DIRECTORIES.has(entry.name) || entry.name.startsWith(".")) {
 				continue;
 			}
 
 			walk(fullPath, files);
-		} else {
+			continue;
+		}
+
+		if (entry.isFile()) {
+			if (isIgnoredFile(entry.name)) {
+				continue;
+			}
 			files.push(fullPath);
 		}
 	}
@@ -49,6 +112,9 @@ function walk(dir: string, files: string[] = []): string[] {
 	return files;
 }
 
+/**
+ * Replaces the existing output directory atomically.
+ */
 function atomicReplaceDir(outDir: string, tmpDir: string): void {
 	const hadPrevious = existsSync(outDir);
 	const backupDir = `${outDir}.old-${process.pid}-${Date.now()}`;
@@ -60,14 +126,14 @@ function atomicReplaceDir(outDir: string, tmpDir: string): void {
 	try {
 		renameSync(tmpDir, outDir);
 	} catch (err: unknown) {
-		if (hadPrevious) {
+		if (hadPrevious && !existsSync(outDir) && existsSync(backupDir)) {
 			renameSync(backupDir, outDir);
 		}
 
 		throw err;
 	}
 
-	if (hadPrevious) {
+	if (hadPrevious && existsSync(backupDir)) {
 		rmSync(backupDir, {
 			recursive: true,
 			force: true,
@@ -75,31 +141,84 @@ function atomicReplaceDir(outDir: string, tmpDir: string): void {
 	}
 }
 
+/**
+ * Logs a list of files relative to the project root.
+ */
 function logFiles(files: readonly string[], cwd: string, prefix = "✓"): void {
 	for (const file of files) {
 		console.log(`  ${prefix} ${path.relative(cwd, file)}`);
 	}
 }
 
+/**
+ * Checks whether a file has a supported source extension.
+ */
+function isSourceFile(file: string): boolean {
+	return SOURCE_EXTENSIONS.has(path.extname(file).toLowerCase());
+}
+
+/**
+ * Copies static assets while preserving their directory structure.
+ */
+function copyStaticFiles(
+	files: readonly string[],
+	srcDir: string,
+	tmpDir: string,
+): void {
+	for (const file of files) {
+		const relative = path.relative(srcDir, file);
+		const destination = path.join(tmpDir, relative);
+
+		mkdirSync(path.dirname(destination), {
+			recursive: true,
+		});
+
+		copyFileSync(file, destination);
+	}
+}
+
+/**
+ * Builds the current Subatom application.
+ */
 export async function runBuild(): Promise<void> {
 	const cwd = process.cwd();
+
 	const config = await findAndLoadConfig(cwd);
 	const pkg = readUserPackageJson(cwd);
 
 	let entryFile: string;
+
 	try {
-		entryFile = resolveEntry(config.entry, cwd);
+		entryFile = path.resolve(cwd, resolveEntry(config.entry, cwd));
 	} catch (err: unknown) {
 		logger.error(err instanceof Error ? err.message : String(err));
 		process.exit(1);
 	}
 
-	const relativeEntry = path.relative(cwd, entryFile);
-	const firstSegment = relativeEntry.split(path.sep)[0] ?? ".";
-	const srcDir =
-		path.dirname(relativeEntry) === "" ? cwd : path.resolve(cwd, firstSegment);
+	if (!existsSync(entryFile)) {
+		logger.error(`Entry file not found: ${path.relative(cwd, entryFile)}`);
+		process.exit(1);
+	}
+
+	const entryStat = statSync(entryFile);
+
+	if (!entryStat.isFile()) {
+		logger.error(`Entry path is not a file: ${path.relative(cwd, entryFile)}`);
+		process.exit(1);
+	}
+
+	if (!isSourceFile(entryFile)) {
+		logger.error(
+			`Unsupported entry file type: ${path.relative(cwd, entryFile)}`,
+		);
+		logger.error(`Supported extensions: ${[...SOURCE_EXTENSIONS].join(", ")}`);
+		process.exit(1);
+	}
+
+	const srcDir = path.dirname(entryFile);
 
 	const outDir = path.resolve(cwd, config.outDir ?? "dist");
+
 	const tmpDir = `${outDir}.tmp-${process.pid}-${Date.now()}`;
 
 	if (!existsSync(srcDir)) {
@@ -107,35 +226,39 @@ export async function runBuild(): Promise<void> {
 		process.exit(1);
 	}
 
-	const allFiles = walk(srcDir);
-
-	const sourceFiles = allFiles.filter((file) =>
-		SOURCE_EXTENSIONS.has(path.extname(file).toLowerCase()),
-	);
-
-	const staticFiles = allFiles.filter((file) =>
-		STATIC_ASSET_EXTENSIONS.has(path.extname(file).toLowerCase()),
-	);
-
-	if (sourceFiles.length === 0) {
+	if (!statSync(srcDir).isDirectory()) {
 		logger.error(
-			`No TypeScript/JavaScript source files found in ${path.relative(
-				cwd,
-				srcDir,
-			)}`,
+			`Source path is not a directory: ${path.relative(cwd, srcDir)}`,
 		);
 		process.exit(1);
 	}
 
+	const allFiles = walk(srcDir);
+
+	const sourceFiles = allFiles.filter(isSourceFile);
+	const staticFiles = allFiles.filter((file) => {
+		const ext = path.extname(file).toLowerCase();
+		const basename = path.basename(file).toLowerCase();
+		return STATIC_ASSET_EXTENSIONS.has(ext) || basename === ".env";
+	});
+
+	if (!sourceFiles.includes(entryFile)) {
+		sourceFiles.push(entryFile);
+	}
+
+	const uniqueSourceFiles = [...new Set(sourceFiles)];
+
 	const start = performance.now();
 
 	logger.info(
-		`Building ${sourceFiles.length} source file${
-			sourceFiles.length === 1 ? "" : "s"
+		`Building ${uniqueSourceFiles.length} source file${
+			uniqueSourceFiles.length === 1 ? "" : "s"
 		}...`,
 	);
 
-	logFiles(sourceFiles, cwd);
+	logger.info(`Entry: ${path.relative(cwd, entryFile)}`);
+
+	logFiles(uniqueSourceFiles, cwd);
 
 	if (staticFiles.length > 0) {
 		logger.info(
@@ -147,13 +270,20 @@ export async function runBuild(): Promise<void> {
 		logFiles(staticFiles, cwd);
 	}
 
+	if (existsSync(tmpDir)) {
+		rmSync(tmpDir, {
+			recursive: true,
+			force: true,
+		});
+	}
+
 	mkdirSync(tmpDir, {
 		recursive: true,
 	});
 
 	try {
 		await build({
-			entryPoints: sourceFiles,
+			entryPoints: uniqueSourceFiles,
 			outdir: tmpDir,
 			outbase: srcDir,
 			bundle: false,
@@ -165,15 +295,8 @@ export async function runBuild(): Promise<void> {
 			logLevel: "silent",
 		});
 
-		for (const file of staticFiles) {
-			const relative = path.relative(srcDir, file);
-			const dest = path.join(tmpDir, relative);
-
-			mkdirSync(path.dirname(dest), {
-				recursive: true,
-			});
-
-			copyFileSync(file, dest);
+		if (staticFiles.length > 0) {
+			copyStaticFiles(staticFiles, srcDir, tmpDir);
 		}
 	} catch (err: unknown) {
 		rmSync(tmpDir, {
@@ -182,19 +305,33 @@ export async function runBuild(): Promise<void> {
 		});
 
 		logger.error("Build failed:");
+
 		console.error(err instanceof Error ? err.message : err);
+
 		process.exit(1);
 	}
 
-	logger.info("Swapping in new build...");
+	try {
+		logger.info("Swapping in new build...");
+		atomicReplaceDir(outDir, tmpDir);
+	} catch (err: unknown) {
+		rmSync(tmpDir, {
+			recursive: true,
+			force: true,
+		});
 
-	atomicReplaceDir(outDir, tmpDir);
+		logger.error("Failed to replace production build:");
+
+		console.error(err instanceof Error ? err.message : err);
+
+		process.exit(1);
+	}
 
 	const elapsed = ((performance.now() - start) / 1000).toFixed(2);
 
 	logger.success(
-		`Compiled ${sourceFiles.length} source file${
-			sourceFiles.length === 1 ? "" : "s"
+		`Compiled ${uniqueSourceFiles.length} source file${
+			uniqueSourceFiles.length === 1 ? "" : "s"
 		} successfully.`,
 	);
 

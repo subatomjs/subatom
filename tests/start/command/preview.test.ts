@@ -1,4 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
+/// <reference types="node" />
+
+/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import { runPreview } from "../../../start/commands/preview.js";
@@ -70,6 +73,9 @@ describe("runPreview", () => {
 
 	it("should resolve port and start server with default config and localhost protocol", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => false,
+		} as any);
 		vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
 			entry: "src/server.ts",
 		} as any);
@@ -89,6 +95,9 @@ describe("runPreview", () => {
 
 	it("should use https protocol when host is not localhost", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => false,
+		} as any);
 		vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
 			entry: "src/server.ts",
 			host: "custom.domain",
@@ -103,6 +112,9 @@ describe("runPreview", () => {
 
 	it("should resolve compiled path when entry is configured with outDir", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => false,
+		} as any);
 		vi.spyOn(resolveEntryModule, "resolveEntry").mockReturnValue(
 			"/workspace/src/index.ts",
 		);
@@ -115,25 +127,26 @@ describe("runPreview", () => {
 
 		expect(utils.runProcess).toHaveBeenCalledWith(
 			process.execPath,
-			["/workspace/dist/index.js"],
+			["/workspace/dist/src/index.js"],
 			expect.anything(),
 		);
 	});
 
-	it("should resolve a compiled root-level entry relative to cwd", async () => {
+	it("should resolve a compiled root-level entry relative to cwd and fallback to index.js if directory", async () => {
 		vi.spyOn(fs, "existsSync").mockReturnValue(true);
-		vi.spyOn(resolveEntryModule, "resolveEntry").mockReturnValue(
-			"/workspace/index.ts",
-		);
+		vi.spyOn(fs, "statSync").mockReturnValue({
+			isDirectory: () => true,
+		} as any);
+		vi.spyOn(resolveEntryModule, "resolveEntry").mockReturnValue("/workspace");
 		vi.spyOn(loadConfig, "findAndLoadConfig").mockResolvedValue({
-			entry: "index.ts",
+			entry: "",
 		} as any);
 
 		await runPreview();
 
 		expect(utils.runProcess).toHaveBeenCalledWith(
 			process.execPath,
-			["/workspace/dist"],
+			["/workspace/dist/index.js"],
 			expect.objectContaining({ label: "preview server" }),
 		);
 	});

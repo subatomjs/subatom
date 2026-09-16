@@ -5,7 +5,7 @@
  * @license MIT
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { findAndLoadConfig } from "../../config/helpers/load.config.js";
 import { resolvePort, runProcess, logger } from "../utils/index.js";
@@ -24,19 +24,22 @@ export async function runPreview(): Promise<void> {
 	}
 
 	const outDir = path.resolve(cwd, config.outDir ?? "dist");
-	const relativeToCwd = path.relative(cwd, entryFile);
-	const firstSegment = relativeToCwd.split(path.sep)[0] ?? ".";
 
-	const sourceRoot =
-		path.dirname(relativeToCwd) === "" ? cwd : path.resolve(cwd, firstSegment);
-
-	const relativeEntry = path.relative(sourceRoot, entryFile);
+	// Dynamically compute compiled entry based on user's configured entry file path
+	const relativeEntry = path.relative(cwd, entryFile);
 	const compiledRelativeEntry = relativeEntry.replace(
 		/\.(tsx?|mts|cts|jsx?|mjs|cjs)$/,
 		".js",
 	);
 
-	const compiledEntry = path.resolve(outDir, compiledRelativeEntry);
+	let compiledEntry = path.resolve(outDir, compiledRelativeEntry);
+	if (
+		compiledRelativeEntry === "" ||
+		compiledRelativeEntry === "." ||
+		(existsSync(compiledEntry) && tryIsDirectory(compiledEntry))
+	) {
+		compiledEntry = path.join(compiledEntry, "index.js");
+	}
 
 	if (!existsSync(compiledEntry)) {
 		logger.error(
@@ -64,4 +67,13 @@ export async function runPreview(): Promise<void> {
 			HOST: host,
 		},
 	});
+}
+
+function tryIsDirectory(p: string): boolean {
+	try {
+		const stat = statSync(p);
+		return stat ? stat.isDirectory() : false;
+	} catch {
+		return false;
+	}
 }
