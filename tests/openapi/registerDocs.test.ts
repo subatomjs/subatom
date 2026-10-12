@@ -176,9 +176,7 @@ describe("registerDocs", () => {
 		routeHandlers["/openapi.json"]({}, res);
 
 		const spec = res.json.mock.calls[0][0];
-		expect(
-			spec.paths["/multiple-resume"].get.parameters,
-		).toContainEqual({
+		expect(spec.paths["/multiple-resume"].get.parameters).toContainEqual({
 			name: "ids",
 			in: "query",
 			required: true,
