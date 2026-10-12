@@ -581,6 +581,41 @@ describe("openApiGenerator", () => {
 			});
 		});
 
+		it("should document array query parameters as comma-separated values", () => {
+			const routes: IRoute[] = [
+				{
+					method: "GET",
+					path: "/multiple-resume",
+					schema: {
+						query: {
+							ids: {
+								_type: "array",
+								items: { _type: "string" },
+							},
+						},
+					},
+					handlers: [],
+				} as unknown as IRoute,
+			];
+
+			const spec = generateOpenApiSpec(routes);
+			const idsParameter = spec.paths["/multiple-resume"].get.parameters?.find(
+				(parameter) => parameter.name === "ids",
+			);
+
+			expect(idsParameter).toEqual({
+				name: "ids",
+				in: "query",
+				required: true,
+				style: "form",
+				explode: false,
+				schema: {
+					type: "array",
+					items: { type: "string" },
+				},
+			});
+		});
+
 		it("should expand 'ALL' method to standard OpenAPI methods", () => {
 			const routes: IRoute[] = [
 				{

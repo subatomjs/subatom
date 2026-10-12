@@ -32,7 +32,8 @@ export function extractFileMetadata(handler: unknown): FileMetadata | null {
 		config &&
 		(config.type === "single" ||
 			config.type === "array" ||
-			config.type === "fields")
+			config.type === "fields" ||
+			config.type === "any")
 	) {
 		return config;
 	}

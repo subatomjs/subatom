@@ -145,6 +145,52 @@ describe("registerDocs", () => {
 		);
 	});
 
+	it("should serve the current OpenAPI array-query serialization format", () => {
+		const routeHandlers: Record<string, RouteHandler> = {};
+		const sampleRoutes: IRoute[] = [
+			{
+				method: "GET",
+				path: "/multiple-resume",
+				schema: {
+					query: {
+						ids: {
+							_type: "array",
+							items: { _type: "string" },
+						},
+					},
+				},
+				handlers: [],
+			} as unknown as IRoute,
+		];
+
+		const app: MockApp = {
+			get: vi.fn((path: string, handler: RouteHandler) => {
+				routeHandlers[path] = handler;
+			}),
+			getRoutes: () => sampleRoutes,
+		};
+
+		SubAtomDocs(app as unknown as ISubatom);
+
+		const res = createMockResponse();
+		routeHandlers["/openapi.json"]({}, res);
+
+		const spec = res.json.mock.calls[0][0];
+		expect(
+			spec.paths["/multiple-resume"].get.parameters,
+		).toContainEqual({
+			name: "ids",
+			in: "query",
+			required: true,
+			style: "form",
+			explode: false,
+			schema: {
+				type: "array",
+				items: { type: "string" },
+			},
+		});
+	});
+
 	it("should extract routes from app.router.getRoutes if app.getRoutes is not defined", () => {
 		const routeHandlers: Record<string, RouteHandler> = {};
 		const sampleRoutes: IRoute[] = [

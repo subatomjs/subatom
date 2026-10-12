@@ -130,9 +130,21 @@ export class Request<
 		try {
 			const parsedUrl = new URL(this.url, `${protocol}://${host}`);
 			this.path = parsedUrl.pathname as Path;
-			this.query = Object.fromEntries(
-				parsedUrl.searchParams.entries(),
-			) as Query;
+			const query = new Map<string, string | string[]>();
+
+			for (const [key, value] of parsedUrl.searchParams.entries()) {
+				const existing = query.get(key);
+
+				if (existing === undefined) {
+					query.set(key, value);
+				} else if (Array.isArray(existing)) {
+					existing.push(value);
+				} else {
+					query.set(key, [existing, value]);
+				}
+			}
+
+			this.query = Object.fromEntries(query) as Query;
 		} catch (_urlError: unknown) {
 			throw new BadRequestError("Malformed or invalid HTTP Request URL");
 		}

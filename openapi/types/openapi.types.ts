@@ -29,6 +29,20 @@ export interface OpenApiParameter {
 	in: "path" | "query" | "header" | "cookie";
 	required?: boolean;
 	description?: string;
+	/**
+	 * Serialization style for parameter values, as defined by OpenAPI.
+	 * Query arrays use `form` with `explode: false` so they serialize as
+	 * comma-separated values (for example, `?ids=id1,id2`).
+	 */
+	style?:
+		| "matrix"
+		| "label"
+		| "form"
+		| "simple"
+		| "spaceDelimited"
+		| "pipeDelimited"
+		| "deepObject";
+	explode?: boolean;
 	schema?: OpenApiSchema;
 }
 
@@ -47,6 +61,33 @@ export interface OpenApiResponse {
 	content?: Record<string, OpenApiMediaType>;
 }
 
+export interface DynamicFileReferenceLocation {
+	/**
+	 * Schema path to the FileReference object.
+	 * `*` represents an object/catchall key and `[]` represents an array item.
+	 */
+	path: string[];
+	/** Path to the referenced multipart field name (`...fileId`). */
+	fileIdPath: string[];
+	/** Human-readable field name, for example `certificateContent` or `documents[]`. */
+	label: string;
+	/** True when the FileReference occurs inside an array. */
+	multiple: boolean;
+}
+
+export interface DynamicFileUploadDocumentation {
+	version: 1;
+	/** The multipart field name is the `fileId` value from the request body. */
+	fieldName: {
+		source: "body";
+		property: "fileId";
+		format: "uuid";
+	};
+	/** Locations in the JSON body where file references may occur. */
+	locations: DynamicFileReferenceLocation[];
+	description: string;
+}
+
 export interface OpenApiOperation {
 	summary?: string;
 	description?: string;
@@ -54,6 +95,8 @@ export interface OpenApiOperation {
 	parameters?: OpenApiParameter[];
 	requestBody?: OpenApiRequestBody;
 	responses: Record<string | number, OpenApiResponse>;
+	/** Subatom vendor extension consumed by its Swagger UI integration. */
+	"x-subatom-dynamic-files"?: DynamicFileUploadDocumentation;
 }
 
 export interface OpenApiSchema {
