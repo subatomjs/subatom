@@ -58,15 +58,7 @@ export { random } from "./packages/methods/random.js";
 export { sleep } from "./packages/methods/sleep.js";
 export { slug } from "./packages/methods/slug.js";
 export { uuid } from "./packages/methods/uuid.js";
-export {
-	type TokenPair,
-	type SubatomSignOptions,
-	type SubatomVerifyOptions,
-	type SubatomDecodeOptions,
-	SubatomTokenError,
-	SubatomTokenExpiredError,
-	token,
-} from "./packages/methods/token.js";
+export * from "./packages/methods/token.js";
 
 // Export all types & interfaces.
 export type {
