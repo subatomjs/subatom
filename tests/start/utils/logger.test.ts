@@ -1,6 +1,56 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: explanation */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { logger } from "../../../start/utils/logger.js";
+
+const stripAnsi = (value: unknown): string => {
+	const input = String(value);
+	let output = "";
+	let i = 0;
+
+	while (i < input.length) {
+		if (input.charCodeAt(i) !== 27) {
+			output += input[i];
+			i++;
+			continue;
+		}
+
+		// Skip ANSI escape sequences without using regular expressions.
+		i++;
+
+		if (input[i] === "[") {
+			i++;
+			while (i < input.length) {
+				const code = input.charCodeAt(i);
+				i++;
+				if (code >= 0x40 && code <= 0x7e) break;
+			}
+			continue;
+		}
+
+		if (input[i] === "]") {
+			i++;
+			while (i < input.length) {
+				if (input.charCodeAt(i) === 7) {
+					i++;
+					break;
+				}
+
+				if (input.charCodeAt(i) === 27 && input[i + 1] === "\\") {
+					i += 2;
+					break;
+				}
+
+				i++;
+			}
+		}
+	}
+
+	return output;
+};
+
+const loggedOutput = (
+	calls: readonly (readonly unknown[])[],
+): string[] => calls.map((call) => stripAnsi(call[0]));
+
 
 describe("logger", () => {
 	let logSpy: ReturnType<typeof vi.spyOn>;
@@ -18,36 +68,52 @@ describe("logger", () => {
 	describe("standard log levels", () => {
 		it("should log info messages with and without scope/context", () => {
 			logger.info("Server initialized");
-			expect(logSpy).toHaveBeenCalledWith(
-				expect.stringMatching(/INFO .*SUBATOM.*Server initialized/),
-			);
+			expect(
+				loggedOutput(logSpy.mock.calls).some(
+					(line) =>
+						line.includes("INFO") &&
+						line.includes("SUBATOM") &&
+						line.includes("Server initialized"),
+				),
+			).toBe(true);
 
 			logger.info("Connected", {
 				scope: "BOOT",
 				host: "127.0.0.1",
 				port: 3000,
 			});
-			expect(logSpy).toHaveBeenCalledWith(
-				expect.stringMatching(/\[BOOT\].*Connected.*host=127.0.0.1.*port=3000/),
-			);
+			expect(
+				loggedOutput(logSpy.mock.calls).some(
+					(line) =>
+						line.includes("[BOOT]") &&
+						line.includes("Connected") &&
+						line.includes("host=127.0.0.1") &&
+						line.includes("port=3000"),
+				),
+			).toBe(true);
 		});
 
 		it("should log success, warn, and debug messages", () => {
 			logger.success("Build OK");
-			expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("OK"));
+			expect(loggedOutput(logSpy.mock.calls).some((line) => line.includes("OK"))).toBe(true);
 
 			logger.warn("Deprecated configuration");
-			expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("WARN"));
+			expect(loggedOutput(logSpy.mock.calls).some((line) => line.includes("WARN"))).toBe(true);
 
 			logger.debug("Debugging query parameters");
-			expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("DEBUG"));
+			expect(loggedOutput(logSpy.mock.calls).some((line) => line.includes("DEBUG"))).toBe(true);
 		});
 
 		it("should output error messages to console.error", () => {
 			logger.error("Failed to start service", { scope: "SERVER" });
-			expect(errorSpy).toHaveBeenCalledWith(
-				expect.stringMatching(/ERROR.*\[SERVER\].*Failed to start service/),
-			);
+			expect(
+				loggedOutput(errorSpy.mock.calls).some(
+					(line) =>
+						line.includes("ERROR") &&
+						line.includes("[SERVER]") &&
+						line.includes("Failed to start service"),
+				),
+			).toBe(true);
 			expect(logSpy).not.toHaveBeenCalled();
 		});
 	});
@@ -63,7 +129,7 @@ describe("logger", () => {
 				num: 42,
 			});
 
-			const callArg = logSpy.mock.calls[0][0];
+			const callArg = stripAnsi(logSpy.mock.calls[0][0]);
 			expect(callArg).toContain("err=Connection timed out");
 			expect(callArg).toContain("nullVal=null");
 			expect(callArg).toContain("undefVal=undefined");
@@ -79,7 +145,7 @@ describe("logger", () => {
 				logger.info("Cycle test", { circular });
 			}).not.toThrow();
 
-			const callArg = logSpy.mock.calls[0][0];
+			const callArg = stripAnsi(logSpy.mock.calls[0][0]);
 			expect(callArg).toContain("circular=[object]");
 		});
 
@@ -87,8 +153,8 @@ describe("logger", () => {
 			logger.info("No context", {});
 			logger.info("Only scope", { scope: "CONFIG" });
 
-			expect(logSpy.mock.calls[0][0]).toMatch(/No context$/);
-			expect(logSpy.mock.calls[1][0]).toMatch(/\[CONFIG\] Only scope$/);
+			expect(stripAnsi(logSpy.mock.calls[0][0]).endsWith("No context")).toBe(true);
+			expect(stripAnsi(logSpy.mock.calls[1][0]).endsWith("[CONFIG] Only scope")).toBe(true);
 		});
 	});
 
@@ -110,14 +176,18 @@ describe("logger", () => {
 
 		it("should output shutdown logs", () => {
 			logger.shutdown();
-			expect(logSpy).toHaveBeenCalledWith(
-				expect.stringMatching(/\[SHUTDOWN\].*Server shutting down/),
-			);
+			expect(
+				loggedOutput(logSpy.mock.calls).some(
+					(line) => line.includes("[SHUTDOWN]") && line.includes("Server shutting down"),
+				),
+			).toBe(true);
 
 			logger.shutdown("Custom termination notice");
-			expect(logSpy).toHaveBeenCalledWith(
-				expect.stringMatching(/\[SHUTDOWN\].*Custom termination notice/),
-			);
+			expect(
+				loggedOutput(logSpy.mock.calls).some(
+					(line) => line.includes("[SHUTDOWN]") && line.includes("Custom termination notice"),
+				),
+			).toBe(true);
 		});
 	});
 
@@ -129,7 +199,7 @@ describe("logger", () => {
 				openapi: "http://localhost:3000/openapi.json",
 			});
 
-			const logs = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+			const logs = loggedOutput(logSpy.mock.calls).join("\n");
 			expect(logs).toContain("Documentation");
 			expect(logs).toContain("Swagger UI");
 			expect(logs).toContain("ReDoc");
@@ -156,7 +226,7 @@ describe("logger", () => {
 				},
 			});
 
-			const output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+			const output = loggedOutput(logSpy.mock.calls).join("\n");
 			expect(output).toContain("SubAtom");
 			expect(output).toContain("TypeScript HTTP Framework");
 			expect(output).toContain("Routes registered");
@@ -169,7 +239,7 @@ describe("logger", () => {
 
 		it("should handle omitted routes and missing documentation", () => {
 			logger.startup({ host: "127.0.0.1", port: 5000 });
-			const output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+			const output = loggedOutput(logSpy.mock.calls).join("\n");
 			expect(output).not.toContain("Routes registered");
 			expect(output).not.toContain("Documentation");
 		});
@@ -183,7 +253,7 @@ describe("logger", () => {
 				},
 			});
 
-			let output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+			let output = loggedOutput(logSpy.mock.calls).join("\n");
 			expect(output).toContain("Swagger UI");
 			expect(output).not.toContain("ReDoc");
 			expect(output).not.toContain("OpenAPI");
@@ -198,7 +268,7 @@ describe("logger", () => {
 				},
 			});
 
-			output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+			output = loggedOutput(logSpy.mock.calls).join("\n");
 			expect(output).toContain("ReDoc");
 
 			logSpy.mockClear();
@@ -211,7 +281,7 @@ describe("logger", () => {
 				},
 			});
 
-			output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+			output = loggedOutput(logSpy.mock.calls).join("\n");
 			expect(output).toContain("OpenAPI");
 		});
 
@@ -222,7 +292,7 @@ describe("logger", () => {
 				documentation: {},
 			});
 
-			const output = logSpy.mock.calls.map((c: any) => c[0]).join("\n");
+			const output = loggedOutput(logSpy.mock.calls).join("\n");
 			expect(output).not.toContain("Swagger UI");
 			expect(output).not.toContain("ReDoc");
 			expect(output).not.toContain("OpenAPI");
