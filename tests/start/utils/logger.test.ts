@@ -47,10 +47,8 @@ const stripAnsi = (value: unknown): string => {
 	return output;
 };
 
-const loggedOutput = (
-	calls: readonly (readonly unknown[])[],
-): string[] => calls.map((call) => stripAnsi(call[0]));
-
+const loggedOutput = (calls: readonly (readonly unknown[])[]): string[] =>
+	calls.map((call) => stripAnsi(call[0]));
 
 describe("logger", () => {
 	let logSpy: ReturnType<typeof vi.spyOn>;
@@ -95,13 +93,19 @@ describe("logger", () => {
 
 		it("should log success, warn, and debug messages", () => {
 			logger.success("Build OK");
-			expect(loggedOutput(logSpy.mock.calls).some((line) => line.includes("OK"))).toBe(true);
+			expect(
+				loggedOutput(logSpy.mock.calls).some((line) => line.includes("OK")),
+			).toBe(true);
 
 			logger.warn("Deprecated configuration");
-			expect(loggedOutput(logSpy.mock.calls).some((line) => line.includes("WARN"))).toBe(true);
+			expect(
+				loggedOutput(logSpy.mock.calls).some((line) => line.includes("WARN")),
+			).toBe(true);
 
 			logger.debug("Debugging query parameters");
-			expect(loggedOutput(logSpy.mock.calls).some((line) => line.includes("DEBUG"))).toBe(true);
+			expect(
+				loggedOutput(logSpy.mock.calls).some((line) => line.includes("DEBUG")),
+			).toBe(true);
 		});
 
 		it("should output error messages to console.error", () => {
@@ -153,8 +157,12 @@ describe("logger", () => {
 			logger.info("No context", {});
 			logger.info("Only scope", { scope: "CONFIG" });
 
-			expect(stripAnsi(logSpy.mock.calls[0][0]).endsWith("No context")).toBe(true);
-			expect(stripAnsi(logSpy.mock.calls[1][0]).endsWith("[CONFIG] Only scope")).toBe(true);
+			expect(stripAnsi(logSpy.mock.calls[0][0]).endsWith("No context")).toBe(
+				true,
+			);
+			expect(
+				stripAnsi(logSpy.mock.calls[1][0]).endsWith("[CONFIG] Only scope"),
+			).toBe(true);
 		});
 	});
 
@@ -178,14 +186,18 @@ describe("logger", () => {
 			logger.shutdown();
 			expect(
 				loggedOutput(logSpy.mock.calls).some(
-					(line) => line.includes("[SHUTDOWN]") && line.includes("Server shutting down"),
+					(line) =>
+						line.includes("[SHUTDOWN]") &&
+						line.includes("Server shutting down"),
 				),
 			).toBe(true);
 
 			logger.shutdown("Custom termination notice");
 			expect(
 				loggedOutput(logSpy.mock.calls).some(
-					(line) => line.includes("[SHUTDOWN]") && line.includes("Custom termination notice"),
+					(line) =>
+						line.includes("[SHUTDOWN]") &&
+						line.includes("Custom termination notice"),
 				),
 			).toBe(true);
 		});

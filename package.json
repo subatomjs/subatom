@@ -1,7 +1,7 @@
 {
 	"name": "subatom",
 	"version": "2.0.3",
-	"amendment": "0.0.3",
+	"amendment": "0.0.4",
 	"description": "Subatom is a modern, high-performance, enterprise-grade web framework for Node.js.",
 	"keywords": [
 		"subatom",
@@ -68,7 +68,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"pre:commit": "npm run clean && npm run build && npm run postbuild && npm run lint-fix && npm run test:coverage",
+		"pre:commit": "npm run clean && rm -rf coverage && npm run build && npm run postbuild && npm run lint-fix && npm run test:coverage",
 		"prepare": "husky"
 	},
 	"dependencies": {
